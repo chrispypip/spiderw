@@ -1,0 +1,47 @@
+---
+# golangci-lint configuration for spiderw.
+#
+# Schema is golangci-lint v2. The dev container installs golangci-lint via
+# `@latest` (currently a v2 release) and CI pins the same major version, so this
+# file is the single source of truth for both `make lint` and the CI lint job.
+version: "2"
+
+run:
+  # All build tags used by the test suites, so test files behind
+  # `//go:build <tag>` constraints are also analyzed.
+  build-tags:
+    - unit
+    - race
+    - stress
+    - bench
+    - integration
+    - regression
+
+linters:
+  # `standard` enables errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - errorlint   # correct error wrapping / comparison (errors.Is/As, %w)
+    - misspell    # commonly misspelled English in comments and strings
+    - unconvert   # unnecessary type conversions
+  settings:
+    errcheck:
+      # Writes to CLI output streams: a failed stdout/stderr write is not
+      # actionable, and checking every Fprint call adds noise without value.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+  exclusions:
+    rules:
+      # Deferred Close() in tests and benchmarks: the result is not meaningful
+      # to a test teardown path.
+      - linters:
+          - errcheck
+        path: _test\.go
+        text: "Error return value of `.*\\.Close` is not checked"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

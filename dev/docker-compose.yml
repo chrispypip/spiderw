@@ -1,0 +1,36 @@
+---
+services:
+  spiderw-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+
+    # Enable mac80211_hwsim style tests (optional)
+    devices:
+      - /dev/net/tun
+
+    # Persist Go caches so builds/tests are fast
+    volumes:
+      - ../:/workspace:cached
+      - spiderw-go-build-cache:/home/dev/.cache/go-build
+      - spiderw-go-mod-cache:/home/dev/go/pkg/mod
+
+    working_dir: /workspace
+
+    # Keep the container running so you can exec into it
+    tty: true
+    stdin_open: true
+
+    # Use a dedicated user namespace to avoid needing --privileged
+    security_opt:
+      - no-new-privileges:true
+
+    user: dev
+    init: true
+    restart: unless-stopped
+    command: ["bash"]
+
+
+volumes:
+  spiderw-go-build-cache:
+  spiderw-go-mod-cache:

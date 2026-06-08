@@ -1,0 +1,103 @@
+---
+name: Bug report
+description: Report a reproducible problem in spiderw.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please search existing
+        issues first to avoid duplicates.
+
+        If this is a security issue, do not file a public issue. Use the
+        repository security policy instead.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+      placeholder: Describe the bug clearly and concisely.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description:
+        Provide the smallest set of steps, code, or commands that
+        reproduces the issue.
+      placeholder: |
+        1. Run `...`
+        2. Observe `...`
+    validations:
+      required: true
+
+  - type: dropdown
+    id: affected-area
+    attributes:
+      label: Affected area
+      multiple: true
+      options:
+        - Public Go API
+        - CLI
+        - internal/core
+        - internal/iwdbus
+        - internal/connect
+        - iwd mock service
+        - Tests
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: spiderw version or commit
+      description: Include a tag, commit hash, branch, or `main` if applicable.
+      placeholder: main / v0.1.0 / commit SHA
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include details that may affect D-Bus or iwd behavior.
+      placeholder: |
+        - OS/distribution:
+        - Go version:
+        - iwd version:
+        - D-Bus implementation/version:
+        - Running against real iwd or iwdmock:
+        - System bus or session bus:
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      description:
+        Paste relevant command output, logs, panic traces, or test failures.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues first.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

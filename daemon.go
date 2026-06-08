@@ -1,0 +1,120 @@
+package spiderw
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/chrispypip/spiderw/internal/core"
+	"github.com/chrispypip/spiderw/internal/logging"
+)
+
+// AdapterRef is a lightweight reference to an adapter discovered by the iwd
+// daemon.
+type AdapterRef struct {
+	// Path is the canonical D-Bus object path for the adapter.
+	Path string
+
+	// Name is the adapter's human-friendly Name property.
+	Name string
+}
+
+// DaemonInfo is the public API view of the iwd daemon metadata.
+//
+// This intentionally mirrors core.DaemonInfo but is separate to avoid leaking
+// internal types into the API surface. Future evolution of the internal/core
+// types will not affect public clients.
+type DaemonInfo struct {
+	// Version is the iwd daemon version string.
+	Version string
+
+	// StateDirectory is the daemon's persistent state directory.
+	StateDirectory string
+
+	// NetworkConfigurationEnabled reports whether iwd manages network configuration.
+	NetworkConfigurationEnabled bool
+}
+
+// String returns a human-readable multiline representation of the daemon info.
+func (d *DaemonInfo) String() string {
+	if d == nil {
+		return "<nil>"
+	}
+
+	return fmt.Sprintf(
+		"Version: %s\nStateDirectory: %s\nNetworkConfigurationEnabled: %t",
+		d.Version,
+		d.StateDirectory,
+		d.NetworkConfigurationEnabled,
+	)
+}
+
+// Daemon provides high-level operations for the singleton iwd daemon object.
+type Daemon struct {
+	core core.DaemonIface
+}
+
+func newDaemon(c core.DaemonIface) *Daemon {
+	if c == nil {
+		return nil
+	}
+	return &Daemon{core: c}
+}
+
+func (d *Daemon) coreDaemon(ctx context.Context, op string) (core.DaemonIface, error) {
+	if d == nil || d.core == nil {
+		logging.FromContext(ctx).Error(ctx, "daemon wrapper uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+	return d.core, nil
+}
+
+// Info returns the daemon metadata reported by iwd.
+func (d *Daemon) Info(ctx context.Context) (*DaemonInfo, error) {
+	return delegate(ctx, "Daemon.Info", d.coreDaemon, func(ctx context.Context, c core.DaemonIface) (*DaemonInfo, error) {
+		ci, err := c.Info(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &DaemonInfo{
+			Version:                     ci.Version,
+			StateDirectory:              ci.StateDirectory,
+			NetworkConfigurationEnabled: ci.NetworkConfigurationEnabled,
+		}, nil
+	})
+}
+
+// Version returns the iwd daemon version.
+func (d *Daemon) Version(ctx context.Context) (string, error) {
+	return delegate(ctx, "Daemon.Version", d.coreDaemon, func(ctx context.Context, c core.DaemonIface) (string, error) {
+		return c.Version(ctx)
+	})
+}
+
+// StateDirectory returns the daemon's persistent state directory.
+func (d *Daemon) StateDirectory(ctx context.Context) (string, error) {
+	return delegate(ctx, "Daemon.StateDirectory", d.coreDaemon, func(ctx context.Context, c core.DaemonIface) (string, error) {
+		return c.StateDirectory(ctx)
+	})
+}
+
+// NetworkConfigurationEnabled reports whether iwd manages network configuration.
+func (d *Daemon) NetworkConfigurationEnabled(ctx context.Context) (bool, error) {
+	return delegate(ctx, "Daemon.NetworkConfigurationEnabled", d.coreDaemon, func(ctx context.Context, c core.DaemonIface) (bool, error) {
+		return c.NetworkConfigurationEnabled(ctx)
+	})
+}
+
+// Adapters returns lightweight references to the adapters currently exposed by iwd.
+func (d *Daemon) Adapters(ctx context.Context) ([]AdapterRef, error) {
+	return delegate(ctx, "Daemon.Adapters", d.coreDaemon, func(ctx context.Context, c core.DaemonIface) ([]AdapterRef, error) {
+		refs, err := c.Adapters(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]AdapterRef, 0, len(refs))
+		for _, r := range refs {
+			out = append(out, AdapterRef{Path: r.Path, Name: r.Name})
+		}
+		return out, nil
+	})
+}

@@ -1,0 +1,125 @@
+package connect
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+
+	"github.com/godbus/dbus/v5"
+
+	"github.com/chrispypip/spiderw/internal/core"
+	"github.com/chrispypip/spiderw/internal/iwdbus"
+)
+
+var (
+	connectSystemBusFn  = dbus.ConnectSystemBus
+	connectSessionBusFn = dbus.ConnectSessionBus
+	newIwdDaemonFn      = iwdbus.NewDaemon
+	newIwdAdapterFn     = iwdbus.NewAdapter
+	newCoreDaemonFn     = func(raw *iwdbus.Daemon) *core.Daemon { return core.NewDaemon(raw) }
+	newCoreAdapterFn    = func(raw *iwdbus.Adapter) *core.Adapter { return core.NewAdapter(raw) }
+	closeConnFn         = func(c *dbus.Conn) error { return c.Close() }
+)
+
+func newConn(ctx context.Context, system bool) (*Wiring, error) {
+	const op = "Wiring.newConn"
+
+	var conn *dbus.Conn
+	var err error
+
+	if system {
+		conn, err = connectSystemBusFn()
+	} else {
+		conn, err = connectSessionBusFn()
+	}
+	if err != nil {
+		return nil, core.WrapDaemonUnavailable("Wiring.newConn", "failed to connect to bus", err)
+	}
+
+	var cleanupOnce sync.Once
+	var cleanupErr error
+	cleanup := func() error {
+		cleanupOnce.Do(func() {
+			cleanupErr = closeConnFn(conn)
+		})
+		return cleanupErr
+	}
+
+	iwdDaemon, err := newIwdDaemonFn(ctx, conn)
+	if err != nil {
+		if err2 := cleanup(); err2 != nil {
+			return nil, errors.Join(err, core.WrapDaemonUnavailable(op, "failed iwd daemon cleanup", err2))
+		}
+		return nil, core.WrapDaemonUnavailable(op, "failed to get iwd daemon", err)
+	}
+	if iwdDaemon == nil {
+		if err := cleanup(); err != nil {
+			return nil, errors.Join(err, core.WrapDaemonUnavailable(op, "failed iwd daemon cleanup", err))
+		}
+		return nil, core.WrapDaemonUnavailable(op, "failed to get iwd daemon", fmt.Errorf("iwd daemon interface not available"))
+	}
+	coreDaemon := newCoreDaemonFn(iwdDaemon)
+	if coreDaemon == nil {
+		if err := cleanup(); err != nil {
+			return nil, errors.Join(err, core.WrapDaemonUnavailable("NewDaemon", "daemon unavailable", fmt.Errorf("failed core daemon cleanup")))
+		}
+		return nil, core.WrapDaemonUnavailable(op, "daemon unavailable", fmt.Errorf("core daemon interface not available"))
+	}
+
+	return &Wiring{
+		Conn:    conn,
+		Daemon:  coreDaemon,
+		Cleanup: cleanup,
+	}, nil
+}
+
+// Wiring bundles the constructed D-Bus connection and core objects for the public layer.
+type Wiring struct {
+	// Conn is the owned D-Bus connection used to construct iwd objects.
+	Conn *dbus.Conn
+
+	// Daemon is the core-layer daemon wrapper built from Conn.
+	Daemon core.DaemonIface
+
+	// Cleanup releases resources owned by this Wiring.
+	Cleanup func() error
+
+	// AdapterFactory optionally overrides adapter construction for tests.
+	AdapterFactory func(ctx context.Context, path string) (core.AdapterIface, error)
+}
+
+// NewAdapter constructs a core adapter wrapper for the given iwd object path.
+func (w *Wiring) NewAdapter(ctx context.Context, path string) (core.AdapterIface, error) {
+	const op = "NewAdapter"
+
+	if w == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "wiring cannot be nil", core.ErrCore)
+	}
+	if path == "" {
+		return nil, core.WrapInvalidArgument(core.ResourceAdapter, op, "adapter path cannot be empty", core.ErrCore)
+	}
+	if path[0] != '/' {
+		return nil, core.WrapInvalidArgument(core.ResourceAdapter, op, "adapter path must be absolute", core.ErrCore)
+	}
+	if w.AdapterFactory != nil {
+		return w.AdapterFactory(ctx, path)
+	}
+	if w.Conn == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "D-Bus conn cannot be nil", core.ErrCore)
+	}
+
+	iwdAdapter, err := newIwdAdapterFn(ctx, w.Conn, dbus.ObjectPath(path))
+	if err != nil {
+		return nil, core.WrapAdapterUnavailable("NewAdapter", "adapter unavailable", err)
+	}
+	if iwdAdapter == nil {
+		return nil, core.WrapAdapterUnavailable("NewAdapter", "adapter unavailable", iwdbus.WrapIntrospection(path, fmt.Errorf("iwd adapter interface not available")))
+	}
+
+	coreAdapter := newCoreAdapterFn(iwdAdapter)
+	if coreAdapter == nil {
+		return nil, core.WrapAdapterUnavailable("NewAdapter", "adapter unavailable", fmt.Errorf("core adapter interface not available"))
+	}
+	return coreAdapter, nil
+}

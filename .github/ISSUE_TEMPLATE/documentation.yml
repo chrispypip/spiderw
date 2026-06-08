@@ -1,0 +1,40 @@
+---
+name: Documentation issue
+description: Report missing, unclear, or inaccurate documentation.
+title: "docs: "
+labels:
+  - documentation
+body:
+  - type: textarea
+    id: location
+    attributes:
+      label: Documentation location
+      description:
+        Which file, section, GoDoc symbol, or command output needs attention?
+      placeholder:
+        README.md, TESTING.md, Adapter.SupportsMode, `spiderw adapter --help`,
+        etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is missing, confusing, stale, or incorrect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested improvement
+      description: If you have suggested wording, include it here.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues first.
+          required: true

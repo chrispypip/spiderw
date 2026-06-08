@@ -1,0 +1,107 @@
+---
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Pin the toolchain to match the dev container (dev/Dockerfile.dev) and the
+# golangci-lint version available locally, so CI is reproducible.
+env:
+  GO_VERSION: "1.22.5"
+  GOLANGCI_LINT_VERSION: "v2.11.4"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build + vet gate. Fast failure before the heavier test jobs run.
+  # ---------------------------------------------------------------------------
+  build:
+    name: build & vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - run: go build ./...
+      - run: go vet ./...
+
+  # ---------------------------------------------------------------------------
+  # Lint + formatting. golangci-lint v2 also runs the configured formatters
+  # (gofmt, goimports), so this job covers both linting and format checking.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+
+  # ---------------------------------------------------------------------------
+  # Native test suites that do NOT require D-Bus. One matrix leg per build tag
+  # so each suite reports independently. (The `race` tag is intentionally not
+  # here: internal/connect/race_test.go drives the iwd mock over a session bus,
+  # so the race suite runs in the D-Bus job below.)
+  # ---------------------------------------------------------------------------
+  test:
+    name: test (${{ matrix.suite.name }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - name: unit
+            cmd: go test -tags=unit ./...
+          - name: stress
+            cmd: go test -tags=stress -timeout=1m ./...
+          - name: regression
+            cmd: go test -tags=regression ./...
+          - name: bench
+            cmd: go test -tags=bench -bench=. -benchmem -benchtime=1x
+                 -run='^$' ./...
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: ${{ matrix.suite.name }}
+        run: ${{ matrix.suite.cmd }}
+
+  # ---------------------------------------------------------------------------
+  # Suites that require a session bus: the integration suite (pure-Go iwd mock)
+  # and the race suite (internal/connect drives the mock under concurrency).
+  # Running race over ./... here still covers the non-D-Bus packages too.
+  #
+  # The mock harness builds the mock by import path and embeds its introspection
+  # XML, so these run from the default checkout with no special layout.
+  # ---------------------------------------------------------------------------
+  dbus:
+    name: dbus tests (race + integration)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install D-Bus
+        run: sudo apt-get update && sudo apt-get install -y dbus
+      - name: Race suite under a session bus
+        run: dbus-run-session -- go test -race -tags=race ./...
+      - name: Integration suite under a session bus
+        run: dbus-run-session -- go test -tags=integration ./...

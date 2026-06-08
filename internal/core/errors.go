@@ -1,0 +1,206 @@
+package core
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/chrispypip/spiderw/internal/failure"
+	"github.com/chrispypip/spiderw/internal/iwdbus"
+)
+
+// -----------------------------------------------------------------------------
+// Error kinds
+// -----------------------------------------------------------------------------
+//
+// These represent semantic, high-level categories of failure that callers
+// will care about. They are intentionally stable.
+//
+// Example kinds:
+//   - "unavailable"
+//   - "invalid state"
+//   - "operation failed"
+//
+// These are used instead of raw D-Bus error names, because spiderw's semantics
+// are defined here.
+//
+
+// Kind identifies a stable internal core error category.
+type Kind = failure.Kind
+
+// Kind constants classify core-layer failures.
+const (
+	// KindUnavailable indicates that a resource or subsystem could not be
+	// reached or did not expose the expected API.
+	KindUnavailable = failure.KindUnavailable
+
+	// KindInvalidState indicates that core observed invalid state.
+	KindInvalidState = failure.KindInvalidState
+
+	// KindInvalidArgument indicates that a caller supplied an invalid argument.
+	KindInvalidArgument = failure.KindInvalidArgument
+
+	// KindOperationFailed indicates an internal operation failed but should map
+	// to a public internal error.
+	KindOperationFailed = failure.KindOperationFailed
+)
+
+// Resource identifies which core resource a failure applies to.
+type Resource = failure.Resource
+
+// Resource constants classify failures by target object/subsystem.
+const (
+	// ResourceUnknown indicates that no specific resource is known.
+	ResourceUnknown = failure.ResourceUnknown
+
+	// ResourceClient identifies client-level failures.
+	ResourceClient = failure.ResourceClient
+
+	// ResourceDaemon identifies failures involving the iwd daemon object.
+	ResourceDaemon = failure.ResourceDaemon
+
+	// ResourceAdapter identifies failures involving an iwd adapter object.
+	ResourceAdapter = failure.ResourceAdapter
+
+	// ResourceDevice identifies failures involving an iwd device object.
+	ResourceDevice = failure.ResourceDevice
+
+	// ResourceStation identifies failures involving an iwd station object.
+	ResourceStation = failure.ResourceStation
+
+	// ResourceNetwork identifies failures involving an iwd network object.
+	ResourceNetwork = failure.ResourceNetwork
+)
+
+// Error sentinels support errors.Is checks in core-layer errors.
+var (
+	// ErrCore marks structured errors produced by the core layer.
+	ErrCore = errors.New("core error")
+
+	// ErrDaemonNotInitialized indicates that a Daemon wrapper has no raw
+	// backend.
+	ErrDaemonNotInitialized = errors.New("daemon not initialized")
+
+	// ErrAdapterNotInitialized indicates that an Adapter wrapper has no raw
+	// backend.
+	ErrAdapterNotInitialized = errors.New("adapter not initialized")
+)
+
+func newError(kind Kind, resource Resource, op, details string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return &Error{
+		Kind:     kind,
+		Resource: resource,
+		Op:       op,
+		Details:  details,
+		Err:      err,
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Structured core error type
+// -----------------------------------------------------------------------------
+//
+// This is the main error type used inside internal/core.
+//
+// It wraps:
+//   - Op: the semantic operation ("Scan", "Connect", "InitAdapter")
+//   - Kind: the category of failure (see above)
+//   - Details: optional human-friendly explanatory text
+//   - Err: the wrapped underlying error (D-Bus or other)
+//
+// This allows excellent traceability while still giving callers a clean,
+// semantic, machine-readable error surface.
+//
+
+// Error is the structured error type used inside internal/core.
+type Error struct {
+	Kind     Kind     // category of failure
+	Resource Resource // resource or subsystem involved, when known
+	Op       string   // semantic operation
+	Details  string   // optional additional info
+	Err      error    // wrapped underlying error
+}
+
+// Error returns a human-readable core error string.
+func (e *Error) Error() string {
+	label := errorLabel(e.Kind, e.Resource)
+	if e.Details != "" {
+		return fmt.Sprintf("%s: Op=%s: %v (%s)", label, e.Op, e.Err, e.Details)
+	}
+	return fmt.Sprintf("%s: Op=%s: %v", label, e.Op, e.Err)
+}
+
+// Unwrap returns the sentinel and underlying errors for errors.Is and errors.As.
+func (e *Error) Unwrap() error {
+	return errors.Join(ErrCore, e.Err)
+}
+
+type unavailablePolicy struct {
+	resource            Resource
+	includeDBusProperty bool
+}
+
+var (
+	daemonUnavailablePolicy  = unavailablePolicy{resource: ResourceDaemon}
+	adapterUnavailablePolicy = unavailablePolicy{resource: ResourceAdapter, includeDBusProperty: true}
+	networkUnavailablePolicy = unavailablePolicy{resource: ResourceNetwork}
+)
+
+func wrapUnavailable(op, details string, err error, policy unavailablePolicy) error {
+	if err == nil {
+		return nil
+	}
+	if isUnavailableDBusError(err, policy.includeDBusProperty) {
+		return newError(KindUnavailable, policy.resource, op, details, err)
+	}
+	return newError(KindOperationFailed, policy.resource, op, details, err)
+}
+
+func isUnavailableDBusError(err error, includeProperty bool) bool {
+	if errors.Is(err, iwdbus.ErrDBusConnection) ||
+		errors.Is(err, iwdbus.ErrDBusMethod) ||
+		errors.Is(err, iwdbus.ErrDBusIntrospection) ||
+		errors.Is(err, iwdbus.ErrDBusVariant) {
+		return true
+	}
+	return includeProperty && errors.Is(err, iwdbus.ErrDBusProperty)
+}
+
+// WrapDaemonUnavailable classifies D-Bus daemon failures by kind and resource.
+func WrapDaemonUnavailable(op, details string, err error) error {
+	return wrapUnavailable(op, details, err, daemonUnavailablePolicy)
+}
+
+// WrapAdapterUnavailable classifies D-Bus adapter failures by kind and resource.
+func WrapAdapterUnavailable(op, details string, err error) error {
+	return wrapUnavailable(op, details, err, adapterUnavailablePolicy)
+}
+
+// WrapNetworkUnavailable classifies D-Bus network failures by kind and resource.
+func WrapNetworkUnavailable(op, details string, err error) error {
+	return wrapUnavailable(op, details, err, networkUnavailablePolicy)
+}
+
+// WrapInvalidState wraps invalid state issues for resource.
+func WrapInvalidState(resource Resource, op, details string, err error) error {
+	return newError(KindInvalidState, resource, op, details, err)
+}
+
+// WrapInvalidArgument wraps invalid argument issues for resource.
+func WrapInvalidArgument(resource Resource, op, details string, err error) error {
+	return newError(KindInvalidArgument, resource, op, details, err)
+}
+
+// WrapOperationFailed wraps generic non-D-Bus failures for resource.
+func WrapOperationFailed(resource Resource, op, details string, err error) error {
+	return newError(KindOperationFailed, resource, op, details, err)
+}
+
+func errorLabel(kind Kind, resource Resource) string {
+	if resource == ResourceUnknown {
+		return string(kind)
+	}
+	return fmt.Sprintf("%s %s", resource, kind)
+}

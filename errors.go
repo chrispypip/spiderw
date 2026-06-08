@@ -1,0 +1,200 @@
+package spiderw
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/chrispypip/spiderw/internal/core"
+	"github.com/chrispypip/spiderw/internal/failure"
+)
+
+// -----------------------------------------------------------------------------
+// Public-facing error kinds
+// -----------------------------------------------------------------------------
+//
+// These are semantic categories stable across versions of spiderw.
+// External callers should rely on these for handling structured errors.
+//
+
+// Kind identifies a stable public spiderw error category.
+type Kind string
+
+// Kind constants are stable public error categories.
+const (
+	// KindUnavailable indicates that the requested resource or subsystem could
+	// not be reached or did not expose the expected API.
+	KindUnavailable Kind = Kind(failure.KindUnavailable)
+
+	// KindInvalidState indicates that spiderw observed an invalid or
+	// inconsistent state from iwd or its own wrappers.
+	KindInvalidState Kind = Kind(failure.KindInvalidState)
+
+	// KindInvalidArgument indicates that a caller supplied an invalid argument
+	// to the public API.
+	KindInvalidArgument Kind = Kind(failure.KindInvalidArgument)
+
+	// KindInternal indicates an uncategorized internal spiderw failure.
+	KindInternal Kind = Kind(failure.KindInternal)
+)
+
+// Resource identifies which public spiderw object or subsystem an error applies to.
+type Resource string
+
+// Resource constants classify public errors by target object/subsystem.
+const (
+	// ResourceUnknown indicates that no specific resource is known.
+	ResourceUnknown Resource = Resource(failure.ResourceUnknown)
+
+	// ResourceClient identifies client-level failures.
+	ResourceClient Resource = Resource(failure.ResourceClient)
+
+	// ResourceDaemon identifies failures involving the iwd daemon object.
+	ResourceDaemon Resource = Resource(failure.ResourceDaemon)
+
+	// ResourceAdapter identifies failures involving an iwd adapter object.
+	ResourceAdapter Resource = Resource(failure.ResourceAdapter)
+
+	// ResourceDevice identifies failures involving an iwd device object.
+	ResourceDevice Resource = Resource(failure.ResourceDevice)
+
+	// ResourceStation identifies failures involving an iwd station object.
+	ResourceStation Resource = Resource(failure.ResourceStation)
+
+	// ResourceNetwork identifies failures involving an iwd network object.
+	ResourceNetwork Resource = Resource(failure.ResourceNetwork)
+)
+
+// -----------------------------------------------------------------------------
+// Public error sentinels for errors.Is
+// -----------------------------------------------------------------------------
+//
+// These are the *correct* way for public consumers to test error categories:
+//
+//    if errors.Is(err, spiderw.ErrUnavailable) { ... }
+//
+// They behave similarly to os.ErrNotExist and other Go stdlib practice.
+//
+
+// Error sentinels support errors.Is checks against public error categories.
+var (
+	// ErrUnavailable matches errors whose public kind is KindUnavailable.
+	ErrUnavailable = errors.New("unavailable")
+
+	// ErrInvalidState matches errors whose public kind is KindInvalidState.
+	ErrInvalidState = errors.New("invalid state")
+
+	// ErrInternal matches errors whose public kind is KindInternal.
+	ErrInternal = errors.New("internal error")
+
+	// ErrInvalidArgument matches errors whose public kind is KindInvalidArgument.
+	ErrInvalidArgument = errors.New("invalid argument")
+
+	// ErrSpiderw matches all structured errors returned by the public API.
+	ErrSpiderw = errors.New("spiderw api error")
+)
+
+// -----------------------------------------------------------------------------
+// Public API error type
+// -----------------------------------------------------------------------------
+
+// Error is the structured error type returned by the public API.
+//
+// Underlying core and D-Bus errors remain discoverable via errors.Is and
+// errors.As.
+//
+// Example:
+//
+//	v, err := client.Daemon().Version(ctx)
+//	if errors.Is(err, spiderw.ErrUnavailable) { ... }
+type Error struct {
+	Kind     Kind     // stable API category
+	Resource Resource // public object/subsystem involved, when known
+	Op       string   // public-facing operation name (for example, "Daemon.Version")
+	Details  string   // optional human-friendly text
+	Err      error    // wrapped core.Error or raw error
+}
+
+// Error returns a human-readable public API error string.
+func (e *Error) Error() string {
+	label := publicErrorLabel(e.Kind, e.Resource)
+	if e.Details != "" {
+		return fmt.Sprintf("%s: Op=%s: %v (%s)", label, e.Op, e.Err, e.Details)
+	}
+	return fmt.Sprintf("%s: Op=%s: %v", label, e.Op, e.Err)
+}
+
+// Unwrap exposes:
+//   - ErrSpiderw (public indication this came from spiderw)
+//   - the sentinel for this Kind
+//   - the underlying wrapped error
+func (e *Error) Unwrap() error {
+	return errors.Join(ErrSpiderw, sentinelForKind(e.Kind), e.Err)
+}
+
+// sentinelForKind returns the public sentinel error for the given Kind.
+func sentinelForKind(k Kind) error {
+	switch k {
+	case KindUnavailable:
+		return ErrUnavailable
+	case KindInvalidState:
+		return ErrInvalidState
+	case KindInvalidArgument:
+		return ErrInvalidArgument
+	default:
+		return ErrInternal
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Mapping: core layer to public API kinds
+// -----------------------------------------------------------------------------
+
+func mapCoreKind(k core.Kind) Kind {
+	return Kind(failure.Public(k))
+}
+
+func mapCoreResource(r core.Resource) Resource {
+	return Resource(r)
+}
+
+// -----------------------------------------------------------------------------
+// Public wrapper for client.go and other public entry points.
+// -----------------------------------------------------------------------------
+
+func wrapPublicError(op string, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// If it's a public error, preserve it to prevent double-wrapping.
+	var pe *Error
+	if errors.As(err, &pe) {
+		return err
+	}
+
+	// If it's a core error, map it
+	var ce *core.Error
+	if errors.As(err, &ce) {
+		return &Error{
+			Kind:     mapCoreKind(ce.Kind),
+			Resource: mapCoreResource(ce.Resource),
+			Op:       op,
+			Details:  ce.Details,
+			Err:      err,
+		}
+	}
+
+	// Unknown or non-core error maps to an internal error.
+	return &Error{
+		Kind: KindInternal,
+		Op:   op,
+		Err:  err,
+	}
+}
+
+func publicErrorLabel(kind Kind, resource Resource) string {
+	if resource == ResourceUnknown {
+		return string(kind)
+	}
+	return fmt.Sprintf("%s %s", resource, kind)
+}

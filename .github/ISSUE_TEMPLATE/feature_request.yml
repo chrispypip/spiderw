@@ -1,0 +1,71 @@
+---
+name: Feature request
+description: Suggest an enhancement or new spiderw capability.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Please describe the use case
+        first so the API shape can be evaluated clearly.
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description:
+        What are you trying to do, and why is the current API or CLI not enough?
+      placeholder: I want to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-api
+    attributes:
+      label: Proposed API or CLI shape
+      description:
+        Show the Go code or CLI command you wish existed, if you have one.
+      placeholder: |
+        client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+        ...
+      render: text
+
+  - type: dropdown
+    id: affected-area
+    attributes:
+      label: Affected area
+      multiple: true
+      options:
+        - Public Go API
+        - CLI
+        - internal/core
+        - internal/iwdbus
+        - internal/connect
+        - iwd mock service
+        - Tests
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternate designs have you considered?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add links, examples, related iwd behavior, or D-Bus details.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues first.
+          required: true

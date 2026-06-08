@@ -1,0 +1,29 @@
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+  "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node>
+  <interface name="org.freedesktop.DBus.Introspectable">
+    <method name="Introspect">
+      <arg direction="out" name="xml" type="s"/>
+    </method>
+  </interface>
+
+  <interface name="net.connman.iwd.Daemon">
+    <method name="GetInfo">
+      <arg direction="out" name="info" type="a{sv}"/>
+    </method>
+  </interface>
+
+  <interface name="org.freedesktop.DBus.Properties">
+    <method name="Get">
+      <arg direction="in" name="interface" type="s"/>
+      <arg direction="in" name="property" type="s"/>
+      <arg direction="out" name="value" type="v"/>
+    </method>
+    <method name="GetAll">
+      <arg direction="in" name="interface" type="s"/>
+      <arg direction="out" name="values" type="a{sv}"/>
+    </method>
+  </interface>
+
+  <node name="0"/>
+</node>
