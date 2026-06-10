@@ -69,6 +69,19 @@ func drainBoolChan(ch <-chan bool) {
 	}
 }
 
+func findAdapterStatusEntry(t *testing.T, list []map[string]any, path string) map[string]any {
+	t.Helper()
+
+	for _, entry := range list {
+		if p, ok := entry["Path"].(string); ok && p == path {
+			return entry
+		}
+	}
+
+	t.Fatalf("adapter %q not found in status output: %#v", path, list)
+	return nil
+}
+
 func runSpiderAdapter(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
@@ -398,4 +411,95 @@ func TestAdapterMock_Firehose(t *testing.T) {
 	require.Equal(t, iwdbus.IwdAdapterIface, s)
 	require.Equal(t, changed, v)
 	require.Equal(t, []string{}, ss)
+}
+
+// TestAdapterMock_Status exercises `adapter status`, which drives
+// Client.AllAdapters: it constructs a handle per adapter and reports the full
+// per-adapter snapshot (path, name, powered, model, vendor, supported modes).
+func TestAdapterMock_Status(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	out, err := runSpiderAdapter(t, "status")
+	require.NoError(t, err, "output:\n%s", out)
+
+	// Human output is an aligned key:value block per adapter.
+	mustContainAll(t, out, []string{
+		"Name:",
+		"phy0",
+		"Path:",
+		"/net/connman/iwd/phy0",
+		"Powered:",
+		"true",
+		"Model:",
+		"MockModel",
+		"Vendor:",
+		"MockVendor",
+		"SupportedModes:",
+		"station",
+		"ap",
+	})
+}
+
+// TestAdapterMock_StatusJSON verifies the structured `adapter status --json`
+// output, which is a JSON array of per-adapter snapshots.
+func TestAdapterMock_StatusJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	list, out, err := runSpiderJSONArray(t, "adapter", "status")
+	require.NoError(t, err, "output:\n%s", out)
+	require.NotEmpty(t, list, "expected at least one adapter:\n%s", out)
+
+	entry := findAdapterStatusEntry(t, list, "/net/connman/iwd/phy0")
+	require.Equal(t, "phy0", jsonGetString(t, entry, "Name"))
+	require.Equal(t, true, jsonGetBool(t, entry, "Powered"))
+	require.Equal(t, "MockModel", jsonGetString(t, entry, "Model"))
+	require.Equal(t, "MockVendor", jsonGetString(t, entry, "Vendor"))
+	require.ElementsMatch(t, []string{"station", "ap"}, jsonGetArray(t, entry, "SupportedModes"))
+}
+
+// TestAdapterMock_StatusOmittedOptionals verifies that status tolerates an
+// adapter that does not expose the optional Model/Vendor properties: the
+// command still succeeds and renders those fields as "-" rather than failing,
+// unlike the per-property `adapter <adapter> model` query which surfaces the
+// error.
+func TestAdapterMock_StatusOmittedOptionals(t *testing.T) {
+	iwdmock.StartMockWithOmittedOptionals(t)
+
+	out, err := runSpiderAdapter(t, "status")
+	require.NoError(t, err, "output:\n%s", out)
+
+	// The omit-optionals mock reproduces real iwd: an absent optional returns a
+	// "Getting property value failed" getter error that internal/iwdbus collapses
+	// to nil, so status reads nil (no error) and renders "-" under strict
+	// propagation. Required fields are still present; absent optionals show "-".
+	mustContainAll(t, out, []string{
+		"Name:",
+		"phy0",
+		"Powered:",
+		"Model:",
+		"Vendor:",
+		"SupportedModes:",
+		"-",
+	})
+	require.NotContains(t, out, "MockModel", "output:\n%s", out)
+	require.NotContains(t, out, "MockVendor", "output:\n%s", out)
+}
+
+// TestAdapterMock_StatusOmittedOptionalsJSON verifies the structured output
+// renders the absent optionals as JSON null.
+func TestAdapterMock_StatusOmittedOptionalsJSON(t *testing.T) {
+	iwdmock.StartMockWithOmittedOptionals(t)
+
+	list, out, err := runSpiderJSONArray(t, "adapter", "status")
+	require.NoError(t, err, "output:\n%s", out)
+
+	entry := findAdapterStatusEntry(t, list, "/net/connman/iwd/phy0")
+	require.Equal(t, "phy0", jsonGetString(t, entry, "Name"))
+	require.Nil(t, entry["Model"], "expected null Model:\n%s", out)
+	require.Nil(t, entry["Vendor"], "expected null Vendor:\n%s", out)
+	require.ElementsMatch(t, []string{"station", "ap"}, jsonGetArray(t, entry, "SupportedModes"))
 }

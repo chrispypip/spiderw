@@ -260,6 +260,148 @@ func TestClient(t *testing.T) {
 	})
 }
 
+func TestClientAllAdapters(t *testing.T) {
+	ctx := context.Background()
+
+	// newAllAdaptersClient builds a Client whose daemon enumerates the supplied
+	// refs and whose wiring constructs handles via factory. factory may be nil,
+	// in which case each path yields a fakeCoreAdapter named after its path.
+	newAllAdaptersClient := func(
+		refs []core.AdapterRef,
+		daemonErr error,
+		factory func(ctx context.Context, path string) (core.AdapterIface, error),
+	) *Client {
+		fakeDaemon := &fakeCoreDaemon{}
+		fakeDaemon.setAdapters(refs)
+		if daemonErr != nil {
+			fakeDaemon.setErr(daemonErr)
+		}
+		if factory == nil {
+			factory = func(_ context.Context, path string) (core.AdapterIface, error) {
+				fa := &fakeCoreAdapter{}
+				fa.name.Store(path)
+				return fa, nil
+			}
+		}
+		wire := &connect.Wiring{
+			Conn:           &dbus.Conn{},
+			Daemon:         fakeDaemon,
+			Cleanup:        func() error { return nil },
+			AdapterFactory: factory,
+		}
+		return &Client{
+			daemon:  newDaemon(fakeDaemon),
+			wire:    wire,
+			cleanup: wire.Cleanup,
+		}
+	}
+
+	t.Run("Success", func(t *testing.T) {
+		refs := []core.AdapterRef{
+			{Path: "/net/connman/iwd/phy0", Name: "phy0"},
+			{Path: "/net/connman/iwd/phy1", Name: "phy1"},
+			{Path: "/net/connman/iwd/phy2", Name: "phy2"},
+		}
+		c := newAllAdaptersClient(refs, nil, nil)
+
+		adapters, err := c.AllAdapters(ctx)
+		require.NoError(t, err)
+		require.Len(t, adapters, len(refs))
+
+		// Order is preserved and each handle is live: the fake names each
+		// adapter after the path it was constructed from. Path reflects the
+		// ref the handle was built from without a backend call.
+		for i, a := range adapters {
+			require.NotNil(t, a)
+			require.Equal(t, refs[i].Path, a.Path())
+			name, err := a.Name(ctx)
+			require.NoError(t, err)
+			require.Equal(t, refs[i].Path, name)
+		}
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		c := newAllAdaptersClient(nil, nil, nil)
+
+		adapters, err := c.AllAdapters(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, adapters)
+		require.Empty(t, adapters)
+	})
+
+	t.Run("EnumerationErrorMapsToPublicError", func(t *testing.T) {
+		base := errors.New("enumeration failed")
+		c := newAllAdaptersClient(nil, base, nil)
+
+		adapters, err := c.AllAdapters(ctx)
+		require.Nil(t, adapters)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+		require.ErrorIs(t, err, base)
+	})
+
+	t.Run("ConstructionErrorFailsFast", func(t *testing.T) {
+		refs := []core.AdapterRef{
+			{Path: "/net/connman/iwd/phy0", Name: "phy0"},
+			{Path: "/net/connman/iwd/phy1", Name: "phy1"},
+			{Path: "/net/connman/iwd/phy2", Name: "phy2"},
+		}
+		base := errors.New("adapter unavailable")
+		var constructed []string
+		factory := func(_ context.Context, path string) (core.AdapterIface, error) {
+			constructed = append(constructed, path)
+			if path == refs[1].Path {
+				return nil, base
+			}
+			fa := &fakeCoreAdapter{}
+			fa.name.Store(path)
+			return fa, nil
+		}
+		c := newAllAdaptersClient(refs, nil, factory)
+
+		adapters, err := c.AllAdapters(ctx)
+		require.Nil(t, adapters)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+		require.ErrorIs(t, err, base)
+
+		// Fail-fast: stopped at the failing adapter, never reached phy2.
+		require.Equal(t, []string{refs[0].Path, refs[1].Path}, constructed)
+	})
+
+	t.Run("Closed", func(t *testing.T) {
+		refs := []core.AdapterRef{{Path: "/net/connman/iwd/phy0", Name: "phy0"}}
+		c := newAllAdaptersClient(refs, nil, nil)
+		require.NoError(t, c.Close())
+
+		adapters, err := c.AllAdapters(ctx)
+		require.Nil(t, adapters)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidState)
+
+		var pe *Error
+		require.ErrorAs(t, err, &pe)
+		require.Equal(t, KindInvalidState, pe.Kind)
+		require.Equal(t, ResourceClient, pe.Resource)
+	})
+
+	t.Run("NilReceiver", func(t *testing.T) {
+		var c *Client
+		adapters, err := c.AllAdapters(ctx)
+		require.Nil(t, adapters)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+	})
+
+	t.Run("UninitializedWiring", func(t *testing.T) {
+		c := &Client{}
+		adapters, err := c.AllAdapters(ctx)
+		require.Nil(t, adapters)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+	})
+}
+
 func resetClientSeams(t *testing.T) {
 	t.Helper()
 

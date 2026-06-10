@@ -95,6 +95,39 @@ func ExampleClient_Adapter() {
 	fmt.Printf("%s powered: %t\n", refs[0].Name, powered)
 }
 
+// ExampleClient_AllAdapters constructs a handle for every adapter iwd exposes
+// and reports each one's powered state.
+func ExampleClient_AllAdapters() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	// AllAdapters enumerates via the daemon and returns a live handle per
+	// adapter, in enumeration order. Use it when you want to operate on every
+	// adapter; use Daemon.Adapters for lightweight references only.
+	adapters, err := client.AllAdapters(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, adapter := range adapters {
+		name, err := adapter.Name(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		powered, err := adapter.Powered(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// Path is static identity and needs no D-Bus call.
+		fmt.Printf("%s (%s) powered: %t\n", name, adapter.Path(), powered)
+	}
+}
+
 // ExampleAdapter_SupportsMode checks whether an adapter supports station mode.
 func ExampleAdapter_SupportsMode() {
 	ctx := context.Background()

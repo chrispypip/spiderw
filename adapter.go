@@ -63,13 +63,25 @@ type AdapterPropertiesChanged struct {
 // Adapter provides high-level operations for a specific iwd adapter object.
 type Adapter struct {
 	core core.AdapterIface
+	path string
 }
 
-func newAdapter(c core.AdapterIface) *Adapter {
+func newAdapter(c core.AdapterIface, path string) *Adapter {
 	if c == nil {
 		return nil
 	}
-	return &Adapter{core: c}
+	return &Adapter{core: c, path: path}
+}
+
+// Path returns the D-Bus object path the adapter was constructed from.
+//
+// Path is static adapter identity, not an iwd property: it requires no D-Bus
+// round-trip and never fails. Path returns "" for a nil receiver.
+func (a *Adapter) Path() string {
+	if a == nil {
+		return ""
+	}
+	return a.path
 }
 
 func (a *Adapter) coreAdapter(ctx context.Context, op string) (core.AdapterIface, error) {

@@ -206,10 +206,62 @@ func (c *Client) Adapter(ctx context.Context, path string) (*Adapter, error) {
 		return nil, wrapPublicError(op, err)
 	}
 
-	pub := newAdapter(coreAdapter)
+	pub := newAdapter(coreAdapter, path)
 	if pub == nil {
 		log.Error(ctx, "adapter wrapper unexpectedly nil", "op", op, "path", path)
 		return nil, wrapPublicError(op, ErrInternal)
 	}
 	return pub, nil
+}
+
+// AllAdapters mints live Adapter handles for every adapter iwd currently
+// exposes.
+//
+// It enumerates adapters via the daemon, then constructs a handle for each,
+// preserving the daemon's enumeration order. Use Adapter to obtain a single
+// adapter by path, or Daemon.Adapters for lightweight references without
+// constructing handles.
+func (c *Client) AllAdapters(ctx context.Context) ([]*Adapter, error) {
+	const op = "Client.AllAdapters"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil || c.daemon == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	// Enumeration is the daemon's job; construction is the client's.
+	refs, err := c.daemon.Adapters(ctx)
+	if err != nil {
+		log.Error(ctx, "adapter enumeration failed", "op", op, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	adapters := make([]*Adapter, 0, len(refs))
+	for _, ref := range refs {
+		coreAdapter, err := c.wire.NewAdapter(ctx, ref.Path)
+		if err != nil {
+			log.Error(ctx, "adapter wiring failed", "op", op, "path", ref.Path, "err", err)
+			return nil, wrapPublicError(op, err)
+		}
+		pub := newAdapter(coreAdapter, ref.Path)
+		if pub == nil {
+			log.Error(ctx, "adapter wrapper unexpectedly nil", "op", op, "path", ref.Path)
+			return nil, wrapPublicError(op, ErrInternal)
+		}
+		adapters = append(adapters, pub)
+	}
+
+	return adapters, nil
 }

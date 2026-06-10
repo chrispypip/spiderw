@@ -60,6 +60,33 @@ func extractJSONObject(t *testing.T, out string) string {
 	return out[start : end+1]
 }
 
+// runSpiderJSONArray runs the spiderw CLI with --json enabled for commands that
+// emit a JSON array (e.g. `adapter status`) and returns the parsed list.
+func runSpiderJSONArray(t *testing.T, args ...string) ([]map[string]any, string, error) {
+	t.Helper()
+
+	out, err := runSpider(t, append([]string{"--json"}, args...)...)
+	if err != nil {
+		return nil, out, err
+	}
+
+	arr := extractJSONArray(t, out)
+	var list []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(arr), &list), "failed to parse JSON array output: %s", out)
+	return list, out, nil
+}
+
+func extractJSONArray(t *testing.T, out string) string {
+	t.Helper()
+
+	start := strings.Index(out, "[")
+	end := strings.LastIndex(out, "]")
+	require.GreaterOrEqual(t, start, 0, "missing '[' in output:\n%s", out)
+	require.GreaterOrEqual(t, end, 0, "missing ']' in output:\n%s", out)
+	require.Greater(t, end, start, "invalid JSON brackets in output:\n%s", out)
+	return out[start : end+1]
+}
+
 func jsonGetString(t *testing.T, m map[string]any, key string) string {
 	t.Helper()
 

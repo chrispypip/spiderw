@@ -256,6 +256,112 @@ func runAdapterList(app *App, args []string) error {
 	return app.printOutput(out)
 }
 
+type adapterStatusEntry struct {
+	Path           string   `json:"Path"`
+	Name           string   `json:"Name"`
+	Powered        bool     `json:"Powered"`
+	Model          *string  `json:"Model"`
+	Vendor         *string  `json:"Vendor"`
+	SupportedModes []string `json:"SupportedModes"`
+}
+
+type adapterStatusResult []adapterStatusEntry
+
+// String returns the CLI string form of the value.
+func (r adapterStatusResult) String() string {
+	if len(r) == 0 {
+		return "no adapters available"
+	}
+
+	optional := func(v *string) string {
+		if v == nil || *v == "" {
+			return "-"
+		}
+		return *v
+	}
+	field := func(label, value string) string {
+		return fmt.Sprintf("%-16s%s", label+":", value)
+	}
+
+	blocks := make([]string, 0, len(r))
+	for _, entry := range r {
+		name := entry.Name
+		if name == "" {
+			name = "(unnamed)"
+		}
+		modes := "-"
+		if len(entry.SupportedModes) > 0 {
+			modes = strings.Join(entry.SupportedModes, ", ")
+		}
+
+		lines := []string{
+			field("Name", name),
+			field("Path", entry.Path),
+			field("Powered", fmt.Sprintf("%t", entry.Powered)),
+			field("Model", optional(entry.Model)),
+			field("Vendor", optional(entry.Vendor)),
+			field("SupportedModes", modes),
+		}
+		blocks = append(blocks, strings.Join(lines, "\n"))
+	}
+	return strings.Join(blocks, "\n\n")
+}
+
+func runAdapterStatus(app *App, args []string) error {
+	if len(args) > 0 {
+		return fmt.Errorf("unknown adapter status argument: %s", args[0])
+	}
+	ctx := context.Background()
+	client, err := app.newClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = client.Close()
+	}()
+
+	adapters, err := client.AllAdapters(ctx)
+	if err != nil {
+		return err
+	}
+
+	out := make(adapterStatusResult, 0, len(adapters))
+	for _, a := range adapters {
+		name, err := a.Name(ctx)
+		if err != nil {
+			return err
+		}
+		powered, err := a.Powered(ctx)
+		if err != nil {
+			return err
+		}
+		// Model and Vendor are optional in iwd. status is a best-effort
+		// overview, so a failed or absent read degrades to "-" rather than
+		// aborting the whole snapshot. Use `adapter <adapter> model` /
+		// `vendor` for an authoritative query that surfaces such errors.
+		model, _ := a.Model(ctx)
+		vendor, _ := a.Vendor(ctx)
+		modes, err := a.SupportedModes(ctx)
+		if err != nil {
+			return err
+		}
+		modeStrs := make([]string, 0, len(modes))
+		for _, mode := range modes {
+			modeStrs = append(modeStrs, mode.String())
+		}
+
+		out = append(out, adapterStatusEntry{
+			Path:           a.Path(),
+			Name:           name,
+			Powered:        powered,
+			Model:          model,
+			Vendor:         vendor,
+			SupportedModes: modeStrs,
+		})
+	}
+	return app.printOutput(out)
+}
+
 func runAdapterPowered(app *App, ctx context.Context, adapterRef string, args []string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("usage: spiderw adapter <adapter> powered [true|false]")
@@ -414,11 +520,14 @@ func runAdapterWithRef(app *App, args []string) error {
 
 func runAdapter(app *App, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: spiderw adapter list OR spiderw adapter <adapter> <command>")
+		return fmt.Errorf("usage: spiderw adapter list OR spiderw adapter status OR spiderw adapter <adapter> <command>")
 	}
 
-	if args[0] == "list" {
+	switch args[0] {
+	case "list":
 		return runAdapterList(app, args[1:])
+	case "status":
+		return runAdapterStatus(app, args[1:])
 	}
 
 	return runAdapterWithRef(app, args)
