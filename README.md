@@ -346,6 +346,14 @@ instructions. Participation in project spaces is covered by the
 
 ---
 
+## Support
+
+`spiderw` is developed and maintained in my spare time. If you find it useful
+and would like to support the project, sponsorships are appreciated but never
+expected.
+
+---
+
 ## Further Reading
 
 * [Roadmap](ROADMAP.md)
