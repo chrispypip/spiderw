@@ -10,10 +10,10 @@ on:
 permissions:
   contents: read
 
-# Pin the toolchain to match the dev container (dev/Dockerfile.dev) and the
-# golangci-lint version available locally, so CI is reproducible.
+# The Go version is single-sourced from go.mod (jobs use go-version-file), so it
+# never drifts from the module's declared toolchain. golangci-lint is pinned here
+# and in dev/Dockerfile.dev; Renovate keeps the two in sync (see renovate.json).
 env:
-  GO_VERSION: "1.22.5"
   GOLANGCI_LINT_VERSION: "v2.11.4"
 
 concurrency:
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - run: go build ./...
       - run: go vet ./...
 
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - uses: golangci/golangci-lint-action@v8
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - name: ${{ matrix.suite.name }}
         run: ${{ matrix.suite.cmd }}
 
@@ -98,7 +98,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - name: Install D-Bus
         run: sudo apt-get update && sudo apt-get install -y dbus
       - name: Race suite under a session bus
