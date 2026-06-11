@@ -94,6 +94,12 @@ func (a *Adapter) Get(iface, p string) (dbus.Variant, *dbus.Error) {
 	props := a.buildPropertyMap()
 	v, ok := props[p]
 	if !ok {
+		// Reproduce real iwd: an absent *optional* (Model/Vendor) makes the
+		// property getter fail with "Getting property value failed" rather than
+		// being reported as an unknown property.
+		if p == "Model" || p == "Vendor" {
+			return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("getting property value failed"))
+		}
 		return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("unknown property %q", p))
 	}
 	return v, nil

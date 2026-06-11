@@ -134,12 +134,12 @@ func TestAdapterMock_GetModelProvided(t *testing.T) {
 	require.Equal(t, "MockModel", jsonGetString(t, m, "Value"))
 }
 
-func TestAdapterMock_GetModelNotImplemented(t *testing.T) {
+func TestAdapterMock_GetModelAbsent(t *testing.T) {
 	iwdmock.StartMockWithOmittedOptionals(t)
 
-	_, out, err := runSpiderAdapterJSON(t, "phy0", "model")
-	require.Error(t, err, "output:\n%s", out)
-	mustContainAll(t, out, []string{"adapter unavailable", "dbus property error", "Op=Adapter.Model", "unknown property \"Model\""})
+	m, out, err := runSpiderAdapterJSON(t, "phy0", "model")
+	require.NoError(t, err, "output:\n%s", out)
+	require.Nil(t, m["Value"], "expected null Model value:\n%s", out)
 }
 
 func TestAdapterMock_GetVendorProvided(t *testing.T) {
@@ -152,12 +152,12 @@ func TestAdapterMock_GetVendorProvided(t *testing.T) {
 	require.Equal(t, "MockVendor", jsonGetString(t, m, "Value"))
 }
 
-func TestAdapterMock_GetVendorNotImplemented(t *testing.T) {
+func TestAdapterMock_GetVendorAbsent(t *testing.T) {
 	iwdmock.StartMockWithOmittedOptionals(t)
 
-	_, out, err := runSpiderAdapterJSON(t, "phy0", "vendor")
-	require.Error(t, err, "output:\n%s", out)
-	mustContainAll(t, out, []string{"adapter unavailable", "dbus property error", "Op=Adapter.Vendor", "unknown property \"Vendor\""})
+	m, out, err := runSpiderAdapterJSON(t, "phy0", "vendor")
+	require.NoError(t, err, "output:\n%s", out)
+	require.Nil(t, m["Value"], "expected null Vendor value:\n%s", out)
 }
 
 func TestAdapterMock_GetSupportedModes(t *testing.T) {

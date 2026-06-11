@@ -335,12 +335,18 @@ func runAdapterStatus(app *App, args []string) error {
 		if err != nil {
 			return err
 		}
-		// Model and Vendor are optional in iwd. status is a best-effort
-		// overview, so a failed or absent read degrades to "-" rather than
-		// aborting the whole snapshot. Use `adapter <adapter> model` /
-		// `vendor` for an authoritative query that surfaces such errors.
-		model, _ := a.Model(ctx)
-		vendor, _ := a.Vendor(ctx)
+		// Model and Vendor are optional in iwd. A genuinely absent optional is
+		// collapsed to nil one layer down (internal/iwdbus recognizes the
+		// daemon's absent-property reply) and renders "-", so any error that
+		// reaches here is a real failure and is surfaced rather than masked.
+		model, err := a.Model(ctx)
+		if err != nil {
+			return err
+		}
+		vendor, err := a.Vendor(ctx)
+		if err != nil {
+			return err
+		}
 		modes, err := a.SupportedModes(ctx)
 		if err != nil {
 			return err

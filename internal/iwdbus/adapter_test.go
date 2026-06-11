@@ -117,6 +117,34 @@ func TestAdapter_Iwdbus(t *testing.T) {
 	})
 }
 
+func TestAdapter_GetModel_AbsentOptionalCollapsesToNil(t *testing.T) {
+	t.Parallel()
+
+	a := &Adapter{call: &fakeCaller{
+		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
+			return nil, fmt.Errorf("Getting property value failed")
+		},
+	}}
+
+	model, err := a.GetModel(context.Background())
+	require.NoError(t, err)
+	require.Nil(t, model)
+}
+
+func TestAdapter_GetVendor_AbsentOptionalCollapsesToNil(t *testing.T) {
+	t.Parallel()
+
+	a := &Adapter{call: &fakeCaller{
+		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
+			return nil, fmt.Errorf("Getting property value failed")
+		},
+	}}
+
+	vendor, err := a.GetVendor(context.Background())
+	require.NoError(t, err)
+	require.Nil(t, vendor)
+}
+
 func testParseSupportedModes(t *testing.T) {
 	t.Parallel()
 

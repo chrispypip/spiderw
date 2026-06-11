@@ -8,12 +8,18 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-var re = regexp.MustCompile(`GetProperty\sfailed:\sunknown property`)
+// unknownPropertyRe matches the D-Bus error replies iwd returns when an
+// optional Adapter property has no value. Real hardware reports "Getting
+// property value failed" (the ELL property getter declined to provide a value);
+// some paths report "GetProperty failed: unknown property". Only GetModel and
+// GetVendor consult this, so the match is scoped to genuinely-optional
+// properties where a getter failure means "absent".
+var unknownPropertyRe = regexp.MustCompile(`GetProperty\sfailed:\sunknown property|Getting property value failed`)
 
-// isUnknownPropertyError inspects a wrapped dbus.Error to decide whether the
-// server is saying "that property does not exist" for an optional property.
+// isUnknownPropertyError inspects a dbus error to decide whether the server is
+// saying "that optional property has no value".
 func isUnknownPropertyError(err error) bool {
-	return re.MatchString(err.Error())
+	return unknownPropertyRe.MatchString(err.Error())
 }
 
 func parseOptionalString(v interface{}) (*string, error) {
