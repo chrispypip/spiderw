@@ -131,6 +131,12 @@ func mustContainAll(t *testing.T, out string, substrs []string) {
 	}
 }
 
+func mustContainExactlyOnce(t *testing.T, out, substr string) {
+	t.Helper()
+
+	require.Equal(t, 1, strings.Count(out, substr), "expected %q exactly once in output:\n%s", substr, out)
+}
+
 func requireFired(t *testing.T, ch <-chan struct{}, msg ...string) {
 	t.Helper()
 

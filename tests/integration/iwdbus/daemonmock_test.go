@@ -60,7 +60,10 @@ func TestDaemonMock_NoDaemon(t *testing.T) {
 
 	out, err := runSpiderDaemon(t, "info")
 	require.Error(t, err)
-	mustContainAll(t, out, []string{"internal error", "operation failed", "Op=NewClient", "iwd daemon interface not available"})
+	// Note: the public message surfaces the public kind ("internal error") and
+	// no longer leaks the internal core label ("operation failed"), which only
+	// appeared via the previously-duplicated core frame.
+	mustContainAll(t, out, []string{"internal error", "Op=NewClient", "iwd daemon interface not available"})
 }
 
 func TestDaemonMock_MissingVersion(t *testing.T) {

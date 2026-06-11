@@ -503,3 +503,18 @@ func TestAdapterMock_StatusOmittedOptionalsJSON(t *testing.T) {
 	require.Nil(t, entry["Vendor"], "expected null Vendor:\n%s", out)
 	require.ElementsMatch(t, []string{"station", "ap"}, jsonGetArray(t, entry, "SupportedModes"))
 }
+
+// TestAdapterMock_ErrorMessageNotDuplicated guards end-to-end against the public
+// error message restating a wrapped layer's frame. A bad SupportedModes payload
+// produces a multi-layer error (variant conversion -> core -> public); the
+// public frame and its details must each appear exactly once rather than being
+// duplicated by the public-over-core wrapping.
+func TestAdapterMock_ErrorMessageNotDuplicated(t *testing.T) {
+	iwdmock.StartMockAdapterWithBadModes(t)
+
+	out, err := runSpiderAdapter(t, "phy0", "supported-modes")
+	require.Error(t, err, "output:\n%s", out)
+
+	mustContainExactlyOnce(t, out, "adapter unavailable: Op=Adapter.SupportedModes:")
+	mustContainExactlyOnce(t, out, "(failed querying iwd Adapter supported modes)")
+}

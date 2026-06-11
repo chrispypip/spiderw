@@ -206,7 +206,9 @@ func (i *IntrospectedObject) GetProperty(ctx context.Context, iface, prop string
 	obj := i.Conn.Object(i.BusName, i.Path)
 	var v dbus.Variant
 	if err := obj.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, iface, prop).Store(&v); err != nil {
-		return nil, WrapProperty(iface, prop, err)
+		// Return the raw D-Bus error; the typed caller (e.g. Adapter.GetModel)
+		// owns property-error wrapping so it is applied exactly once.
+		return nil, err
 	}
 
 	return v.Value(), nil
@@ -217,7 +219,9 @@ func (i *IntrospectedObject) SetProperty(ctx context.Context, iface, prop string
 	obj := i.Conn.Object(i.BusName, i.Path)
 	call := obj.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Set", 0, iface, prop, dbus.MakeVariant(val))
 	if call.Err != nil {
-		return WrapProperty(iface, prop, call.Err)
+		// Return the raw D-Bus error; the typed caller owns property-error
+		// wrapping so it is applied exactly once.
+		return call.Err
 	}
 
 	return nil

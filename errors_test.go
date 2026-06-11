@@ -4,12 +4,40 @@ package spiderw
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/chrispypip/spiderw/internal/core"
 )
+
+// TestErrors_NoDuplicateFrame guards against the public Error restating the
+// frame of a wrapped core.Error (label, Op, Details), which previously rendered
+// every layer twice. The core.Error must still be discoverable via errors.As.
+func TestErrors_NoDuplicateFrame(t *testing.T) {
+	inner := errors.New("dbus property error: iface=net.connman.iwd.Adapter, property=Model: boom")
+	ce := &core.Error{
+		Kind:     core.KindUnavailable,
+		Resource: core.ResourceAdapter,
+		Op:       "Adapter.Model",
+		Details:  "failed querying iwd Adapter model",
+		Err:      inner,
+	}
+
+	pub := wrapPublicError("Adapter.Model", ce)
+	msg := pub.Error()
+
+	require.Equal(t, 1, strings.Count(msg, "adapter unavailable"), "duplicated label: %s", msg)
+	require.Equal(t, 1, strings.Count(msg, "Op=Adapter.Model"), "duplicated Op: %s", msg)
+	require.Equal(t, 1, strings.Count(msg, "failed querying iwd Adapter model"), "duplicated Details: %s", msg)
+	require.Contains(t, msg, "boom")
+
+	// Documented contract: underlying core and raw errors stay discoverable.
+	var got *core.Error
+	require.ErrorAs(t, pub, &got)
+	require.ErrorIs(t, pub, inner)
+}
 
 func TestErrors_Public(t *testing.T) {
 	t.Run("Sentinels", func(t *testing.T) {

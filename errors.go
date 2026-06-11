@@ -117,10 +117,21 @@ type Error struct {
 // Error returns a human-readable public API error string.
 func (e *Error) Error() string {
 	label := publicErrorLabel(e.Kind, e.Resource)
-	if e.Details != "" {
-		return fmt.Sprintf("%s: Op=%s: %v (%s)", label, e.Op, e.Err, e.Details)
+
+	// When we wrap a core.Error, its own Error() restates the same label, Op,
+	// and Details we are about to print, which would duplicate every frame.
+	// Render the core error's underlying cause instead; the core.Error itself
+	// stays in the Unwrap chain for errors.Is / errors.As.
+	cause := e.Err
+	var ce *core.Error
+	if errors.As(e.Err, &ce) {
+		cause = ce.Err
 	}
-	return fmt.Sprintf("%s: Op=%s: %v", label, e.Op, e.Err)
+
+	if e.Details != "" {
+		return fmt.Sprintf("%s: Op=%s: %v (%s)", label, e.Op, cause, e.Details)
+	}
+	return fmt.Sprintf("%s: Op=%s: %v", label, e.Op, cause)
 }
 
 // Unwrap exposes:
