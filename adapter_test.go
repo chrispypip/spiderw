@@ -407,3 +407,37 @@ func TestAdapter_SubscribePoweredChanged_Public_InvokesCallback(t *testing.T) {
 	require.True(t, called)
 	require.True(t, got)
 }
+
+func TestAdapter_Properties(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("DelegatesAndConvertsModes", func(t *testing.T) {
+		model := "Broadcom"
+		f := &fakeCoreAdapter{}
+		f.powered.Store(true)
+		f.name.Store("phy0")
+		f.model.Store(&model)
+		f.modes.Store([]core.AdapterMode{core.AdapterModeStation, core.AdapterModeAP})
+		a := newAdapter(f, "/net/connman/iwd/phy0")
+
+		props, err := a.Properties(ctx)
+		require.NoError(t, err)
+		require.True(t, props.Powered)
+		require.Equal(t, "phy0", props.Name)
+		require.NotNil(t, props.Model)
+		require.Equal(t, "Broadcom", *props.Model)
+		require.Nil(t, props.Vendor)
+		require.Equal(t, []AdapterMode{AdapterModeStation, AdapterModeAP}, props.SupportedModes)
+	})
+
+	t.Run("ErrorPropagates", func(t *testing.T) {
+		base := errors.New("boom")
+		f := &fakeCoreAdapter{}
+		f.setErr(base)
+		a := newAdapter(f, "/net/connman/iwd/phy0")
+
+		_, err := a.Properties(ctx)
+		require.Error(t, err)
+		require.ErrorIs(t, err, base)
+	})
+}

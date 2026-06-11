@@ -518,3 +518,48 @@ func TestAdapterMock_ErrorMessageNotDuplicated(t *testing.T) {
 	mustContainExactlyOnce(t, out, "adapter unavailable: Op=Adapter.SupportedModes:")
 	mustContainExactlyOnce(t, out, "(failed querying iwd Adapter supported modes)")
 }
+
+// TestAdapterMock_Properties exercises the batched Properties (Properties.GetAll)
+// path through the public API against the iwd mock.
+func TestAdapterMock_Properties(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	ctx := context.Background()
+	// SessionBus is where the iwd mock is registered.
+	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, client.Close()) })
+
+	a := newPublicMockAdapter(t, ctx, client, "phy0")
+
+	props, err := a.Properties(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "phy0", props.Name)
+	require.True(t, props.Powered)
+	require.NotNil(t, props.Model)
+	require.Equal(t, "MockModel", *props.Model)
+	require.NotNil(t, props.Vendor)
+	require.Equal(t, "MockVendor", *props.Vendor)
+	require.ElementsMatch(t, []spiderw.AdapterMode{spiderw.AdapterModeStation, spiderw.AdapterModeAP}, props.SupportedModes)
+}
+
+// TestAdapterMock_PropertiesOmittedOptionals confirms an absent optional is
+// simply missing from the GetAll reply and stays nil without erroring.
+func TestAdapterMock_PropertiesOmittedOptionals(t *testing.T) {
+	iwdmock.StartMockWithOmittedOptionals(t)
+
+	ctx := context.Background()
+	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, client.Close()) })
+
+	a := newPublicMockAdapter(t, ctx, client, "phy0")
+
+	props, err := a.Properties(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "phy0", props.Name)
+	require.Nil(t, props.Model)
+	require.Nil(t, props.Vendor)
+	require.ElementsMatch(t, []spiderw.AdapterMode{spiderw.AdapterModeStation, spiderw.AdapterModeAP}, props.SupportedModes)
+}

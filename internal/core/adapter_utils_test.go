@@ -89,6 +89,28 @@ func (f *fakeIwdbusAdapter) GetSupportedModes(context.Context) ([]iwdbus.Adapter
 	return nil, f.loadErr()
 }
 
+func (f *fakeIwdbusAdapter) GetProperties(context.Context) (*iwdbus.AdapterProperties, error) {
+	if err := f.loadErr(); err != nil {
+		return nil, err
+	}
+
+	props := &iwdbus.AdapterProperties{Powered: f.powered.Load()}
+	if v := f.name.Load(); v != nil {
+		props.Name = v.(string)
+	}
+	if v := f.model.Load(); v != nil {
+		props.Model = v.(*string)
+	}
+	if v := f.vendor.Load(); v != nil {
+		props.Vendor = v.(*string)
+	}
+	if v := f.modes.Load(); v != nil {
+		in := v.([]iwdbus.AdapterMode)
+		props.SupportedModes = slices.Clone(in)
+	}
+	return props, nil
+}
+
 func (f *fakeIwdbusAdapter) SupportsMode(ctx context.Context, mode iwdbus.AdapterMode) (bool, error) {
 	modes, _ := f.GetSupportedModes(ctx)
 	return slices.Contains(modes, mode), f.loadErr()

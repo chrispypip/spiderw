@@ -5,11 +5,14 @@ package iwdbus
 import (
 	"context"
 	"fmt"
+
+	"github.com/godbus/dbus/v5"
 )
 
 type fakeCaller struct {
 	callFn     func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error)
 	getPropFn  func(ctx context.Context, iface, prop string) (interface{}, error)
+	getAllFn   func(ctx context.Context, iface string) (map[string]dbus.Variant, error)
 	setPropFn  func(ctx context.Context, iface, prop string, value interface{}) error
 	hasIfaceFn func(name string) bool
 }
@@ -29,6 +32,14 @@ func (f *fakeCaller) GetProperty(ctx context.Context, iface, prop string) (inter
 	}
 
 	return f.getPropFn(ctx, iface, prop)
+}
+
+// GetAll returns all fake D-Bus property values for iface.
+func (f *fakeCaller) GetAll(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
+	if f.getAllFn == nil {
+		return nil, fmt.Errorf("unexpected GetAll(%s)", iface)
+	}
+	return f.getAllFn(ctx, iface)
 }
 
 // SetProperty sets a fake D-Bus property value.

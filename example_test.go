@@ -128,6 +128,37 @@ func ExampleClient_AllAdapters() {
 	}
 }
 
+// ExampleAdapter_Properties reads every adapter property in a single
+// Properties.GetAll call instead of one D-Bus call per property.
+func ExampleAdapter_Properties() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	adapter, err := client.Adapter(ctx, "/net/connman/iwd/0")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// One round-trip fetches Powered, Name, Model, Vendor, and SupportedModes
+	// together. Model and Vendor are nil when iwd does not report them.
+	props, err := adapter.Properties(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	model := "unknown"
+	if props.Model != nil {
+		model = *props.Model
+	}
+	fmt.Printf("%s powered=%t model=%s modes=%v\n",
+		props.Name, props.Powered, model, props.SupportedModes)
+}
+
 // ExampleAdapter_SupportsMode checks whether an adapter supports station mode.
 func ExampleAdapter_SupportsMode() {
 	ctx := context.Background()

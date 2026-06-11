@@ -145,6 +145,120 @@ func TestAdapter_GetVendor_AbsentOptionalCollapsesToNil(t *testing.T) {
 	require.Nil(t, vendor)
 }
 
+func TestAdapter_GetProperties_OptionalsAbsent(t *testing.T) {
+	t.Parallel()
+
+	a := newGetAllAdapter(func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+		return map[string]dbus.Variant{
+			"Powered":        dbus.MakeVariant(false),
+			"Name":           dbus.MakeVariant("phy1"),
+			"SupportedModes": dbus.MakeVariant([]string{"station"}),
+		}, nil
+	})
+
+	props, err := a.GetProperties(context.Background())
+	require.NoError(t, err)
+	require.False(t, props.Powered)
+	require.Equal(t, "phy1", props.Name)
+	require.Nil(t, props.Model)
+	require.Nil(t, props.Vendor)
+	require.Equal(t, []AdapterMode{AdapterModeStation}, props.SupportedModes)
+}
+
+func TestAdapter_GetProperties_Errors(t *testing.T) {
+	t.Parallel()
+
+	full := func() map[string]dbus.Variant {
+		return map[string]dbus.Variant{
+			"Powered":        dbus.MakeVariant(true),
+			"Name":           dbus.MakeVariant("phy0"),
+			"SupportedModes": dbus.MakeVariant([]string{"station"}),
+		}
+	}
+
+	cases := []struct {
+		name         string
+		props        map[string]dbus.Variant
+		callErr      error
+		wantContains string
+	}{
+		{
+			name: "missing Powered",
+			props: map[string]dbus.Variant{
+				"Name":           dbus.MakeVariant("phy0"),
+				"SupportedModes": dbus.MakeVariant([]string{"station"}),
+			},
+			wantContains: "property=Powered",
+		},
+		{
+			name: "missing Name",
+			props: map[string]dbus.Variant{
+				"Powered":        dbus.MakeVariant(true),
+				"SupportedModes": dbus.MakeVariant([]string{"station"}),
+			},
+			wantContains: "property=Name",
+		},
+		{
+			name: "missing SupportedModes",
+			props: map[string]dbus.Variant{
+				"Powered": dbus.MakeVariant(true),
+				"Name":    dbus.MakeVariant("phy0"),
+			},
+			wantContains: "property=SupportedModes",
+		},
+		{
+			name: "Powered wrong type",
+			props: func() map[string]dbus.Variant {
+				m := full()
+				m["Powered"] = dbus.MakeVariant("nope")
+				return m
+			}(),
+			wantContains: "expected bool",
+		},
+		{
+			name: "Name wrong type",
+			props: func() map[string]dbus.Variant {
+				m := full()
+				m["Name"] = dbus.MakeVariant(123)
+				return m
+			}(),
+			wantContains: "expected string",
+		},
+		{
+			name: "SupportedModes wrong type",
+			props: func() map[string]dbus.Variant {
+				m := full()
+				m["SupportedModes"] = dbus.MakeVariant(42)
+				return m
+			}(),
+			wantContains: "unexpected type",
+		},
+		{
+			name:         "GetAll call error",
+			callErr:      fmt.Errorf("dbus failure"),
+			wantContains: "dbus failure",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			a := newGetAllAdapter(func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+				if tc.callErr != nil {
+					return nil, tc.callErr
+				}
+				return tc.props, nil
+			})
+
+			_, err := a.GetProperties(context.Background())
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.wantContains)
+		})
+	}
+}
+
 func testParseSupportedModes(t *testing.T) {
 	t.Parallel()
 
@@ -1380,4 +1494,8 @@ func requireNotFired(t *testing.T, ch <-chan struct{}) {
 			return true
 		}
 	}, signalTimeout, pollInterval)
+}
+
+func newGetAllAdapter(fn func(ctx context.Context, iface string) (map[string]dbus.Variant, error)) *Adapter {
+	return &Adapter{call: &fakeCaller{getAllFn: fn}}
 }

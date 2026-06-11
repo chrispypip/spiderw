@@ -86,6 +86,27 @@ func (f *fakeCoreAdapter) SupportedModes(ctx context.Context) ([]core.AdapterMod
 	return nil, f.loadErr()
 }
 
+func (f *fakeCoreAdapter) Properties(ctx context.Context) (*core.AdapterProperties, error) {
+	if err := f.loadErr(); err != nil {
+		return nil, err
+	}
+
+	props := &core.AdapterProperties{Powered: f.powered.Load()}
+	if v := f.name.Load(); v != nil {
+		props.Name = v.(string)
+	}
+	if v := f.model.Load(); v != nil {
+		props.Model = v.(*string)
+	}
+	if v := f.vendor.Load(); v != nil {
+		props.Vendor = v.(*string)
+	}
+	if v := f.modes.Load(); v != nil {
+		props.SupportedModes = slices.Clone(v.([]core.AdapterMode))
+	}
+	return props, nil
+}
+
 func (f *fakeCoreAdapter) SupportsMode(ctx context.Context, mode core.AdapterMode) (bool, error) {
 	modes, _ := f.SupportedModes(ctx)
 	return slices.Contains(modes, mode), f.loadErr()

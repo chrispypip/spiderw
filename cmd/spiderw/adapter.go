@@ -327,41 +327,25 @@ func runAdapterStatus(app *App, args []string) error {
 
 	out := make(adapterStatusResult, 0, len(adapters))
 	for _, a := range adapters {
-		name, err := a.Name(ctx)
+		// One Properties.GetAll call per adapter instead of one Get per
+		// property. An absent optional (Model/Vendor) is simply missing from
+		// the reply and stays nil; any error is a real failure and surfaces.
+		props, err := a.Properties(ctx)
 		if err != nil {
 			return err
 		}
-		powered, err := a.Powered(ctx)
-		if err != nil {
-			return err
-		}
-		// Model and Vendor are optional in iwd. A genuinely absent optional is
-		// collapsed to nil one layer down (internal/iwdbus recognizes the
-		// daemon's absent-property reply) and renders "-", so any error that
-		// reaches here is a real failure and is surfaced rather than masked.
-		model, err := a.Model(ctx)
-		if err != nil {
-			return err
-		}
-		vendor, err := a.Vendor(ctx)
-		if err != nil {
-			return err
-		}
-		modes, err := a.SupportedModes(ctx)
-		if err != nil {
-			return err
-		}
-		modeStrs := make([]string, 0, len(modes))
-		for _, mode := range modes {
+
+		modeStrs := make([]string, 0, len(props.SupportedModes))
+		for _, mode := range props.SupportedModes {
 			modeStrs = append(modeStrs, mode.String())
 		}
 
 		out = append(out, adapterStatusEntry{
 			Path:           a.Path(),
-			Name:           name,
-			Powered:        powered,
-			Model:          model,
-			Vendor:         vendor,
+			Name:           props.Name,
+			Powered:        props.Powered,
+			Model:          props.Model,
+			Vendor:         props.Vendor,
 			SupportedModes: modeStrs,
 		})
 	}

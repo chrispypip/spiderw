@@ -14,7 +14,9 @@ import (
 // some paths report "GetProperty failed: unknown property". Only GetModel and
 // GetVendor consult this, so the match is scoped to genuinely-optional
 // properties where a getter failure means "absent".
-var unknownPropertyRe = regexp.MustCompile(`GetProperty\sfailed:\sunknown property|Getting property value failed`)
+// Matched case-insensitively since iwd/ELL casing of these messages is not
+// guaranteed across versions.
+var unknownPropertyRe = regexp.MustCompile(`(?i)GetProperty\sfailed:\sunknown property|Getting property value failed`)
 
 // isUnknownPropertyError inspects a dbus error to decide whether the server is
 // saying "that optional property has no value".

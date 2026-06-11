@@ -56,6 +56,7 @@ type adapterRaw interface {
 	GetModel(ctx context.Context) (*string, error)
 	GetVendor(ctx context.Context) (*string, error)
 	GetSupportedModes(ctx context.Context) ([]iwdbus.AdapterMode, error)
+	GetProperties(ctx context.Context) (*iwdbus.AdapterProperties, error)
 	SupportsMode(ctx context.Context, mode iwdbus.AdapterMode) (bool, error)
 	SupportsStation(ctx context.Context) (bool, error)
 	SupportsAP(ctx context.Context) (bool, error)
@@ -72,12 +73,23 @@ type AdapterIface interface {
 	Model(ctx context.Context) (*string, error)
 	Vendor(ctx context.Context) (*string, error)
 	SupportedModes(ctx context.Context) ([]AdapterMode, error)
+	Properties(ctx context.Context) (*AdapterProperties, error)
 	SupportsMode(ctx context.Context, mode AdapterMode) (bool, error)
 	SupportsStation(ctx context.Context) (bool, error)
 	SupportsAP(ctx context.Context) (bool, error)
 	SupportsAdHoc(ctx context.Context) (bool, error)
 	SubscribePropertiesChanged(ctx context.Context, fn func(AdapterPropertiesChanged)) (UnsubscribeFunc, error)
 	SubscribePoweredChanged(ctx context.Context, fn func(bool)) (UnsubscribeFunc, error)
+}
+
+// AdapterProperties holds normalized adapter properties read in a single backend
+// call. Model and Vendor are nil when the adapter does not report them.
+type AdapterProperties struct {
+	Powered        bool
+	Name           string
+	Model          *string
+	Vendor         *string
+	SupportedModes []AdapterMode
 }
 
 // Adapter is the core-layer facade over a raw iwd adapter backend.
@@ -212,6 +224,50 @@ func (a *Adapter) SupportedModes(ctx context.Context) ([]AdapterMode, error) {
 	}
 
 	return validateSupportedModes(raw)
+}
+
+// Properties returns all normalized adapter properties read in a single backend
+// call (Properties.GetAll), applying the same normalization as the per-property
+// getters: Name is trimmed and required, Model/Vendor are trimmed when present,
+// and SupportedModes are validated.
+func (a *Adapter) Properties(ctx context.Context) (*AdapterProperties, error) {
+	const op = "Adapter.Properties"
+
+	rawAdapter, err := a.rawAdapter(op)
+	if err != nil {
+		return nil, err
+	}
+
+	raw, err := rawAdapter.GetProperties(ctx)
+	if err != nil {
+		return nil, WrapAdapterUnavailable(op, "failed querying iwd Adapter properties", err)
+	}
+
+	name := strings.TrimSpace(raw.Name)
+	if name == "" {
+		return nil, WrapInvalidState(ResourceAdapter, op, "adapter returned empty Name", fmt.Errorf("missing or invalid Name field"))
+	}
+
+	modes, err := validateSupportedModes(raw.SupportedModes)
+	if err != nil {
+		return nil, err
+	}
+
+	props := &AdapterProperties{
+		Powered:        raw.Powered,
+		Name:           name,
+		SupportedModes: modes,
+	}
+	if raw.Model != nil {
+		m := strings.TrimSpace(*raw.Model)
+		props.Model = &m
+	}
+	if raw.Vendor != nil {
+		v := strings.TrimSpace(*raw.Vendor)
+		props.Vendor = &v
+	}
+
+	return props, nil
 }
 
 // SupportsMode reports whether the adapter supports mode.

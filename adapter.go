@@ -60,6 +60,25 @@ type AdapterPropertiesChanged struct {
 	Invalidated []string
 }
 
+// AdapterProperties is a snapshot of all adapter properties read in a single
+// D-Bus call. Model and Vendor are nil when iwd does not report them.
+type AdapterProperties struct {
+	// Powered reports whether the adapter is currently powered.
+	Powered bool
+
+	// Name is the adapter's human-friendly Name property.
+	Name string
+
+	// Model is the adapter's Model property, or nil when not reported.
+	Model *string
+
+	// Vendor is the adapter's Vendor property, or nil when not reported.
+	Vendor *string
+
+	// SupportedModes lists the adapter's supported operating modes.
+	SupportedModes []AdapterMode
+}
+
 // Adapter provides high-level operations for a specific iwd adapter object.
 type Adapter struct {
 	core core.AdapterIface
@@ -124,6 +143,31 @@ func (a *Adapter) Model(ctx context.Context) (*string, error) {
 func (a *Adapter) Vendor(ctx context.Context) (*string, error) {
 	return delegate(ctx, "Adapter.Vendor", a.coreAdapter, func(ctx context.Context, c core.AdapterIface) (*string, error) {
 		return c.Vendor(ctx)
+	})
+}
+
+// Properties reads every adapter property in a single D-Bus call
+// (Properties.GetAll) instead of one call per property. Prefer it when you need
+// several properties at once, such as building an overview of an adapter.
+func (a *Adapter) Properties(ctx context.Context) (*AdapterProperties, error) {
+	return delegate(ctx, "Adapter.Properties", a.coreAdapter, func(ctx context.Context, c core.AdapterIface) (*AdapterProperties, error) {
+		cp, err := c.Properties(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		modes, err := convertSupportedModes(cp.SupportedModes)
+		if err != nil {
+			return nil, err
+		}
+
+		return &AdapterProperties{
+			Powered:        cp.Powered,
+			Name:           cp.Name,
+			Model:          cp.Model,
+			Vendor:         cp.Vendor,
+			SupportedModes: modes,
+		}, nil
 	})
 }
 

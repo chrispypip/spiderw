@@ -168,6 +168,86 @@ func (a *Adapter) GetSupportedModes(ctx context.Context) ([]AdapterMode, error) 
 	return parseSupportedModes(value)
 }
 
+// AdapterProperties holds every adapter property read in a single
+// Properties.GetAll call. Model and Vendor are optional: a nil pointer means the
+// adapter did not report a value (the property is simply absent from GetAll).
+type AdapterProperties struct {
+	Powered        bool
+	Name           string
+	Model          *string
+	Vendor         *string
+	SupportedModes []AdapterMode
+}
+
+// GetProperties reads every adapter property in a single Properties.GetAll call
+// instead of one Get per property.
+//
+// Powered, Name, and SupportedModes are required; a missing one is an error.
+// Model and Vendor are optional and left nil when absent from the reply, so the
+// batched path needs no unknown-property handling.
+func (a *Adapter) GetProperties(ctx context.Context) (*AdapterProperties, error) {
+	if err := a.ensureInitialized(); err != nil {
+		return nil, WrapConnection("Adapter.ensureInitialized", err)
+	}
+
+	raw, err := a.call.GetAll(ctx, IwdAdapterIface)
+	if err != nil {
+		return nil, WrapProperty(IwdAdapterIface, "GetAll", err)
+	}
+
+	props := &AdapterProperties{}
+
+	poweredV, ok := raw["Powered"]
+	if !ok {
+		return nil, WrapProperty(IwdAdapterIface, "Powered", fmt.Errorf("missing required property"))
+	}
+	powered, ok := poweredV.Value().(bool)
+	if !ok {
+		return nil, WrapVariant("Powered", fmt.Errorf("expected bool, got %T", poweredV.Value()))
+	}
+	props.Powered = powered
+
+	nameV, ok := raw["Name"]
+	if !ok {
+		return nil, WrapProperty(IwdAdapterIface, "Name", fmt.Errorf("missing required property"))
+	}
+	// Empty/whitespace Name is a semantic concern owned by the core layer; the
+	// D-Bus layer returns the raw value (matching GetName).
+	name, ok := nameV.Value().(string)
+	if !ok {
+		return nil, WrapVariant("Name", fmt.Errorf("expected string, got %T", nameV.Value()))
+	}
+	props.Name = name
+
+	modesV, ok := raw["SupportedModes"]
+	if !ok {
+		return nil, WrapProperty(IwdAdapterIface, "SupportedModes", fmt.Errorf("missing required property"))
+	}
+	modes, err := parseSupportedModes(modesV.Value())
+	if err != nil {
+		return nil, err
+	}
+	props.SupportedModes = modes
+
+	if modelV, ok := raw["Model"]; ok {
+		model, err := parseOptionalString(modelV.Value())
+		if err != nil {
+			return nil, WrapVariant("Model", err)
+		}
+		props.Model = model
+	}
+
+	if vendorV, ok := raw["Vendor"]; ok {
+		vendor, err := parseOptionalString(vendorV.Value())
+		if err != nil {
+			return nil, WrapVariant("Vendor", err)
+		}
+		props.Vendor = vendor
+	}
+
+	return props, nil
+}
+
 // SupportsMode reports whether the adapter declares support for mode.
 func (a *Adapter) SupportsMode(ctx context.Context, mode AdapterMode) (bool, error) {
 	if err := a.ensureInitialized(); err != nil {

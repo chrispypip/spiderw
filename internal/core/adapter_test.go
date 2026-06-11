@@ -440,3 +440,63 @@ func TestAdapter_Core(t *testing.T) {
 		require.Contains(t, msg, "Name")
 	})
 }
+
+func TestAdapter_Properties(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("NormalizesAndValidates", func(t *testing.T) {
+		model := "  Broadcom  "
+		vendor := "  Acme  "
+		f := &fakeIwdbusAdapter{}
+		f.powered.Store(true)
+		f.name.Store("  phy0  ")
+		f.model.Store(&model)
+		f.vendor.Store(&vendor)
+		f.modes.Store([]iwdbus.AdapterMode{iwdbus.AdapterModeStation, iwdbus.AdapterModeAP})
+		a := NewAdapter(f)
+
+		props, err := a.Properties(ctx)
+		require.NoError(t, err)
+		require.True(t, props.Powered)
+		require.Equal(t, "phy0", props.Name)
+		require.NotNil(t, props.Model)
+		require.Equal(t, "Broadcom", *props.Model)
+		require.NotNil(t, props.Vendor)
+		require.Equal(t, "Acme", *props.Vendor)
+		require.Equal(t, []AdapterMode{AdapterModeStation, AdapterModeAP}, props.SupportedModes)
+	})
+
+	t.Run("OptionalsNil", func(t *testing.T) {
+		f := &fakeIwdbusAdapter{}
+		f.name.Store("phy0")
+		f.modes.Store([]iwdbus.AdapterMode{iwdbus.AdapterModeStation})
+		a := NewAdapter(f)
+
+		props, err := a.Properties(ctx)
+		require.NoError(t, err)
+		require.Nil(t, props.Model)
+		require.Nil(t, props.Vendor)
+	})
+
+	t.Run("EmptyNameInvalidState", func(t *testing.T) {
+		f := &fakeIwdbusAdapter{}
+		f.name.Store("   ")
+		f.modes.Store([]iwdbus.AdapterMode{iwdbus.AdapterModeStation})
+		a := NewAdapter(f)
+
+		_, err := a.Properties(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "empty Name")
+	})
+
+	t.Run("BackendErrorWrapped", func(t *testing.T) {
+		base := errors.New("boom")
+		f := &fakeIwdbusAdapter{}
+		f.setErr(base)
+		a := NewAdapter(f)
+
+		_, err := a.Properties(ctx)
+		require.Error(t, err)
+		require.ErrorIs(t, err, base)
+	})
+}

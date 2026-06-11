@@ -214,6 +214,20 @@ func (i *IntrospectedObject) GetProperty(ctx context.Context, iface, prop string
 	return v.Value(), nil
 }
 
+// GetAll fetches every property of iface in a single
+// org.freedesktop.DBus.Properties.GetAll call.
+func (i *IntrospectedObject) GetAll(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
+	obj := i.Conn.Object(i.BusName, i.Path)
+	var props map[string]dbus.Variant
+	if err := obj.CallWithContext(ctx, "org.freedesktop.DBus.Properties.GetAll", 0, iface).Store(&props); err != nil {
+		// Return the raw D-Bus error; the typed caller owns wrapping so it is
+		// applied exactly once.
+		return nil, err
+	}
+
+	return props, nil
+}
+
 // SetProperty uses Properties.Set.
 func (i *IntrospectedObject) SetProperty(ctx context.Context, iface, prop string, val interface{}) error {
 	obj := i.Conn.Object(i.BusName, i.Path)
