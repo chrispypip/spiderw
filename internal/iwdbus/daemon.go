@@ -25,6 +25,15 @@ type AdapterRef struct {
 	Name string
 }
 
+// DeviceRef is a lightweight reference to a device discovered by ObjectManager.
+type DeviceRef struct {
+	// Path is the canonical D-Bus object path for the device.
+	Path dbus.ObjectPath
+
+	// Name is the Device.Name property.
+	Name string
+}
+
 // Daemon provides typed access to the iwd daemon D-Bus interface.
 type Daemon struct {
 	conn  *dbus.Conn
@@ -217,13 +226,55 @@ func (d *Daemon) GetAdapters(ctx context.Context) ([]AdapterRef, error) {
 }
 
 func adapterNameFromManagedObject(path dbus.ObjectPath, props map[string]dbus.Variant) (string, error) {
+	return objectNameFromManagedObject("adapter", path, props)
+}
+
+// GetDevices asks iwd's ObjectManager for managed objects and returns every
+// object that implements net.connman.iwd.Device, along with its Name property.
+func (d *Daemon) GetDevices(ctx context.Context) ([]DeviceRef, error) {
+	const op = "Daemon.GetDevices"
+
+	if d == nil || d.conn == nil {
+		return nil, WrapConnection(op, ErrDaemonUninitialized)
+	}
+
+	objects, err := getManagedObjects(ctx, d.conn, IwdService)
+	if err != nil {
+		return nil, WrapIntrospection(DBusObjectManagerGetManagedObjects, err)
+	}
+	refs := make([]DeviceRef, 0, len(objects))
+	for path, ifaces := range objects {
+		props, ok := ifaces[IwdDeviceIface]
+		if !ok {
+			continue
+		}
+
+		name, err := objectNameFromManagedObject("device", path, props)
+		if err != nil {
+			return nil, err
+		}
+
+		refs = append(refs, DeviceRef{Path: path, Name: name})
+	}
+
+	sort.Slice(refs, func(i, j int) bool {
+		return string(refs[i].Path) < string(refs[j].Path)
+	})
+
+	return refs, nil
+}
+
+// objectNameFromManagedObject validates an object path and extracts its required
+// Name property from a managed-object property map. label names the object kind
+// for error messages (e.g. "adapter", "device").
+func objectNameFromManagedObject(label string, path dbus.ObjectPath, props map[string]dbus.Variant) (string, error) {
 	if !path.IsValid() || !strings.HasPrefix(string(path), "/") {
-		return "", WrapVariant("Path", fmt.Errorf("invalid adapter path %q", path))
+		return "", WrapVariant("Path", fmt.Errorf("invalid %s path %q", label, path))
 	}
 
 	v, ok := props["Name"]
 	if !ok {
-		return "", WrapVariant("Name", fmt.Errorf("adapter %s missing Name property", path))
+		return "", WrapVariant("Name", fmt.Errorf("%s %s missing Name property", label, path))
 	}
 
 	s, ok := v.Value().(string)
@@ -232,7 +283,7 @@ func adapterNameFromManagedObject(path dbus.ObjectPath, props map[string]dbus.Va
 	}
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return "", WrapVariant("Name", fmt.Errorf("adapter Name was empty"))
+		return "", WrapVariant("Name", fmt.Errorf("%s Name was empty", label))
 	}
 	return s, nil
 }

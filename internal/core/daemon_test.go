@@ -244,6 +244,95 @@ func TestDaemon_Core(t *testing.T) {
 		})
 	})
 
+	t.Run("Devices", func(t *testing.T) {
+		t.Run("Uninitialized", func(t *testing.T) {
+			tests := []struct {
+				name   string
+				daemon *Daemon
+			}{
+				{name: "nil receiver", daemon: nil},
+				{name: "inner nil", daemon: &Daemon{raw: nil}},
+			}
+
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					_, err := tc.daemon.Devices(context.Background())
+					require.Error(t, err)
+					require.True(t, errors.Is(err, ErrDaemonNotInitialized))
+					require.True(t, errors.Is(err, ErrCore))
+				})
+			}
+		})
+
+		t.Run("DBusErrorMapping", func(t *testing.T) {
+			f := &fakeIwdbusDaemon{}
+			f.setErr(iwdbus.ErrDBusIntrospection)
+			d := NewDaemon(f)
+
+			_, err := d.Devices(context.Background())
+			require.Error(t, err)
+
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindUnavailable, ce.Kind)
+			require.Equal(t, ResourceDaemon, ce.Resource)
+			require.True(t, errors.Is(err, ErrCore))
+			require.True(t, errors.Is(err, iwdbus.ErrDBusIntrospection))
+		})
+
+		t.Run("InvalidFields", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				devices  []iwdbus.DeviceRef
+				wantKind Kind
+				wantSub  string
+			}{
+				{name: "empty path", devices: []iwdbus.DeviceRef{{Path: "", Name: "wlan0"}}, wantKind: KindInvalidState, wantSub: "invalid path"},
+				{name: "path not absolute", devices: []iwdbus.DeviceRef{{Path: "not/abs", Name: "wlan0"}}, wantKind: KindInvalidState, wantSub: "invalid path"},
+				{name: "empty name", devices: []iwdbus.DeviceRef{{Path: "/net/connman/iwd/phy0/wlan0", Name: ""}}, wantKind: KindInvalidState, wantSub: "empty Name"},
+				{name: "name whitespace", devices: []iwdbus.DeviceRef{{Path: "/net/connman/iwd/phy0/wlan0", Name: "  \t "}}, wantKind: KindInvalidState, wantSub: "empty Name"},
+			}
+
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					f := &fakeIwdbusDaemon{}
+					f.setDevices(tc.devices)
+					d := NewDaemon(f)
+					_, err := d.Devices(context.Background())
+					require.Error(t, err)
+
+					var ce *Error
+					require.ErrorAs(t, err, &ce)
+					require.Equal(t, tc.wantKind, ce.Kind)
+					require.Equal(t, ResourceDevice, ce.Resource)
+					require.Contains(t, err.Error(), tc.wantSub)
+				})
+			}
+		})
+
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeIwdbusDaemon{}
+			f.setDevices([]iwdbus.DeviceRef{
+				{
+					Path: "/net/connman/iwd/phy0/wlan0",
+					Name: "wlan0",
+				},
+				{
+					Path: "  /net/connman/iwd/phy1/wlan1  ",
+					Name: "  wlan1  ",
+				},
+			})
+			d := NewDaemon(f)
+
+			out, err := d.Devices(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, []DeviceRef{
+				{Path: "/net/connman/iwd/phy0/wlan0", Name: "wlan0"},
+				{Path: "/net/connman/iwd/phy1/wlan1", Name: "wlan1"},
+			}, out)
+		})
+	})
+
 	t.Run("ConvenienceMethods", func(t *testing.T) {
 		tests := []struct {
 			name string
@@ -293,13 +382,11 @@ func TestDaemon_Core(t *testing.T) {
 
 		var wg sync.WaitGroup
 		for range 50 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				info, err := d.Info(ctx)
 				require.NoError(t, err)
 				require.Equal(t, "1.0", info.Version)
-			}()
+			})
 		}
 
 		wg.Wait()

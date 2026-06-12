@@ -3,6 +3,7 @@ package spiderw
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/chrispypip/spiderw/internal/core"
@@ -25,28 +26,28 @@ func (u UnsubscribeFunc) Unsubscribe() error {
 	return u()
 }
 
-// AdapterMode identifies an iwd adapter operating mode exposed by spiderw.
-type AdapterMode string
+// Mode identifies an iwd operating mode exposed by spiderw.
+type Mode string
 
-// Adapter mode constants identify the supported iwd adapter modes.
-// AdapterModeUnknown is reserved for invalid or unrecognized values.
+// Mode constants identify the supported iwd modes.
+// ModeUnknown is reserved for invalid or unrecognized values.
 const (
-	// AdapterModeUnknown represents an invalid or unrecognized adapter mode.
-	AdapterModeUnknown AdapterMode = AdapterMode(iwdvalue.AdapterModeUnknown)
+	// ModeUnknown represents an invalid or unrecognized mode.
+	ModeUnknown Mode = Mode(iwdvalue.ModeUnknown)
 
-	// AdapterModeStation is the iwd station adapter mode.
-	AdapterModeStation AdapterMode = AdapterMode(iwdvalue.AdapterModeStation)
+	// ModeStation is the iwd station mode.
+	ModeStation Mode = Mode(iwdvalue.ModeStation)
 
-	// AdapterModeAP is the iwd access point adapter mode.
-	AdapterModeAP AdapterMode = AdapterMode(iwdvalue.AdapterModeAP)
+	// ModeAP is the iwd access point mode.
+	ModeAP Mode = Mode(iwdvalue.ModeAP)
 
-	// AdapterModeAdHoc is the iwd ad-hoc adapter mode.
-	AdapterModeAdHoc AdapterMode = AdapterMode(iwdvalue.AdapterModeAdHoc)
+	// ModeAdHoc is the iwd ad-hoc mode.
+	ModeAdHoc Mode = Mode(iwdvalue.ModeAdHoc)
 )
 
-// String returns the canonical iwd string for the adapter mode.
-func (m AdapterMode) String() string {
-	return iwdvalue.AdapterMode(m).String()
+// String returns the canonical iwd string for the mode.
+func (m Mode) String() string {
+	return iwdvalue.Mode(m).String()
 }
 
 // AdapterPropertiesChanged describes adapter properties reported by a D-Bus
@@ -76,7 +77,7 @@ type AdapterProperties struct {
 	Vendor *string
 
 	// SupportedModes lists the adapter's supported operating modes.
-	SupportedModes []AdapterMode
+	SupportedModes []Mode
 }
 
 // Adapter provides high-level operations for a specific iwd adapter object.
@@ -172,8 +173,8 @@ func (a *Adapter) Properties(ctx context.Context) (*AdapterProperties, error) {
 }
 
 // SupportedModes returns the adapter modes currently reported by iwd.
-func (a *Adapter) SupportedModes(ctx context.Context) ([]AdapterMode, error) {
-	return delegate(ctx, "Adapter.SupportedModes", a.coreAdapter, func(ctx context.Context, c core.AdapterIface) ([]AdapterMode, error) {
+func (a *Adapter) SupportedModes(ctx context.Context) ([]Mode, error) {
+	return delegate(ctx, "Adapter.SupportedModes", a.coreAdapter, func(ctx context.Context, c core.AdapterIface) ([]Mode, error) {
 		modes, err := c.SupportedModes(ctx)
 		if err != nil {
 			return nil, err
@@ -183,7 +184,7 @@ func (a *Adapter) SupportedModes(ctx context.Context) ([]AdapterMode, error) {
 }
 
 // SupportsMode reports whether the adapter supports the provided mode.
-func (a *Adapter) SupportsMode(ctx context.Context, mode AdapterMode) (bool, error) {
+func (a *Adapter) SupportsMode(ctx context.Context, mode Mode) (bool, error) {
 	return delegate(ctx, "Adapter.SupportsMode", a.coreAdapter, func(ctx context.Context, c core.AdapterIface) (bool, error) {
 		cm, err := convertSupportedModePublicToCore(mode)
 		if err != nil {
@@ -229,9 +230,7 @@ func (a *Adapter) SubscribePropertiesChanged(ctx context.Context, fn func(Adapte
 
 	unsubscribe, err := coreAdapter.SubscribePropertiesChanged(ctx, func(core core.AdapterPropertiesChanged) {
 		changed := make(map[string]any, len(core.Changed))
-		for k, v := range core.Changed {
-			changed[k] = v
-		}
+		maps.Copy(changed, core.Changed)
 
 		// Copy invalidated to avoid aliasing/mutation across layers.
 		var invalidated []string
@@ -270,35 +269,35 @@ func (a *Adapter) SubscribePoweredChanged(ctx context.Context, fn func(bool)) (U
 	return UnsubscribeFunc(unsubscribe), nil
 }
 
-// ParseAdapterMode converts a canonical iwd mode string to an AdapterMode.
-func ParseAdapterMode(s string) (AdapterMode, error) {
-	mode, ok := iwdvalue.ParseAdapterMode(s)
+// ParseMode converts a canonical iwd mode string to an Mode.
+func ParseMode(s string) (Mode, error) {
+	mode, ok := iwdvalue.ParseMode(s)
 	if !ok {
-		details := fmt.Sprintf("invalid adapter mode %q", s)
-		return AdapterModeUnknown, &Error{Kind: KindInvalidArgument, Resource: ResourceAdapter, Op: "Adapter.ParseAdapterMode", Details: details, Err: ErrInvalidArgument}
+		details := fmt.Sprintf("invalid mode %q", s)
+		return ModeUnknown, &Error{Kind: KindInvalidArgument, Resource: ResourceAdapter, Op: "Adapter.ParseMode", Details: details, Err: ErrInvalidArgument}
 	}
-	return AdapterMode(mode), nil
+	return Mode(mode), nil
 }
 
-func convertSupportedModeCoreToPublic(mode core.AdapterMode) (AdapterMode, error) {
-	if !iwdvalue.ValidAdapterMode(mode) {
-		details := fmt.Sprintf("invalid adapter mode %q", mode)
-		return AdapterModeUnknown, &Error{Kind: KindInvalidArgument, Resource: ResourceAdapter, Op: "Adapter.convertSupportedMode", Details: details, Err: ErrInvalidArgument}
+func convertSupportedModeCoreToPublic(mode core.Mode) (Mode, error) {
+	if !iwdvalue.ValidMode(mode) {
+		details := fmt.Sprintf("invalid mode %q", mode)
+		return ModeUnknown, &Error{Kind: KindInvalidArgument, Resource: ResourceAdapter, Op: "Adapter.convertSupportedMode", Details: details, Err: ErrInvalidArgument}
 	}
-	return AdapterMode(mode), nil
+	return Mode(mode), nil
 }
 
-func convertSupportedModePublicToCore(mode AdapterMode) (core.AdapterMode, error) {
-	coreMode := core.AdapterMode(mode)
-	if !iwdvalue.ValidAdapterMode(coreMode) {
-		details := fmt.Sprintf("invalid adapter mode %q", mode)
-		return core.AdapterModeUnknown, &Error{Kind: KindInvalidArgument, Resource: ResourceAdapter, Op: "Adapter.convertSupportedMode", Details: details, Err: ErrInvalidArgument}
+func convertSupportedModePublicToCore(mode Mode) (core.Mode, error) {
+	coreMode := core.Mode(mode)
+	if !iwdvalue.ValidMode(coreMode) {
+		details := fmt.Sprintf("invalid mode %q", mode)
+		return core.ModeUnknown, &Error{Kind: KindInvalidArgument, Resource: ResourceAdapter, Op: "Adapter.convertSupportedMode", Details: details, Err: ErrInvalidArgument}
 	}
 	return coreMode, nil
 }
 
-func convertSupportedModes(modes []core.AdapterMode) ([]AdapterMode, error) {
-	ret := make([]AdapterMode, 0, len(modes))
+func convertSupportedModes(modes []core.Mode) ([]Mode, error) {
+	ret := make([]Mode, 0, len(modes))
 	for _, mode := range modes {
 		cm, err := convertSupportedModeCoreToPublic(mode)
 		if err != nil {

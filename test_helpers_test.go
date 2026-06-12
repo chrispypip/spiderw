@@ -16,6 +16,7 @@ import (
 type fakeCore struct {
 	daemon  *fakeCoreDaemon
 	adapter *fakeCoreAdapter
+	device  *fakeCoreDevice
 }
 
 // newClientWithDaemon is a test-only constructor that wires a Client
@@ -32,6 +33,9 @@ func newClientWithCore(fc *fakeCore) (*Client, error) {
 		},
 		AdapterFactory: func(ctx context.Context, path string) (core.AdapterIface, error) {
 			return fc.adapter, nil
+		},
+		DeviceFactory: func(ctx context.Context, path string) (core.DeviceIface, error) {
+			return fc.device, nil
 		},
 	}
 	return newClientFromWiring(w)
@@ -55,6 +59,12 @@ func newTestClient(t *testing.T) *Client {
 			Name: "phy0",
 		},
 	})
+	fakeDaemon.setDevices([]core.DeviceRef{
+		{
+			Path: "/net/connman/iwd/phy0/wlan0",
+			Name: "wlan0",
+		},
+	})
 	mockModel := "MockModel"
 	mockVendor := "MockVendor"
 	fakeAdapter := &fakeCoreAdapter{}
@@ -62,11 +72,19 @@ func newTestClient(t *testing.T) *Client {
 	fakeAdapter.name.Store("phy0")
 	fakeAdapter.model.Store(&mockModel)
 	fakeAdapter.vendor.Store(&mockVendor)
-	fakeAdapter.modes.Store([]core.AdapterMode{core.AdapterModeStation, core.AdapterModeAP})
+	fakeAdapter.modes.Store([]core.Mode{core.ModeStation, core.ModeAP})
+
+	fakeDevice := &fakeCoreDevice{}
+	fakeDevice.name.Store("wlan0")
+	fakeDevice.address.Store("aa:bb:cc:dd:ee:ff")
+	fakeDevice.powered.Store(true)
+	fakeDevice.mode.Store(core.ModeStation)
+	fakeDevice.adapter.Store("/net/connman/iwd/phy0")
 
 	fake := &fakeCore{
 		daemon:  fakeDaemon,
 		adapter: fakeAdapter,
+		device:  fakeDevice,
 	}
 
 	c, err := newClientWithCore(fake)
@@ -84,4 +102,15 @@ func newTestAdapter(t *testing.T) *Adapter {
 	a, err := client.Adapter(context.Background(), refs[0].Path)
 	require.NoError(t, err)
 	return a
+}
+
+func newTestDevice(t *testing.T) *Device {
+	t.Helper()
+	client := newTestClient(t)
+	refs, err := client.Daemon().Devices(context.Background())
+	require.NoError(t, err)
+	require.NotEmpty(t, refs)
+	d, err := client.Device(context.Background(), refs[0].Path)
+	require.NoError(t, err)
+	return d
 }

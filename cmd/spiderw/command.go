@@ -121,6 +121,7 @@ func rootCommand(app *App) *Command {
 		Subcommands: map[string]*Command{
 			"daemon":  daemonCommand(app),
 			"adapter": adapterCommand(app),
+			"device":  deviceCommand(app),
 		},
 	}
 }

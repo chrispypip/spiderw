@@ -111,10 +111,11 @@ func Fuzz_Iwdbus_ParseSupportedModes(f *testing.F) {
 		// Decode fuzz input into []string safely
 		var modes []string
 		if len(data) > 0 {
-			parts := bytes.Split(data, []byte{','})
-			for _, p := range parts {
-				modes = append(modes, string(p))
-			}
+			seq := bytes.SplitSeq(data, []byte{','})
+			seq(func(part []byte) bool {
+				modes = append(modes, string(part))
+				return true
+			})
 		}
 
 		// []string path
@@ -136,14 +137,14 @@ func Fuzz_Iwdbus_ParseSupportedModes(f *testing.F) {
 	})
 }
 
-func Fuzz_Iwdbus_ParseAdapterMode(f *testing.F) {
+func Fuzz_Iwdbus_ParseMode(f *testing.F) {
 	f.Add("station")
 	f.Add("ap")
 	f.Add("ad-hoc")
 	f.Add("bogus")
 
 	f.Fuzz(func(t *testing.T, s string) {
-		_, _ = ParseAdapterMode(s)
+		_, _ = ParseMode(s)
 	})
 }
 

@@ -262,16 +262,16 @@ func TestAdapter_Core(t *testing.T) {
 	t.Run("SupportedModes", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			fake := &fakeIwdbusAdapter{}
-			fake.modes.Store([]iwdbus.AdapterMode{iwdbus.AdapterModeStation, iwdbus.AdapterModeAP})
+			fake.modes.Store([]iwdbus.Mode{iwdbus.ModeStation, iwdbus.ModeAP})
 			a := NewAdapter(fake)
 			out, err := a.SupportedModes(ctx)
 			require.NoError(t, err)
-			require.Equal(t, []AdapterMode{AdapterModeStation, AdapterModeAP}, out)
+			require.Equal(t, []Mode{ModeStation, ModeAP}, out)
 		})
 
 		t.Run("UnknownMode", func(t *testing.T) {
 			fake := &fakeIwdbusAdapter{}
-			fake.modes.Store([]iwdbus.AdapterMode{iwdbus.AdapterMode("bad-mode")})
+			fake.modes.Store([]iwdbus.Mode{iwdbus.Mode("bad-mode")})
 			a := NewAdapter(fake)
 			_, err := a.SupportedModes(ctx)
 			require.Error(t, err)
@@ -284,7 +284,7 @@ func TestAdapter_Core(t *testing.T) {
 	t.Run("SupportsMode", func(t *testing.T) {
 		t.Run("UnknownCoreMode", func(t *testing.T) {
 			a := NewAdapter(&fakeIwdbusAdapter{})
-			_, err := a.SupportsMode(ctx, AdapterModeUnknown)
+			_, err := a.SupportsMode(ctx, ModeUnknown)
 			require.Error(t, err)
 
 			var ce *Error
@@ -298,7 +298,7 @@ func TestAdapter_Core(t *testing.T) {
 			f := &fakeIwdbusAdapter{}
 			f.setErr(iwdbus.ErrDBusMethod)
 			a := NewAdapter(f)
-			_, err := a.SupportsMode(ctx, AdapterModeStation)
+			_, err := a.SupportsMode(ctx, ModeStation)
 			require.Error(t, err)
 
 			var ce *Error
@@ -309,9 +309,9 @@ func TestAdapter_Core(t *testing.T) {
 
 		t.Run("Success", func(t *testing.T) {
 			f := &fakeIwdbusAdapter{}
-			f.modes.Store([]iwdbus.AdapterMode{iwdbus.AdapterModeAP, iwdbus.AdapterModeStation})
+			f.modes.Store([]iwdbus.Mode{iwdbus.ModeAP, iwdbus.ModeStation})
 			a := NewAdapter(f)
-			ok, err := a.SupportsMode(ctx, AdapterModeAP)
+			ok, err := a.SupportsMode(ctx, ModeAP)
 			require.NoError(t, err)
 			require.True(t, ok)
 		})
@@ -415,13 +415,11 @@ func TestAdapter_Core(t *testing.T) {
 
 		var wg sync.WaitGroup
 		for range 50 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				powered, err := a.Powered(ctx)
 				require.NoError(t, err)
 				require.True(t, powered)
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -452,7 +450,7 @@ func TestAdapter_Properties(t *testing.T) {
 		f.name.Store("  phy0  ")
 		f.model.Store(&model)
 		f.vendor.Store(&vendor)
-		f.modes.Store([]iwdbus.AdapterMode{iwdbus.AdapterModeStation, iwdbus.AdapterModeAP})
+		f.modes.Store([]iwdbus.Mode{iwdbus.ModeStation, iwdbus.ModeAP})
 		a := NewAdapter(f)
 
 		props, err := a.Properties(ctx)
@@ -463,13 +461,13 @@ func TestAdapter_Properties(t *testing.T) {
 		require.Equal(t, "Broadcom", *props.Model)
 		require.NotNil(t, props.Vendor)
 		require.Equal(t, "Acme", *props.Vendor)
-		require.Equal(t, []AdapterMode{AdapterModeStation, AdapterModeAP}, props.SupportedModes)
+		require.Equal(t, []Mode{ModeStation, ModeAP}, props.SupportedModes)
 	})
 
 	t.Run("OptionalsNil", func(t *testing.T) {
 		f := &fakeIwdbusAdapter{}
 		f.name.Store("phy0")
-		f.modes.Store([]iwdbus.AdapterMode{iwdbus.AdapterModeStation})
+		f.modes.Store([]iwdbus.Mode{iwdbus.ModeStation})
 		a := NewAdapter(f)
 
 		props, err := a.Properties(ctx)
@@ -481,7 +479,7 @@ func TestAdapter_Properties(t *testing.T) {
 	t.Run("EmptyNameInvalidState", func(t *testing.T) {
 		f := &fakeIwdbusAdapter{}
 		f.name.Store("   ")
-		f.modes.Store([]iwdbus.AdapterMode{iwdbus.AdapterModeStation})
+		f.modes.Store([]iwdbus.Mode{iwdbus.ModeStation})
 		a := NewAdapter(f)
 
 		_, err := a.Properties(ctx)

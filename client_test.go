@@ -56,7 +56,7 @@ func TestClient(t *testing.T) {
 					fakeAdapter.powered.Store(true)
 					fakeAdapter.name.Store("phy0")
 					fakeAdapter.model.Store(&mockModel)
-					fakeAdapter.modes.Store([]core.AdapterMode{core.AdapterModeAP, core.AdapterModeAdHoc})
+					fakeAdapter.modes.Store([]core.Mode{core.ModeAP, core.ModeAdHoc})
 
 					resetClientSeams(t)
 					bus.set(func(ctx context.Context) (*connect.Wiring, error) {
@@ -150,7 +150,7 @@ func TestClient(t *testing.T) {
 			fakeCoreAdapter.powered.Store(true)
 			fakeCoreAdapter.name.Store("phy0")
 			fakeCoreAdapter.model.Store(&mockModel)
-			fakeCoreAdapter.modes.Store([]core.AdapterMode{core.AdapterModeAP, core.AdapterModeAdHoc})
+			fakeCoreAdapter.modes.Store([]core.Mode{core.ModeAP, core.ModeAdHoc})
 			w := &connect.Wiring{
 				Conn:    &dbus.Conn{},
 				Daemon:  fakeCoreDaemon,
@@ -397,6 +397,212 @@ func TestClientAllAdapters(t *testing.T) {
 		c := &Client{}
 		adapters, err := c.AllAdapters(ctx)
 		require.Nil(t, adapters)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+	})
+}
+
+func TestClientDevice(t *testing.T) {
+	ctx := context.Background()
+
+	newDeviceClient := func(factory func(ctx context.Context, path string) (core.DeviceIface, error)) *Client {
+		if factory == nil {
+			factory = func(_ context.Context, path string) (core.DeviceIface, error) {
+				fd := &fakeCoreDevice{}
+				fd.name.Store(path)
+				return fd, nil
+			}
+		}
+		wire := &connect.Wiring{
+			Conn:          &dbus.Conn{},
+			Daemon:        &fakeCoreDaemon{},
+			Cleanup:       func() error { return nil },
+			DeviceFactory: factory,
+		}
+		return &Client{daemon: newDaemon(&fakeCoreDaemon{}), wire: wire, cleanup: wire.Cleanup}
+	}
+
+	t.Run("Success", func(t *testing.T) {
+		c := newDeviceClient(nil)
+		d, err := c.Device(ctx, "/net/connman/iwd/phy0/wlan0")
+		require.NoError(t, err)
+		require.NotNil(t, d)
+		require.Equal(t, "/net/connman/iwd/phy0/wlan0", d.Path())
+	})
+
+	t.Run("WiringErrorMapsToPublicError", func(t *testing.T) {
+		base := errors.New("device unavailable")
+		c := newDeviceClient(func(_ context.Context, _ string) (core.DeviceIface, error) {
+			return nil, base
+		})
+		d, err := c.Device(ctx, "/net/connman/iwd/phy0/wlan0")
+		require.Nil(t, d)
+		require.Error(t, err)
+		require.ErrorIs(t, err, base)
+	})
+
+	t.Run("Closed", func(t *testing.T) {
+		c := newDeviceClient(nil)
+		require.NoError(t, c.Close())
+
+		d, err := c.Device(ctx, "/net/connman/iwd/phy0/wlan0")
+		require.Nil(t, d)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidState)
+	})
+
+	t.Run("NilReceiver", func(t *testing.T) {
+		var c *Client
+		d, err := c.Device(ctx, "/net/connman/iwd/phy0/wlan0")
+		require.Nil(t, d)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+	})
+
+	t.Run("UninitializedWiring", func(t *testing.T) {
+		c := &Client{}
+		d, err := c.Device(ctx, "/net/connman/iwd/phy0/wlan0")
+		require.Nil(t, d)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+	})
+}
+
+func TestClientAllDevices(t *testing.T) {
+	ctx := context.Background()
+
+	// newAllDevicesClient builds a Client whose daemon enumerates the supplied
+	// refs and whose wiring constructs handles via factory. factory may be nil,
+	// in which case each path yields a fakeCoreDevice named after its path.
+	newAllDevicesClient := func(
+		refs []core.DeviceRef,
+		daemonErr error,
+		factory func(ctx context.Context, path string) (core.DeviceIface, error),
+	) *Client {
+		fakeDaemon := &fakeCoreDaemon{}
+		fakeDaemon.setDevices(refs)
+		if daemonErr != nil {
+			fakeDaemon.setErr(daemonErr)
+		}
+		if factory == nil {
+			factory = func(_ context.Context, path string) (core.DeviceIface, error) {
+				fd := &fakeCoreDevice{}
+				fd.name.Store(path)
+				return fd, nil
+			}
+		}
+		wire := &connect.Wiring{
+			Conn:          &dbus.Conn{},
+			Daemon:        fakeDaemon,
+			Cleanup:       func() error { return nil },
+			DeviceFactory: factory,
+		}
+		return &Client{
+			daemon:  newDaemon(fakeDaemon),
+			wire:    wire,
+			cleanup: wire.Cleanup,
+		}
+	}
+
+	t.Run("Success", func(t *testing.T) {
+		refs := []core.DeviceRef{
+			{Path: "/net/connman/iwd/phy0/wlan0", Name: "wlan0"},
+			{Path: "/net/connman/iwd/phy1/wlan1", Name: "wlan1"},
+		}
+		c := newAllDevicesClient(refs, nil, nil)
+
+		devices, err := c.AllDevices(ctx)
+		require.NoError(t, err)
+		require.Len(t, devices, len(refs))
+
+		// Order is preserved and each handle is live: the fake names each
+		// device after the path it was constructed from.
+		for i, d := range devices {
+			require.NotNil(t, d)
+			require.Equal(t, refs[i].Path, d.Path())
+			name, err := d.Name(ctx)
+			require.NoError(t, err)
+			require.Equal(t, refs[i].Path, name)
+		}
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		c := newAllDevicesClient(nil, nil, nil)
+
+		devices, err := c.AllDevices(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, devices)
+		require.Empty(t, devices)
+	})
+
+	t.Run("EnumerationErrorMapsToPublicError", func(t *testing.T) {
+		base := errors.New("enumeration failed")
+		c := newAllDevicesClient(nil, base, nil)
+
+		devices, err := c.AllDevices(ctx)
+		require.Nil(t, devices)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+		require.ErrorIs(t, err, base)
+	})
+
+	t.Run("ConstructionErrorFailsFast", func(t *testing.T) {
+		refs := []core.DeviceRef{
+			{Path: "/net/connman/iwd/phy0/wlan0", Name: "wlan0"},
+			{Path: "/net/connman/iwd/phy1/wlan1", Name: "wlan1"},
+			{Path: "/net/connman/iwd/phy2/wlan2", Name: "wlan2"},
+		}
+		base := errors.New("device unavailable")
+		var constructed []string
+		factory := func(_ context.Context, path string) (core.DeviceIface, error) {
+			constructed = append(constructed, path)
+			if path == refs[1].Path {
+				return nil, base
+			}
+			fd := &fakeCoreDevice{}
+			fd.name.Store(path)
+			return fd, nil
+		}
+		c := newAllDevicesClient(refs, nil, factory)
+
+		devices, err := c.AllDevices(ctx)
+		require.Nil(t, devices)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+		require.ErrorIs(t, err, base)
+
+		// Fail-fast: stopped at the failing device, never reached wlan2.
+		require.Equal(t, []string{refs[0].Path, refs[1].Path}, constructed)
+	})
+
+	t.Run("Closed", func(t *testing.T) {
+		refs := []core.DeviceRef{{Path: "/net/connman/iwd/phy0/wlan0", Name: "wlan0"}}
+		c := newAllDevicesClient(refs, nil, nil)
+		require.NoError(t, c.Close())
+
+		devices, err := c.AllDevices(ctx)
+		require.Nil(t, devices)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidState)
+
+		var pe *Error
+		require.ErrorAs(t, err, &pe)
+		require.Equal(t, KindInvalidState, pe.Kind)
+		require.Equal(t, ResourceClient, pe.Resource)
+	})
+
+	t.Run("NilReceiver", func(t *testing.T) {
+		var c *Client
+		devices, err := c.AllDevices(ctx)
+		require.Nil(t, devices)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+	})
+
+	t.Run("UninitializedWiring", func(t *testing.T) {
+		c := &Client{}
+		devices, err := c.AllDevices(ctx)
+		require.Nil(t, devices)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrInternal)
 	})

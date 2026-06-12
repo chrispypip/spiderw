@@ -144,6 +144,7 @@ func startMock(dir string, args []string) (*runningMock, error) {
 			close(ready)
 		})
 	}
+	var scanErr error
 	scan := func(r io.Reader) {
 		sc := bufio.NewScanner(r)
 		for sc.Scan() {
@@ -152,6 +153,13 @@ func startMock(dir string, args []string) (*runningMock, error) {
 				signalReady()
 			}
 		}
+		if err := sc.Err(); err != nil {
+			scanErr = err
+			return
+		}
+	}
+	if scanErr != nil {
+		return nil, scanErr
 	}
 
 	go scan(stdout)
@@ -297,4 +305,10 @@ func StartMockWithDaemonFailingCalls(t *testing.T) {
 // StartMockAdapterWithBadModes starts a mock adapter with invalid SupportedModes data.
 func StartMockAdapterWithBadModes(t *testing.T) {
 	startMockWithT(t, "", []string{"--adapter-bad-modes"})
+}
+
+// StartMockWithoutDevice starts an iwd mock that does not export a device object,
+// which exercises empty device enumeration.
+func StartMockWithoutDevice(t *testing.T, dir string) {
+	startMockWithT(t, dir, []string{"--omit-device"})
 }

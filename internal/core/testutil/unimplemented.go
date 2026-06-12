@@ -20,3 +20,8 @@ type UnimplementedCoreDaemon struct{}
 func (UnimplementedCoreDaemon) Adapters(ctx context.Context) ([]core.AdapterRef, error) {
 	panic("fakeCoreDaemon.Adapters not implemented")
 }
+
+// Devices panics when a test fake does not implement device enumeration.
+func (UnimplementedCoreDaemon) Devices(ctx context.Context) ([]core.DeviceRef, error) {
+	panic("fakeCoreDaemon.Devices not implemented")
+}

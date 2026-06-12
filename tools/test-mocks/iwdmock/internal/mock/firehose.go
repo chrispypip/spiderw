@@ -10,10 +10,12 @@ import (
 	"github.com/chrispypip/spiderw/internal/iwdbus"
 )
 
-// StartSignalFirehose starts background mock daemon and adapter signal emitters.
+// StartSignalFirehose starts background mock daemon, adapter, and device signal
+// emitters.
 func StartSignalFirehose() {
 	go firehoseDaemonSignals()
 	go firehoseAdapterSignals()
+	go firehoseDeviceSignals()
 }
 
 func firehoseDaemonSignals() {
@@ -39,6 +41,22 @@ func firehoseAdapterSignals() {
 			map[string]dbus.Variant{
 				"Powered":        dbus.MakeVariant(rand.Intn(2) == 0),
 				"SupportedModes": dbus.MakeVariant([]string{"station", "ap", "ad-hoc"}),
+			},
+			[]string{},
+		)
+		time.Sleep(3 * time.Millisecond)
+	}
+}
+
+func firehoseDeviceSignals() {
+	modes := []string{"station", "ap", "ad-hoc"}
+	for i := 0; ; i++ {
+		emitPropertiesChanged(
+			devicePath,
+			iwdbus.IwdDeviceIface,
+			map[string]dbus.Variant{
+				"Powered": dbus.MakeVariant(rand.Intn(2) == 0),
+				"Mode":    dbus.MakeVariant(modes[i%len(modes)]),
 			},
 			[]string{},
 		)

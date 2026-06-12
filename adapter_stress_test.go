@@ -31,14 +31,12 @@ func TestStress_Public_Adapter_MixedOperations(t *testing.T) {
 
 	const N = 2000
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	sem := make(chan struct{}, runtime.GOMAXPROCS(0)*2)
 
 	for i := range N {
 		sem <- struct{}{}
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			defer func() { <-sem }()
 			time.Sleep(time.Microsecond * time.Duration(rand.Intn(200)))
 
@@ -68,7 +66,7 @@ func TestStress_Public_Adapter_MixedOperations(t *testing.T) {
 				// Mix subscriptions into the load.
 				_, _ = adapter.SubscribePoweredChanged(ctx, func(bool) {})
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -89,14 +87,12 @@ func TestStress_Public_Adapter_Subscriptions_Concurrent(t *testing.T) {
 
 	const N = 3000
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	sem := make(chan struct{}, runtime.GOMAXPROCS(0)*2)
 
 	for i := range N {
 		sem <- struct{}{}
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			defer func() { <-sem }()
 			time.Sleep(time.Microsecond * time.Duration(rand.Intn(200)))
 
@@ -114,7 +110,7 @@ func TestStress_Public_Adapter_Subscriptions_Concurrent(t *testing.T) {
 			}
 
 			_, _ = adapter.SubscribePoweredChanged(ctx, func(bool) {})
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -141,14 +137,11 @@ func TestStress_Public_Adapter_SubscribePropertiesChanged_SlowCallback(t *testin
 
 	const N = 1000
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	sem := make(chan struct{}, runtime.GOMAXPROCS(0)*2)
-
 	for i := range N {
 		sem <- struct{}{}
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			defer func() { <-sem }()
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -166,7 +159,7 @@ func TestStress_Public_Adapter_SubscribePropertiesChanged_SlowCallback(t *testin
 					delete(ev.Changed, "Powered")
 				}
 			})
-		}(i)
+		})
 	}
 
 	wg.Wait()

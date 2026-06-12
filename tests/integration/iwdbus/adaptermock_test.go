@@ -15,7 +15,14 @@ import (
 	"github.com/chrispypip/spiderw/tests/testutil/iwdmock"
 )
 
-const adapterTimeout = 600 * time.Millisecond
+// These tests exercise the adapter against a real D-Bus round trip. Per the
+// integration testing convention, the public Go API is the baseline (it is the
+// primary product surface and carries typed values/errors); the CLI gets a thin
+// layer covering only CLI-specific behavior (command routing, output rendering,
+// argument validation, exit codes); and raw iwdbus tests cover signal plumbing
+// that lives at that layer. Exhaustive per-property / per-mode value and error
+// matrices live in the iwdbus, core, and public unit tests and are not re-tested
+// here.
 
 func newTestAdapter(t *testing.T) (*iwdbus.Adapter, *dbus.Conn) {
 	t.Helper()
@@ -94,185 +101,110 @@ func runSpiderAdapterJSON(t *testing.T, args ...string) (map[string]any, string,
 	return runSpiderJSON(t, append([]string{"adapter"}, args...)...)
 }
 
-func TestAdapterMock_GetPowered(t *testing.T) {
-	tmpDir := t.TempDir()
+// -----------------------------------------------------------------------------
+// Public API against the mock
+// -----------------------------------------------------------------------------
 
+// TestAdapterMock_Properties exercises the batched Properties (Properties.GetAll)
+// path through the public API against the iwd mock. It is the baseline coverage
+// for every per-property getter (Powered/Name/Model/Vendor/SupportedModes).
+func TestAdapterMock_Properties(t *testing.T) {
+	tmpDir := t.TempDir()
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "powered")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, true, jsonGetBool(t, m, "Powered"))
+	ctx := context.Background()
+	a := newPublicMockAdapter(t, ctx, newMockClient(t, ctx), "phy0")
+
+	props, err := a.Properties(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "phy0", props.Name)
+	require.True(t, props.Powered)
+	require.NotNil(t, props.Model)
+	require.Equal(t, "MockModel", *props.Model)
+	require.NotNil(t, props.Vendor)
+	require.Equal(t, "MockVendor", *props.Vendor)
+	require.ElementsMatch(t, []spiderw.Mode{spiderw.ModeStation, spiderw.ModeAP}, props.SupportedModes)
 }
 
-func TestAdapterMock_SetPowered(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "powered", "off")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, false, jsonGetBool(t, m, "Powered"))
-}
-
-func TestAdapterMock_GetName(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "name")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, "phy0", jsonGetString(t, m, "Value"))
-}
-
-func TestAdapterMock_GetModelProvided(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "model")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, "MockModel", jsonGetString(t, m, "Value"))
-}
-
-func TestAdapterMock_GetModelAbsent(t *testing.T) {
+// TestAdapterMock_PropertiesOmittedOptionals confirms an absent optional is
+// simply missing from the GetAll reply and stays nil without erroring.
+func TestAdapterMock_PropertiesOmittedOptionals(t *testing.T) {
 	iwdmock.StartMockWithOmittedOptionals(t)
 
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "model")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Nil(t, m["Value"], "expected null Model value:\n%s", out)
+	ctx := context.Background()
+	a := newPublicMockAdapter(t, ctx, newMockClient(t, ctx), "phy0")
+
+	props, err := a.Properties(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "phy0", props.Name)
+	require.Nil(t, props.Model)
+	require.Nil(t, props.Vendor)
+	require.ElementsMatch(t, []spiderw.Mode{spiderw.ModeStation, spiderw.ModeAP}, props.SupportedModes)
 }
 
-func TestAdapterMock_GetVendorProvided(t *testing.T) {
+// TestAdapterMock_SupportsMode covers the mode-support queries through the public
+// API; the mock advertises station + ap.
+func TestAdapterMock_SupportsMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	ctx := context.Background()
+	a := newPublicMockAdapter(t, ctx, newMockClient(t, ctx), "phy0")
+
+	station, err := a.SupportsStation(ctx)
+	require.NoError(t, err)
+	require.True(t, station)
+
+	ap, err := a.SupportsMode(ctx, spiderw.ModeAP)
+	require.NoError(t, err)
+	require.True(t, ap)
+
+	adhoc, err := a.SupportsAdHoc(ctx)
+	require.NoError(t, err)
+	require.False(t, adhoc)
+}
+
+func TestAdapterMock_SubscribePoweredChanged_UnsubscribeStopsCallbacks(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "vendor")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, "MockVendor", jsonGetString(t, m, "Value"))
-}
+	ctx := context.Background()
+	adapter := newPublicMockAdapter(t, ctx, newMockClient(t, ctx), "phy0")
+	received := make(chan bool, 2)
 
-func TestAdapterMock_GetVendorAbsent(t *testing.T) {
-	iwdmock.StartMockWithOmittedOptionals(t)
+	unsubscribe, err := adapter.SubscribePoweredChanged(ctx, func(powered bool) {
+		received <- powered
+	})
+	require.NoError(t, err)
 
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "vendor")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Nil(t, m["Value"], "expected null Vendor value:\n%s", out)
-}
-
-func TestAdapterMock_GetSupportedModes(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "supported-modes")
-	require.NoError(t, err, "output:\n%s", out)
-	require.ElementsMatch(t, []string{"station", "ap"}, jsonGetArray(t, m, "SupportedModes"))
-}
-
-func TestAdapterMock_SupportsMode_Supported(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "supports-mode", "station")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, true, jsonGetBool(t, m, "Value"))
-}
-
-func TestAdapterMock_SupportsMode_NotSupported(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "supports-mode", "ad-hoc")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, false, jsonGetBool(t, m, "Value"))
-}
-
-func TestAdapterMock_SupportsMode_InvalidMode(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	out, err := runSpiderAdapter(t, "phy0", "supports-mode", "42")
-	require.Error(t, err, "output:\n%s", out)
-	require.Contains(t, out, "invalid adapter mode \"42\"")
-}
-
-func TestAdapterMock_SupportsMode_Specific_Supported(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "supports-station")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, true, jsonGetBool(t, m, "Value"))
-}
-
-func TestAdapterMock_SupportsMode_Specific_NotSupported(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "supports-ad-hoc")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, false, jsonGetBool(t, m, "Value"))
-}
-
-func TestAdapterMock_ConcurrentModeChecks(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	const N = 100
-	errs := make(chan error, N)
-
-	for range N {
-		go func() {
-			_, _ = runSpiderAdapter(t, "phy0", "supported-modes")
-			errs <- nil
-		}()
+	require.NoError(t, adapter.SetPowered(ctx, false))
+	select {
+	case got := <-received:
+		require.False(t, got)
+	case <-time.After(signalTimeout):
+		t.Fatal("timed out waiting for powered=false callback")
 	}
 
-	for range N {
-		require.NoError(t, <-errs)
-	}
+	require.NoError(t, unsubscribe.Unsubscribe())
+	require.NoError(t, unsubscribe.Unsubscribe(), "unsubscribe should be idempotent")
+	drainBoolChan(received)
+
+	require.NoError(t, adapter.SetPowered(ctx, true))
+	require.Never(t, func() bool {
+		select {
+		case got := <-received:
+			t.Logf("unexpected callback after unsubscribe: powered=%t", got)
+			return true
+		default:
+			return false
+		}
+	}, 250*time.Millisecond, pollInterval, "callback fired after unsubscribe")
 }
 
-func TestAdapterMock_InvalidAdapter(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	out, err := runSpiderAdapter(t, "phy9", "powered")
-	require.Error(t, err, "output:\n%s", out)
-	require.Contains(t, out, "adapter \"phy9\" not found")
-}
-
-func TestAdapterMock_BadSupportedModesType(t *testing.T) {
-	iwdmock.StartMockAdapterWithBadModes(t)
-
-	out, err := runSpiderAdapter(t, "phy0", "supported-modes")
-	require.Error(t, err, "output:\n%s", out)
-	mustContainAll(t, out, []string{"dbus variant conversion error", "variant=SupportedModes", "unexpected type"})
-}
-
-func TestAdapterMock_EventuallyPowered(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "powered", "true")
-	require.NoError(t, err, "output:\n%s", out)
-	require.True(t, jsonGetBool(t, m, "Powered"), "output:\n%s", out)
-
-	require.Eventually(t, func() bool {
-		m, out, err := runSpiderAdapterJSON(t, "phy0", "powered")
-		require.NoError(t, err, "output:\n%s", out)
-		return jsonGetBool(t, m, "Powered")
-	}, adapterTimeout, pollInterval)
-}
+// -----------------------------------------------------------------------------
+// Raw iwdbus signal plumbing against the mock
+// -----------------------------------------------------------------------------
 
 func TestAdapterMock_SubscribePropertiesChanged(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -328,49 +260,6 @@ func TestAdapterMock_SubscribePoweredChanged(t *testing.T) {
 	require.Equal(t, false, recv)
 }
 
-func TestAdapterMock_SubscribePoweredChanged_UnsubscribeStopsCallbacks(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	ctx := context.Background()
-	// SessionBus is where the iwd mock is registered.
-	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, client.Close()) })
-
-	adapter := newPublicMockAdapter(t, ctx, client, "phy0")
-	received := make(chan bool, 2)
-
-	unsubscribe, err := adapter.SubscribePoweredChanged(ctx, func(powered bool) {
-		received <- powered
-	})
-	require.NoError(t, err)
-
-	require.NoError(t, adapter.SetPowered(ctx, false))
-	select {
-	case got := <-received:
-		require.False(t, got)
-	case <-time.After(signalTimeout):
-		t.Fatal("timed out waiting for powered=false callback")
-	}
-
-	require.NoError(t, unsubscribe.Unsubscribe())
-	require.NoError(t, unsubscribe.Unsubscribe(), "unsubscribe should be idempotent")
-	drainBoolChan(received)
-
-	require.NoError(t, adapter.SetPowered(ctx, true))
-	require.Never(t, func() bool {
-		select {
-		case got := <-received:
-			t.Logf("unexpected callback after unsubscribe: powered=%t", got)
-			return true
-		default:
-			return false
-		}
-	}, 250*time.Millisecond, pollInterval, "callback fired after unsubscribe")
-}
-
 func TestAdapterMock_Firehose(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -411,6 +300,45 @@ func TestAdapterMock_Firehose(t *testing.T) {
 	require.Equal(t, iwdbus.IwdAdapterIface, s)
 	require.Equal(t, changed, v)
 	require.Equal(t, []string{}, ss)
+}
+
+// -----------------------------------------------------------------------------
+// CLI (`spiderw adapter …`) against the mock — thin, CLI-specific coverage only
+// -----------------------------------------------------------------------------
+
+// TestAdapterMock_CLI_Powered exercises the `adapter <adapter> powered` command
+// routing for both the get and set branches plus JSON output.
+func TestAdapterMock_CLI_Powered(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	m, out, err := runSpiderAdapterJSON(t, "phy0", "powered")
+	require.NoError(t, err, "output:\n%s", out)
+	require.Equal(t, true, jsonGetBool(t, m, "Powered"))
+
+	m, out, err = runSpiderAdapterJSON(t, "phy0", "powered", "off")
+	require.NoError(t, err, "output:\n%s", out)
+	require.Equal(t, false, jsonGetBool(t, m, "Powered"))
+}
+
+// TestAdapterMock_CLI_InvalidMode covers CLI mode-argument validation.
+func TestAdapterMock_CLI_InvalidMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	out, err := runSpiderAdapter(t, "phy0", "supports-mode", "42")
+	require.Error(t, err, "output:\n%s", out)
+	require.Contains(t, out, "invalid mode \"42\"")
+}
+
+// TestAdapterMock_CLI_InvalidAdapter covers CLI adapter-reference resolution.
+func TestAdapterMock_CLI_InvalidAdapter(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	out, err := runSpiderAdapter(t, "phy9", "powered")
+	require.Error(t, err, "output:\n%s", out)
+	require.Contains(t, out, "adapter \"phy9\" not found")
 }
 
 // TestAdapterMock_Status exercises `adapter status`, which drives
@@ -463,19 +391,14 @@ func TestAdapterMock_StatusJSON(t *testing.T) {
 
 // TestAdapterMock_StatusOmittedOptionals verifies that status tolerates an
 // adapter that does not expose the optional Model/Vendor properties: the
-// command still succeeds and renders those fields as "-" rather than failing,
-// unlike the per-property `adapter <adapter> model` query which surfaces the
-// error.
+// command still succeeds and renders those fields as "-" (custom CLI logic)
+// rather than failing.
 func TestAdapterMock_StatusOmittedOptionals(t *testing.T) {
 	iwdmock.StartMockWithOmittedOptionals(t)
 
 	out, err := runSpiderAdapter(t, "status")
 	require.NoError(t, err, "output:\n%s", out)
 
-	// The omit-optionals mock reproduces real iwd: an absent optional returns a
-	// "Getting property value failed" getter error that internal/iwdbus collapses
-	// to nil, so status reads nil (no error) and renders "-" under strict
-	// propagation. Required fields are still present; absent optionals show "-".
 	mustContainAll(t, out, []string{
 		"Name:",
 		"phy0",
@@ -487,21 +410,6 @@ func TestAdapterMock_StatusOmittedOptionals(t *testing.T) {
 	})
 	require.NotContains(t, out, "MockModel", "output:\n%s", out)
 	require.NotContains(t, out, "MockVendor", "output:\n%s", out)
-}
-
-// TestAdapterMock_StatusOmittedOptionalsJSON verifies the structured output
-// renders the absent optionals as JSON null.
-func TestAdapterMock_StatusOmittedOptionalsJSON(t *testing.T) {
-	iwdmock.StartMockWithOmittedOptionals(t)
-
-	list, out, err := runSpiderJSONArray(t, "adapter", "status")
-	require.NoError(t, err, "output:\n%s", out)
-
-	entry := findAdapterStatusEntry(t, list, "/net/connman/iwd/phy0")
-	require.Equal(t, "phy0", jsonGetString(t, entry, "Name"))
-	require.Nil(t, entry["Model"], "expected null Model:\n%s", out)
-	require.Nil(t, entry["Vendor"], "expected null Vendor:\n%s", out)
-	require.ElementsMatch(t, []string{"station", "ap"}, jsonGetArray(t, entry, "SupportedModes"))
 }
 
 // TestAdapterMock_ErrorMessageNotDuplicated guards end-to-end against the public
@@ -517,49 +425,4 @@ func TestAdapterMock_ErrorMessageNotDuplicated(t *testing.T) {
 
 	mustContainExactlyOnce(t, out, "adapter unavailable: Op=Adapter.SupportedModes:")
 	mustContainExactlyOnce(t, out, "(failed querying iwd Adapter supported modes)")
-}
-
-// TestAdapterMock_Properties exercises the batched Properties (Properties.GetAll)
-// path through the public API against the iwd mock.
-func TestAdapterMock_Properties(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	ctx := context.Background()
-	// SessionBus is where the iwd mock is registered.
-	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, client.Close()) })
-
-	a := newPublicMockAdapter(t, ctx, client, "phy0")
-
-	props, err := a.Properties(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "phy0", props.Name)
-	require.True(t, props.Powered)
-	require.NotNil(t, props.Model)
-	require.Equal(t, "MockModel", *props.Model)
-	require.NotNil(t, props.Vendor)
-	require.Equal(t, "MockVendor", *props.Vendor)
-	require.ElementsMatch(t, []spiderw.AdapterMode{spiderw.AdapterModeStation, spiderw.AdapterModeAP}, props.SupportedModes)
-}
-
-// TestAdapterMock_PropertiesOmittedOptionals confirms an absent optional is
-// simply missing from the GetAll reply and stays nil without erroring.
-func TestAdapterMock_PropertiesOmittedOptionals(t *testing.T) {
-	iwdmock.StartMockWithOmittedOptionals(t)
-
-	ctx := context.Background()
-	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, client.Close()) })
-
-	a := newPublicMockAdapter(t, ctx, client, "phy0")
-
-	props, err := a.Properties(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "phy0", props.Name)
-	require.Nil(t, props.Model)
-	require.Nil(t, props.Vendor)
-	require.ElementsMatch(t, []spiderw.AdapterMode{spiderw.AdapterModeStation, spiderw.AdapterModeAP}, props.SupportedModes)
 }

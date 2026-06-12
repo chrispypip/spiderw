@@ -14,7 +14,8 @@ import (
 
 // TestErrors_NoDuplicateFrame guards against the public Error restating the
 // frame of a wrapped core.Error (label, Op, Details), which previously rendered
-// every layer twice. The core.Error must still be discoverable via errors.As.
+// every layer twice. The core.Error must still be discoverable via errors.As and
+// errors.AsType.
 func TestErrors_NoDuplicateFrame(t *testing.T) {
 	inner := errors.New("dbus property error: iface=net.connman.iwd.Adapter, property=Model: boom")
 	ce := &core.Error{

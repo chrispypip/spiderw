@@ -99,8 +99,8 @@ var (
 
 // Error is the structured error type returned by the public API.
 //
-// Underlying core and D-Bus errors remain discoverable via errors.Is and
-// errors.As.
+// Underlying core and D-Bus errors remain discoverable via errors.Is,
+// errors.As, and errors.AsType.
 //
 // Example:
 //
@@ -121,10 +121,9 @@ func (e *Error) Error() string {
 	// When we wrap a core.Error, its own Error() restates the same label, Op,
 	// and Details we are about to print, which would duplicate every frame.
 	// Render the core error's underlying cause instead; the core.Error itself
-	// stays in the Unwrap chain for errors.Is / errors.As.
+	// stays in the Unwrap chain for errors.Is / errors.As / errors.AsType.
 	cause := e.Err
-	var ce *core.Error
-	if errors.As(e.Err, &ce) {
+	if ce, ok := errors.AsType[*core.Error](e.Err); ok {
 		cause = ce.Err
 	}
 
@@ -178,14 +177,12 @@ func wrapPublicError(op string, err error) error {
 	}
 
 	// If it's a public error, preserve it to prevent double-wrapping.
-	var pe *Error
-	if errors.As(err, &pe) {
+	if _, ok := errors.AsType[*Error](err); ok {
 		return err
 	}
 
 	// If it's a core error, map it
-	var ce *core.Error
-	if errors.As(err, &ce) {
+	if ce, ok := errors.AsType[*core.Error](err); ok {
 		return &Error{
 			Kind:     mapCoreKind(ce.Kind),
 			Resource: mapCoreResource(ce.Resource),

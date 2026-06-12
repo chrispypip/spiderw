@@ -95,6 +95,37 @@ func ExampleClient_Adapter() {
 	fmt.Printf("%s powered: %t\n", refs[0].Name, powered)
 }
 
+// ExampleClient_Device discovers a device and reads its current status.
+func ExampleClient_Device() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	refs, err := client.Daemon().Devices(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no devices found")
+	}
+
+	device, err := client.Device(ctx, refs[0].Path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	props, err := device.Properties(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s (%s) mode=%s powered=%t adapter=%s\n",
+		props.Name, props.Address, props.Mode, props.Powered, props.Adapter)
+}
+
 // ExampleClient_AllAdapters constructs a handle for every adapter iwd exposes
 // and reports each one's powered state.
 func ExampleClient_AllAdapters() {
@@ -174,7 +205,7 @@ func ExampleAdapter_SupportsMode() {
 		log.Fatal(err)
 	}
 
-	ok, err := adapter.SupportsMode(ctx, spiderw.AdapterModeStation)
+	ok, err := adapter.SupportsMode(ctx, spiderw.ModeStation)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -226,10 +257,10 @@ func Example_errorHandling() {
 			fmt.Println("iwd is unavailable")
 		}
 
-		// Inspect the structured fields with errors.As.
-		var swErr *spiderw.Error
-		if errors.As(err, &swErr) && swErr.Resource == spiderw.ResourceDaemon {
+		// Inspect the structured fields with errors.AsType.
+		if swErr, ok := errors.AsType[*spiderw.Error](err); ok && swErr.Resource == spiderw.ResourceDaemon {
 			fmt.Printf("daemon error in %s: %v\n", swErr.Op, err)
 		}
+
 	}
 }

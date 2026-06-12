@@ -51,13 +51,10 @@ func TestStress_Logging_LargeAttributeLists(t *testing.T) {
 
 	// Hammer With() + logging concurrently
 	for i := range 100 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			l := tl.With(attrs...)
 			l.Info(ctx, "large-attr-log", "goroutine", i)
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -92,11 +89,9 @@ func TestStress_Logging_DeepContextNesting(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := range 100 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			logging.FromContext(ctx).Info(ctx, "deep-context-log", "i", i)
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -133,9 +128,7 @@ func TestStress_Logging_MixedLogger(t *testing.T) {
 	var wg sync.WaitGroup
 	// Run a large number of goroutines mixing logging types & operations.
 	for i := range 300 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			switch i % 3 {
 			case 0:
 				textLogger.Info(ctx, "text-info", "i", i)
@@ -146,7 +139,7 @@ func TestStress_Logging_MixedLogger(t *testing.T) {
 			default:
 				nopLogger.Debug(ctx, "nop-debug", "i", i)
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -173,9 +166,7 @@ func TestStress_Logging_MixedLogger_ContextSwapStress(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for i := range 150 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			localLogger := logging.New(logging.Config{
 				Writer: baseBuf,
 				JSON:   i%2 == 0,
@@ -183,7 +174,7 @@ func TestStress_Logging_MixedLogger_ContextSwapStress(t *testing.T) {
 			localCtx := logging.WithLogger(ctxWithLogger, localLogger)
 			l := logging.FromContext(localCtx)
 			l.Info(localCtx, "context-swap", "i", i)
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -197,11 +188,7 @@ func TestStress_Logging_MixedLogger_DeepWithChains(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := range 100 {
-		wg.Add(1)
-
-		go func(i int) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			// Pick logger type based on iteration to force intermixing
 			l := loggers[i%len(loggers)]
 
@@ -210,7 +197,7 @@ func TestStress_Logging_MixedLogger_DeepWithChains(t *testing.T) {
 				l = l.With("lvl", j)
 				l.Debug(ctx, "deep chain", "i", i, "j", j)
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -236,9 +223,7 @@ func TestStress_Logging_MixedLogger_PauseAndBurst(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for i := range 200 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			if i%2 == 0 {
 				textLogger.Info(ctx, "burst-text", "i", i)
 				textLogger.Warn(ctx, "burst-warn", "i", i)
@@ -246,22 +231,20 @@ func TestStress_Logging_MixedLogger_PauseAndBurst(t *testing.T) {
 				jsonLogger.Info(ctx, "burst-json", "i", i)
 				jsonLogger.Error(ctx, "burst-json-error", "i", i)
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
 
 	time.Sleep(10 * time.Millisecond)
 	for i := range 100 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			if i%2 == 0 {
 				textLogger.Info(ctx, "second-burst-text", "i", i)
 			} else {
 				jsonLogger.Info(ctx, "second-burst-json", "i", i)
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()

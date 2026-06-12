@@ -13,11 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	signalTimeout = 1 * time.Second
-	pollInterval  = 5 * time.Millisecond
-)
-
 func TestAdapter_Iwdbus(t *testing.T) {
 	t.Parallel()
 
@@ -25,9 +20,9 @@ func TestAdapter_Iwdbus(t *testing.T) {
 		t.Parallel()
 		t.Run("ParseSupportedModes", testParseSupportedModes)
 		t.Run("ParseOptionalString", testParseOptionalString)
-		t.Run("ParseAdapterMode_ValidModes", testParseAdapterMode_ValidModes)
-		t.Run("ParseAdapterMode_Invalid", testParseAdapterMode_Invalid)
-		t.Run("ParseAdapterMode_RoundTrip", testParseAdapterMode_RoundTrip)
+		t.Run("ParseMode_ValidModes", testParseMode_ValidModes)
+		t.Run("ParseMode_Invalid", testParseMode_Invalid)
+		t.Run("ParseMode_RoundTrip", testParseMode_RoundTrip)
 	})
 
 	t.Run("SupportsMode", func(t *testing.T) {
@@ -162,7 +157,7 @@ func TestAdapter_GetProperties_OptionalsAbsent(t *testing.T) {
 	require.Equal(t, "phy1", props.Name)
 	require.Nil(t, props.Model)
 	require.Nil(t, props.Vendor)
-	require.Equal(t, []AdapterMode{AdapterModeStation}, props.SupportedModes)
+	require.Equal(t, []Mode{ModeStation}, props.SupportedModes)
 }
 
 func TestAdapter_GetProperties_Errors(t *testing.T) {
@@ -241,7 +236,6 @@ func TestAdapter_GetProperties_Errors(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -265,20 +259,20 @@ func testParseSupportedModes(t *testing.T) {
 	tests := []struct {
 		name            string
 		in              any
-		want            []AdapterMode
+		want            []Mode
 		wantErrContains []string
 		wantRoundTrip   []string
 	}{
 		{
 			name:          "valid string slice",
 			in:            []string{"station", "ap", "ad-hoc"},
-			want:          []AdapterMode{AdapterModeStation, AdapterModeAP, AdapterModeAdHoc},
+			want:          []Mode{ModeStation, ModeAP, ModeAdHoc},
 			wantRoundTrip: []string{"station", "ap", "ad-hoc"},
 		},
 		{
 			name: "valid interface slice",
 			in:   []interface{}{"ap", "ad-hoc"},
-			want: []AdapterMode{AdapterModeAP, AdapterModeAdHoc},
+			want: []Mode{ModeAP, ModeAdHoc},
 		},
 		{
 			name:            "wrong type",
@@ -396,11 +390,11 @@ func testParseOptionalString(t *testing.T) {
 func testSupportsMode_Supported(t *testing.T) {
 	t.Parallel()
 
-	supported, err := isModeSupported([]AdapterMode{
-		AdapterModeStation,
-		AdapterModeAP,
-		AdapterModeAdHoc,
-	}, AdapterModeStation)
+	supported, err := isModeSupported([]Mode{
+		ModeStation,
+		ModeAP,
+		ModeAdHoc,
+	}, ModeStation)
 	require.NoError(t, err, "failed to parse supported modes")
 	require.True(t, supported)
 }
@@ -408,10 +402,10 @@ func testSupportsMode_Supported(t *testing.T) {
 func testSupportsMode_NotSupported(t *testing.T) {
 	t.Parallel()
 
-	supported, err := isModeSupported([]AdapterMode{
-		AdapterModeStation,
-		AdapterModeAP,
-	}, AdapterModeAdHoc)
+	supported, err := isModeSupported([]Mode{
+		ModeStation,
+		ModeAP,
+	}, ModeAdHoc)
 	require.NoError(t, err, "failed to parse supported modes")
 	require.False(t, supported)
 }
@@ -419,29 +413,29 @@ func testSupportsMode_NotSupported(t *testing.T) {
 func testSupportsMode_InvalidMode(t *testing.T) {
 	t.Parallel()
 
-	_, err := isModeSupported([]AdapterMode{AdapterModeAP, AdapterModeAdHoc}, AdapterModeUnknown)
+	_, err := isModeSupported([]Mode{ModeAP, ModeAdHoc}, ModeUnknown)
 	require.Error(t, err, "expected error")
 }
 
-func testParseAdapterMode_ValidModes(t *testing.T) {
+func testParseMode_ValidModes(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		input string
-		want  AdapterMode
+		want  Mode
 	}{
-		{"station", AdapterModeStation},
-		{"ap", AdapterModeAP},
-		{"ad-hoc", AdapterModeAdHoc},
+		{"station", ModeStation},
+		{"ap", ModeAP},
+		{"ad-hoc", ModeAdHoc},
 	}
 	for _, tt := range tests {
-		mode, err := ParseAdapterMode(tt.input)
+		mode, err := ParseMode(tt.input)
 		require.NoError(t, err, "input=%q", tt.input)
 		require.Equal(t, tt.want, mode)
 	}
 }
 
-func testParseAdapterMode_Invalid(t *testing.T) {
+func testParseMode_Invalid(t *testing.T) {
 	t.Parallel()
 
 	tests := []string{
@@ -451,23 +445,23 @@ func testParseAdapterMode_Invalid(t *testing.T) {
 		"",
 	}
 	for _, input := range tests {
-		mode, err := ParseAdapterMode(input)
+		mode, err := ParseMode(input)
 		require.Error(t, err, "expected error for input=%q", input)
-		require.Equal(t, AdapterModeUnknown, mode)
+		require.Equal(t, ModeUnknown, mode)
 	}
 }
 
-func testParseAdapterMode_RoundTrip(t *testing.T) {
+func testParseMode_RoundTrip(t *testing.T) {
 	t.Parallel()
 
-	modes := []AdapterMode{
-		AdapterModeStation,
-		AdapterModeAP,
-		AdapterModeAdHoc,
+	modes := []Mode{
+		ModeStation,
+		ModeAP,
+		ModeAdHoc,
 	}
 	for _, m := range modes {
 		s := m.String()
-		parsed, err := ParseAdapterMode(s)
+		parsed, err := ParseMode(s)
 		require.NoError(t, err, "round trip failed for %q", s)
 		require.Equal(t, m, parsed)
 	}
@@ -812,7 +806,7 @@ func testAdapter_GetSupportedModes(t *testing.T) {
 
 	modes, err := a.GetSupportedModes(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, []AdapterMode{AdapterModeStation, AdapterModeAP}, modes)
+	require.Equal(t, []Mode{ModeStation, ModeAP}, modes)
 }
 
 func testAdapter_GetSupportedModes_Empty(t *testing.T) {
@@ -911,7 +905,7 @@ func testAdapter_SupportsMode_Valid(t *testing.T) {
 		},
 	}}
 
-	ok, err := a.SupportsMode(context.Background(), AdapterModeStation)
+	ok, err := a.SupportsMode(context.Background(), ModeStation)
 	require.NoError(t, err)
 	require.True(t, ok)
 }
@@ -933,7 +927,7 @@ func testAdapter_SupportsModeTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	t.Cleanup(func() { cancel() })
 
-	_, err := a.SupportsMode(ctx, AdapterModeStation)
+	_, err := a.SupportsMode(ctx, ModeStation)
 	require.Error(t, err)
 }
 
@@ -946,7 +940,7 @@ func testAdapter_SupportsMode_Invalid(t *testing.T) {
 		},
 	}}
 
-	_, err := a.SupportsMode(context.Background(), AdapterModeUnknown)
+	_, err := a.SupportsMode(context.Background(), ModeUnknown)
 	require.Error(t, err)
 }
 
@@ -959,7 +953,7 @@ func testAdapter_SupportsMode_GetSupportedModesError(t *testing.T) {
 		},
 	}}
 
-	_, err := a.SupportsMode(context.Background(), AdapterModeStation)
+	_, err := a.SupportsMode(context.Background(), ModeStation)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "dbus failure")
 }
@@ -969,7 +963,7 @@ func testAdapter_SupportsMode_NoIntro(t *testing.T) {
 
 	a := &Adapter{call: nil}
 
-	_, err := a.SupportsMode(context.Background(), AdapterModeStation)
+	_, err := a.SupportsMode(context.Background(), ModeStation)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "adapter is not initialized")
 }
@@ -985,13 +979,11 @@ func testAdapter_SupportsMode_Concurrent(t *testing.T) {
 	ctx := context.Background()
 
 	for range 50 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			ok, err := a.SupportsMode(ctx, AdapterModeAP)
+		wg.Go(func() {
+			ok, err := a.SupportsMode(ctx, ModeAP)
 			require.NoError(t, err)
 			require.True(t, ok)
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -1472,28 +1464,6 @@ func testAdapter_FirehosePropertiesChanged(t *testing.T) {
 	require.Equal(t, IwdAdapterIface, s)
 	require.Equal(t, changed, v)
 	require.Equal(t, invalid, ss)
-}
-
-func requireFired(t *testing.T, ch <-chan struct{}) {
-	require.Eventually(t, func() bool {
-		select {
-		case <-ch:
-			return true
-		default:
-			return false
-		}
-	}, signalTimeout, pollInterval)
-}
-
-func requireNotFired(t *testing.T, ch <-chan struct{}) {
-	require.Eventually(t, func() bool {
-		select {
-		case <-ch:
-			return false
-		default:
-			return true
-		}
-	}, signalTimeout, pollInterval)
 }
 
 func newGetAllAdapter(fn func(ctx context.Context, iface string) (map[string]dbus.Variant, error)) *Adapter {

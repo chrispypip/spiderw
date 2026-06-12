@@ -22,6 +22,7 @@ type fakeCoreDaemon struct {
 	stateDir atomic.Pointer[string]
 	ncfg     atomic.Bool
 	adapters atomic.Pointer[[]core.AdapterRef]
+	devices  atomic.Pointer[[]core.DeviceRef]
 	err      atomic.Pointer[fakeCoreDaemonError]
 }
 
@@ -57,6 +58,16 @@ func (f *fakeCoreDaemon) setAdapters(adapters []core.AdapterRef) {
 
 	adaptersCopy := append([]core.AdapterRef(nil), adapters...)
 	f.adapters.Store(&adaptersCopy)
+}
+
+func (f *fakeCoreDaemon) setDevices(devices []core.DeviceRef) {
+	if devices == nil {
+		f.devices.Store(nil)
+		return
+	}
+
+	devicesCopy := append([]core.DeviceRef(nil), devices...)
+	f.devices.Store(&devicesCopy)
 }
 
 func (f *fakeCoreDaemon) setErr(err error) {
@@ -131,4 +142,16 @@ func (f *fakeCoreDaemon) Adapters(ctx context.Context) ([]core.AdapterRef, error
 		return nil, nil
 	}
 	return append([]core.AdapterRef(nil), (*adapters)...), nil
+}
+
+func (f *fakeCoreDaemon) Devices(ctx context.Context) ([]core.DeviceRef, error) {
+	if err := f.loadErr(); err != nil {
+		return nil, err
+	}
+
+	devices := f.devices.Load()
+	if devices == nil {
+		return nil, nil
+	}
+	return append([]core.DeviceRef(nil), (*devices)...), nil
 }

@@ -32,22 +32,18 @@ func TestRace_Iwdbus_Dispatch_CloseEmit(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := range 100 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			intro.sigCh <- &dbus.Signal{
 				Name: "net.connman.iwd.Adapter.PoweredChanged",
 				Body: []interface{}{i},
 			}
-		}(i)
+		})
 	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		cancel()
 		_ = intro.Close()
-	}()
+	})
 
 	wg.Wait()
 }
@@ -58,15 +54,13 @@ func TestRace_Iwdbus_ParseIntrospectionChildNames_Concurrent(t *testing.T) {
 
 	const N = 250
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	errCh := make(chan error, N)
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := parseIntrospectionChildNames(xml)
 			errCh <- err
-		}()
+		})
 	}
 
 	wg.Wait()

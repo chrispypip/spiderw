@@ -17,6 +17,15 @@ type AdapterRef struct {
 	Name string
 }
 
+// DeviceRef is a lightweight reference to a device discovered by the iwd daemon.
+type DeviceRef struct {
+	// Path is the canonical D-Bus object path for the device.
+	Path string
+
+	// Name is the device's Name property.
+	Name string
+}
+
 // DaemonIface defines the core daemon operations used by the public layer.
 type DaemonIface interface {
 	Info(ctx context.Context) (*DaemonInfo, error)
@@ -24,6 +33,7 @@ type DaemonIface interface {
 	StateDirectory(ctx context.Context) (string, error)
 	NetworkConfigurationEnabled(ctx context.Context) (bool, error)
 	Adapters(ctx context.Context) ([]AdapterRef, error)
+	Devices(ctx context.Context) ([]DeviceRef, error)
 }
 
 // DaemonInfo is the normalized core-layer view of daemon metadata.
@@ -41,6 +51,7 @@ type DaemonInfo struct {
 type daemonRaw interface {
 	GetInfo(ctx context.Context) (*iwdbus.DaemonInfo, error)
 	GetAdapters(ctx context.Context) ([]iwdbus.AdapterRef, error)
+	GetDevices(ctx context.Context) ([]iwdbus.DeviceRef, error)
 }
 
 // Daemon is the core-layer facade over a raw iwd daemon backend.
@@ -154,6 +165,36 @@ func (d *Daemon) Adapters(ctx context.Context) ([]AdapterRef, error) {
 		}
 
 		refs = append(refs, AdapterRef{Path: p, Name: n})
+	}
+	return refs, nil
+}
+
+// Devices returns the devices currently exposed by the iwd daemon.
+func (d *Daemon) Devices(ctx context.Context) ([]DeviceRef, error) {
+	const op = "Daemon.Devices"
+
+	rawDaemon, err := d.rawDaemon(op)
+	if err != nil {
+		return nil, err
+	}
+
+	rawRefs, err := rawDaemon.GetDevices(ctx)
+	if err != nil {
+		return nil, WrapDaemonUnavailable(op, "failed getting devices", err)
+	}
+	refs := make([]DeviceRef, 0, len(rawRefs))
+	for _, r := range rawRefs {
+		p := strings.TrimSpace(string(r.Path))
+		if p == "" || !strings.HasPrefix(p, "/") {
+			return nil, WrapInvalidState(ResourceDevice, op, "device returned invalid path", fmt.Errorf("invalid device path %q", p))
+		}
+
+		n := strings.TrimSpace(r.Name)
+		if n == "" {
+			return nil, WrapInvalidState(ResourceDevice, op, "device returned empty Name", fmt.Errorf("missing or invalid Name field"))
+		}
+
+		refs = append(refs, DeviceRef{Path: p, Name: n})
 	}
 	return refs, nil
 }

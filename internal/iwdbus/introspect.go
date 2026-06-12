@@ -382,11 +382,9 @@ func (i *IntrospectedObject) RegisterSignalHandler(iface, member string, handler
 
 func (i *IntrospectedObject) startDispatcher() {
 	i.startOnce.Do(func() {
-		i.dispatchWG.Add(1)
-		go func() {
-			defer i.dispatchWG.Done()
+		i.dispatchWG.Go(func() {
 			i.dispatchLoop()
-		}()
+		})
 	})
 }
 

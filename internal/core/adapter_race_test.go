@@ -13,18 +13,16 @@ func TestRace_Core_Adapter_SetPowered_ConcurrentWithGet(t *testing.T) {
 
 	const N = 200
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for i := range N {
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			ctx := context.Background()
 			if i%2 == 0 {
 				_ = adapter.SetPowered(ctx, true)
 			} else {
 				_, _ = adapter.Powered(ctx)
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -35,11 +33,9 @@ func TestRace_Core_Adapter_MixedCalls(t *testing.T) {
 
 	const N = 200
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for i := range N {
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			ctx := context.Background()
 
 			switch i % 9 {
@@ -56,13 +52,13 @@ func TestRace_Core_Adapter_MixedCalls(t *testing.T) {
 			case 5:
 				_, _ = adapter.SupportedModes(ctx)
 			case 6:
-				_, _ = adapter.SupportsMode(ctx, AdapterModeStation)
+				_, _ = adapter.SupportsMode(ctx, ModeStation)
 			case 7:
 				_, _ = adapter.SupportsAP(ctx)
 			case 8:
 				_, _ = adapter.SupportsAdHoc(ctx)
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -75,18 +71,16 @@ func TestRace_Core_Adapter_SubscribePoweredChanged_ConcurrentCallbacks(t *testin
 
 	const N = 200
 	var wg sync.WaitGroup
-	wg.Add(N)
 
-	for i := range N {
-		go func(i int) {
-			defer wg.Done()
+	for range N {
+		wg.Go(func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			_, _ = adapter.SubscribePoweredChanged(ctx, func(bool) {
 				// intentionally empty
 			})
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -97,18 +91,16 @@ func TestRace_Core_Adapter_SubscribePropertiesChanged_ConcurrentCallbacks(t *tes
 
 	const N = 200
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			_, _ = adapter.SubscribePropertiesChanged(ctx, func(AdapterPropertiesChanged) {
 				// intentionally empty
 			})
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -119,13 +111,11 @@ func TestRace_Core_Adapter_NilReceiver(t *testing.T) {
 
 	const N = 50
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, _ = a.Powered(context.Background())
-		}()
+		})
 	}
 
 	wg.Wait()

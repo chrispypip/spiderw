@@ -19,7 +19,7 @@ type fakeCoreAdapter struct {
 	name          atomic.Value // string
 	model         atomic.Value // *string
 	vendor        atomic.Value // *string
-	modes         atomic.Value // []core.AdapterMode
+	modes         atomic.Value // []core.Mode
 	subPropsEvent atomic.Value // core.AdapterPropertiesChanged
 
 	// Check for it SetPowered was called
@@ -76,10 +76,10 @@ func (f *fakeCoreAdapter) Vendor(ctx context.Context) (*string, error) {
 	return nil, f.loadErr()
 }
 
-func (f *fakeCoreAdapter) SupportedModes(ctx context.Context) ([]core.AdapterMode, error) {
+func (f *fakeCoreAdapter) SupportedModes(ctx context.Context) ([]core.Mode, error) {
 	if v := f.modes.Load(); v != nil {
-		in := v.([]core.AdapterMode)
-		out := make([]core.AdapterMode, len(in))
+		in := v.([]core.Mode)
+		out := make([]core.Mode, len(in))
 		copy(out, in)
 		return out, f.loadErr()
 	}
@@ -102,26 +102,26 @@ func (f *fakeCoreAdapter) Properties(ctx context.Context) (*core.AdapterProperti
 		props.Vendor = v.(*string)
 	}
 	if v := f.modes.Load(); v != nil {
-		props.SupportedModes = slices.Clone(v.([]core.AdapterMode))
+		props.SupportedModes = slices.Clone(v.([]core.Mode))
 	}
 	return props, nil
 }
 
-func (f *fakeCoreAdapter) SupportsMode(ctx context.Context, mode core.AdapterMode) (bool, error) {
+func (f *fakeCoreAdapter) SupportsMode(ctx context.Context, mode core.Mode) (bool, error) {
 	modes, _ := f.SupportedModes(ctx)
 	return slices.Contains(modes, mode), f.loadErr()
 }
 
 func (f *fakeCoreAdapter) SupportsStation(ctx context.Context) (bool, error) {
-	return f.SupportsMode(ctx, core.AdapterModeStation)
+	return f.SupportsMode(ctx, core.ModeStation)
 }
 
 func (f *fakeCoreAdapter) SupportsAP(ctx context.Context) (bool, error) {
-	return f.SupportsMode(ctx, core.AdapterModeAP)
+	return f.SupportsMode(ctx, core.ModeAP)
 }
 
 func (f *fakeCoreAdapter) SupportsAdHoc(ctx context.Context) (bool, error) {
-	return f.SupportsMode(ctx, core.AdapterModeAdHoc)
+	return f.SupportsMode(ctx, core.ModeAdHoc)
 }
 
 func (f *fakeCoreAdapter) SubscribePropertiesChanged(ctx context.Context, fn func(core.AdapterPropertiesChanged)) (core.UnsubscribeFunc, error) {

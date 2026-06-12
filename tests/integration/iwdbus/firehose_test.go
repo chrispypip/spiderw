@@ -71,3 +71,54 @@ func TestSignalFirehose_PublicAdapterSubscribePoweredReceivesSignals(t *testing.
 
 	requireFired(t, fired, "adapter powered subscription did not receive firehose signal")
 }
+
+func TestSignalFirehose_DeviceSurvives(t *testing.T) {
+	iwdmock.StartMockFirehose(t)
+
+	for range 20 {
+		out, err := runSpiderDevice(t, "list")
+		require.NoError(t, err, "device list failed under firehose load: %s", out)
+		require.Contains(t, out, "wlan0")
+		require.Contains(t, out, devicePath)
+
+		out, err = runSpiderDevice(t, "wlan0", "powered")
+		require.NoError(t, err, "device powered failed under firehose load: %s", out)
+		require.Contains(t, []string{"true\n", "false\n"}, out)
+
+		out, err = runSpiderDevice(t, "wlan0", "mode")
+		require.NoError(t, err, "device mode failed under firehose load: %s", out)
+		require.Contains(t, []string{"station\n", "ap\n", "ad-hoc\n"}, out)
+	}
+}
+
+func TestSignalFirehose_PublicDeviceSubscribeReceivesSignals(t *testing.T) {
+	iwdmock.StartMockFirehose(t)
+
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+	device := newPublicMockDevice(t, ctx, client, "wlan0")
+
+	poweredFired := make(chan struct{}, 10)
+	modeFired := make(chan struct{}, 10)
+
+	unsubPowered, err := device.SubscribePoweredChanged(ctx, func(bool) {
+		select {
+		case poweredFired <- struct{}{}:
+		default:
+		}
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, unsubPowered.Unsubscribe()) })
+
+	unsubMode, err := device.SubscribeModeChanged(ctx, func(spiderw.Mode) {
+		select {
+		case modeFired <- struct{}{}:
+		default:
+		}
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, unsubMode.Unsubscribe()) })
+
+	requireFired(t, poweredFired, "device powered subscription did not receive firehose signal")
+	requireFired(t, modeFired, "device mode subscription did not receive firehose signal")
+}

@@ -22,7 +22,7 @@ type fakeIwdbusAdapter struct {
 	name          atomic.Value // string
 	model         atomic.Value // *string
 	vendor        atomic.Value // *string
-	modes         atomic.Value // []iwdbus.AdapterMode
+	modes         atomic.Value // []iwdbus.Mode
 	subPropsEvent atomic.Value //iwdbus.AdapterPropertiesChanged
 
 	// Check for if SetPowered was called
@@ -79,10 +79,10 @@ func (f *fakeIwdbusAdapter) GetVendor(context.Context) (*string, error) {
 	return nil, f.loadErr()
 }
 
-func (f *fakeIwdbusAdapter) GetSupportedModes(context.Context) ([]iwdbus.AdapterMode, error) {
+func (f *fakeIwdbusAdapter) GetSupportedModes(context.Context) ([]iwdbus.Mode, error) {
 	if v := f.modes.Load(); v != nil {
-		in := v.([]iwdbus.AdapterMode)
-		out := make([]iwdbus.AdapterMode, len(in))
+		in := v.([]iwdbus.Mode)
+		out := make([]iwdbus.Mode, len(in))
 		copy(out, in)
 		return out, f.loadErr()
 	}
@@ -105,27 +105,27 @@ func (f *fakeIwdbusAdapter) GetProperties(context.Context) (*iwdbus.AdapterPrope
 		props.Vendor = v.(*string)
 	}
 	if v := f.modes.Load(); v != nil {
-		in := v.([]iwdbus.AdapterMode)
+		in := v.([]iwdbus.Mode)
 		props.SupportedModes = slices.Clone(in)
 	}
 	return props, nil
 }
 
-func (f *fakeIwdbusAdapter) SupportsMode(ctx context.Context, mode iwdbus.AdapterMode) (bool, error) {
+func (f *fakeIwdbusAdapter) SupportsMode(ctx context.Context, mode iwdbus.Mode) (bool, error) {
 	modes, _ := f.GetSupportedModes(ctx)
 	return slices.Contains(modes, mode), f.loadErr()
 }
 
 func (f *fakeIwdbusAdapter) SupportsStation(ctx context.Context) (bool, error) {
-	return f.SupportsMode(ctx, iwdbus.AdapterModeStation)
+	return f.SupportsMode(ctx, iwdbus.ModeStation)
 }
 
 func (f *fakeIwdbusAdapter) SupportsAP(ctx context.Context) (bool, error) {
-	return f.SupportsMode(ctx, iwdbus.AdapterModeAP)
+	return f.SupportsMode(ctx, iwdbus.ModeAP)
 }
 
 func (f *fakeIwdbusAdapter) SupportsAdHoc(ctx context.Context) (bool, error) {
-	return f.SupportsMode(ctx, iwdbus.AdapterModeAdHoc)
+	return f.SupportsMode(ctx, iwdbus.ModeAdHoc)
 }
 
 func (f *fakeIwdbusAdapter) SubscribePropertiesChanged(ctx context.Context, fn func(iwdbus.AdapterPropertiesChanged)) (iwdbus.UnsubscribeFunc, error) {

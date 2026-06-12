@@ -19,7 +19,7 @@ func Benchmark_Iwdbus_RegisterSignalHandler(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		_ = i.RegisterSignalHandler("iface", "member", func(*dbus.Signal) {})
 	}
 }
@@ -34,7 +34,7 @@ func Benchmark_Iwdbus_Dispatch_SingleExactHandler(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		select {
 		case i.sigCh <- sig:
 		default:
@@ -52,7 +52,7 @@ func Benchmark_Iwdbus_Dispatch_SingleWildcardHandler(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		select {
 		case i.sigCh <- sig:
 		default:
@@ -72,7 +72,7 @@ func Benchmark_Iwdbus_Dispatch_ManyHandlers(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		select {
 		case i.sigCh <- sig:
 		default:
@@ -98,7 +98,7 @@ func Benchmark_Iwdbus_Dispatch_MixedExactAndWildcard(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		select {
 		case i.sigCh <- sig:
 		default:
@@ -128,7 +128,7 @@ func Benchmark_Iwdbus_Dispatch_SlowHandlerIsolation(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		select {
 		case i.sigCh <- sig:
 		default:
@@ -139,7 +139,7 @@ func Benchmark_Iwdbus_Dispatch_SlowHandlerIsolation(b *testing.B) {
 func Benchmark_Iwdbus_Dispatch_StartupShutdown(b *testing.B) {
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		i := newBenchIntrospectedObject(b)
 		_ = i.Close()
 	}

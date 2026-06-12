@@ -13,23 +13,23 @@ import (
 // IwdAdapterIface is the fully qualified D-Bus interface name for iwd adapters.
 const IwdAdapterIface = IwdService + ".Adapter"
 
-// AdapterMode identifies a raw iwd adapter operating mode.
-type AdapterMode = iwdvalue.AdapterMode
+// Mode identifies a raw iwd operating mode.
+type Mode = iwdvalue.Mode
 
-// Adapter mode constants identify raw iwd adapter modes.
-// AdapterModeUnknown is reserved for invalid or unrecognized values.
+// Mode constants identify raw iwd modes.
+// ModeUnknown is reserved for invalid or unrecognized values.
 const (
-	// AdapterModeUnknown represents an invalid or unrecognized adapter mode.
-	AdapterModeUnknown = iwdvalue.AdapterModeUnknown
+	// ModeUnknown represents an invalid or unrecognized mode.
+	ModeUnknown = iwdvalue.ModeUnknown
 
-	// AdapterModeStation is the iwd station adapter mode.
-	AdapterModeStation = iwdvalue.AdapterModeStation
+	// ModeStation is the iwd station mode.
+	ModeStation = iwdvalue.ModeStation
 
-	// AdapterModeAP is the iwd access point adapter mode.
-	AdapterModeAP = iwdvalue.AdapterModeAP
+	// ModeAP is the iwd access point mode.
+	ModeAP = iwdvalue.ModeAP
 
-	// AdapterModeAdHoc is the iwd ad-hoc adapter mode.
-	AdapterModeAdHoc = iwdvalue.AdapterModeAdHoc
+	// ModeAdHoc is the iwd ad-hoc mode.
+	ModeAdHoc = iwdvalue.ModeAdHoc
 )
 
 // AdapterPropertiesChanged describes raw D-Bus adapter property-change data.
@@ -156,7 +156,7 @@ func (a *Adapter) GetVendor(ctx context.Context) (*string, error) {
 }
 
 // GetSupportedModes reads and parses the SupportedModes property.
-func (a *Adapter) GetSupportedModes(ctx context.Context) ([]AdapterMode, error) {
+func (a *Adapter) GetSupportedModes(ctx context.Context) ([]Mode, error) {
 	if err := a.ensureInitialized(); err != nil {
 		return nil, WrapConnection("Adapter.ensureInitialized", err)
 	}
@@ -176,7 +176,7 @@ type AdapterProperties struct {
 	Name           string
 	Model          *string
 	Vendor         *string
-	SupportedModes []AdapterMode
+	SupportedModes []Mode
 }
 
 // GetProperties reads every adapter property in a single Properties.GetAll call
@@ -249,12 +249,12 @@ func (a *Adapter) GetProperties(ctx context.Context) (*AdapterProperties, error)
 }
 
 // SupportsMode reports whether the adapter declares support for mode.
-func (a *Adapter) SupportsMode(ctx context.Context, mode AdapterMode) (bool, error) {
+func (a *Adapter) SupportsMode(ctx context.Context, mode Mode) (bool, error) {
 	if err := a.ensureInitialized(); err != nil {
 		return false, WrapConnection("Adapter.ensureInitialized", err)
 	}
 
-	if mode == AdapterModeUnknown {
+	if mode == ModeUnknown {
 		return false, fmt.Errorf("invalid mode: %s", mode.String())
 	}
 	modes, err := a.GetSupportedModes(ctx)
@@ -264,19 +264,19 @@ func (a *Adapter) SupportsMode(ctx context.Context, mode AdapterMode) (bool, err
 	return isModeSupported(modes, mode)
 }
 
-// SupportsStation is a convenience wrapper for SupportsMode(AdapterModeStation).
+// SupportsStation is a convenience wrapper for SupportsMode(ModeStation).
 func (a *Adapter) SupportsStation(ctx context.Context) (bool, error) {
-	return a.SupportsMode(ctx, AdapterModeStation)
+	return a.SupportsMode(ctx, ModeStation)
 }
 
-// SupportsAP is a convenience wrapper for SupportsMode(AdapterModeAP).
+// SupportsAP is a convenience wrapper for SupportsMode(ModeAP).
 func (a *Adapter) SupportsAP(ctx context.Context) (bool, error) {
-	return a.SupportsMode(ctx, AdapterModeAP)
+	return a.SupportsMode(ctx, ModeAP)
 }
 
-// SupportsAdHoc is a convenience wrapper for SupportsMode(AdapterModeAdHoc).
+// SupportsAdHoc is a convenience wrapper for SupportsMode(ModeAdHoc).
 func (a *Adapter) SupportsAdHoc(ctx context.Context) (bool, error) {
-	return a.SupportsMode(ctx, AdapterModeAdHoc)
+	return a.SupportsMode(ctx, ModeAdHoc)
 }
 
 // SubscribePropertiesChanged registers fn for raw adapter property-change signals.
@@ -354,11 +354,11 @@ func (a *Adapter) Firehose(ctx context.Context, fn func(FirehoseSignal)) error {
 	})
 }
 
-// ParseAdapterMode converts a canonical iwd mode string to an AdapterMode.
-func ParseAdapterMode(s string) (AdapterMode, error) {
-	mode, ok := iwdvalue.ParseAdapterMode(s)
+// ParseMode converts a canonical iwd mode string to an Mode.
+func ParseMode(s string) (Mode, error) {
+	mode, ok := iwdvalue.ParseMode(s)
 	if !ok {
-		return AdapterModeUnknown, fmt.Errorf("invalid adapter mode %q", s)
+		return ModeUnknown, fmt.Errorf("invalid mode %q", s)
 	}
 	return mode, nil
 }
@@ -371,12 +371,12 @@ func (a *Adapter) ensureInitialized() error {
 	return nil
 }
 
-func parseSupportedModes(v interface{}) ([]AdapterMode, error) {
+func parseSupportedModes(v interface{}) ([]Mode, error) {
 	switch raw := v.(type) {
 	case []string:
-		out := make([]AdapterMode, 0, len(raw))
+		out := make([]Mode, 0, len(raw))
 		for _, s := range raw {
-			mode, ok := iwdvalue.ParseAdapterMode(s)
+			mode, ok := iwdvalue.ParseMode(s)
 			if !ok {
 				return nil, WrapVariant("SupportedModes", fmt.Errorf("invalid mode %q", s))
 			}
@@ -384,13 +384,13 @@ func parseSupportedModes(v interface{}) ([]AdapterMode, error) {
 		}
 		return out, nil
 	case []interface{}:
-		out := make([]AdapterMode, 0, len(raw))
+		out := make([]Mode, 0, len(raw))
 		for _, elem := range raw {
 			str, ok := elem.(string)
 			if !ok {
 				return nil, WrapVariant("SupportedModes", fmt.Errorf("expected string, got %T", elem))
 			}
-			mode, ok := iwdvalue.ParseAdapterMode(str)
+			mode, ok := iwdvalue.ParseMode(str)
 			if !ok {
 				return nil, WrapVariant("SupportedModes", fmt.Errorf("invalid mode %q", str))
 			}
@@ -402,8 +402,8 @@ func parseSupportedModes(v interface{}) ([]AdapterMode, error) {
 	}
 }
 
-func isModeSupported(modes []AdapterMode, mode AdapterMode) (bool, error) {
-	if !iwdvalue.ValidAdapterMode(mode) {
+func isModeSupported(modes []Mode, mode Mode) (bool, error) {
+	if !iwdvalue.ValidMode(mode) {
 		return false, fmt.Errorf("invalid mode: %s", mode.String())
 	}
 	return slices.Contains(modes, mode), nil

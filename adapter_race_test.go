@@ -24,11 +24,9 @@ func TestRace_Public_Client_Adapter(t *testing.T) {
 	errCh := make(chan error, N)
 
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			a, err := client.Adapter(context.Background(), refs[0].Path)
 			if err != nil {
 				errCh <- err
@@ -39,7 +37,7 @@ func TestRace_Public_Client_Adapter(t *testing.T) {
 				return
 			}
 			errCh <- nil
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -55,11 +53,9 @@ func TestRace_Public_Adapter_ConcurrentAccessors(t *testing.T) {
 
 	const N = 200
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for i := range N {
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
@@ -81,7 +77,7 @@ func TestRace_Public_Adapter_ConcurrentAccessors(t *testing.T) {
 			default:
 				_, _ = adapter.SupportsAdHoc(ctx)
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -92,11 +88,9 @@ func TestRace_Public_Adapter_SetPoweredAndPowered(t *testing.T) {
 
 	const N = 200
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for i := range N {
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
@@ -106,7 +100,7 @@ func TestRace_Public_Adapter_SetPoweredAndPowered(t *testing.T) {
 			}
 
 			_, _ = adapter.Powered(ctx)
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -129,11 +123,9 @@ func TestRace_Public_Adapter_SubscribePropertiesChanged_Concurrent(t *testing.T)
 
 	const N = 200
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
@@ -146,7 +138,7 @@ func TestRace_Public_Adapter_SubscribePropertiesChanged_Concurrent(t *testing.T)
 				_ = ev.Invalidated
 			})
 			require.NoError(t, err)
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -165,17 +157,15 @@ func TestRace_Public_Adapter_SubscribePoweredChanged_Concurrent(t *testing.T) {
 
 	const N = 200
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
 			_, err := adapter.SubscribePoweredChanged(ctx, func(bool) {})
 			require.NoError(t, err)
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -186,11 +176,9 @@ func TestRace_Public_Adapter_ContextCancel(t *testing.T) {
 
 	const N = 100
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for i := range N {
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
@@ -204,7 +192,7 @@ func TestRace_Public_Adapter_ContextCancel(t *testing.T) {
 			default:
 				_, _ = adapter.SubscribePoweredChanged(ctx, func(bool) {})
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()

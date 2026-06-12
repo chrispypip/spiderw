@@ -24,16 +24,13 @@ func TestRace_Logging(t *testing.T) {
 		var wg sync.WaitGroup
 
 		for i := range 100 {
-			wg.Add(1)
-
-			go func(i int) {
-				defer wg.Done()
+			wg.Go(func() {
 				l := logging.FromContext(ctx)
 				l.Debug(ctx, "debug message", "i", i)
 				l.Info(ctx, "info message", "i", i)
 				l.Warn(ctx, "warn message", "i", i)
 				l.Error(ctx, "error message", "i", i)
-			}(i)
+			})
 		}
 
 		wg.Wait()
@@ -44,14 +41,12 @@ func TestRace_Logging(t *testing.T) {
 		var wg sync.WaitGroup
 
 		for i := range 100 {
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
+			wg.Go(func() {
 				l := logging.FromContext(ctx)
 
 				child := l.With("child", i)
 				child.Info(ctx, "child logger message")
-			}(i)
+			})
 		}
 
 		wg.Wait()
@@ -62,12 +57,10 @@ func TestRace_Logging(t *testing.T) {
 		var wg sync.WaitGroup
 
 		for i := range 100 {
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
+			wg.Go(func() {
 				local := logging.WithLogger(ctx, tl.With("local", i))
 				logging.FromContext(local).Info(local, "context write")
-			}(i)
+			})
 		}
 
 		wg.Wait()
@@ -77,16 +70,14 @@ func TestRace_Logging(t *testing.T) {
 		var wg sync.WaitGroup
 
 		for i := range 200 {
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
+			wg.Go(func() {
 				l := logging.FromContext(ctx)
 				for j := range 10 {
 					// Every With() returns a *new* TestLogger wrapper
 					l = l.With("lvl", j)
 					l.Info(ctx, "deep chain", "i", i)
 				}
-			}(i)
+			})
 		}
 
 		wg.Wait()
@@ -104,11 +95,9 @@ func TestRace_Logging_StdLogger(t *testing.T) {
 
 		var wg sync.WaitGroup
 		for i := range 200 {
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
+			wg.Go(func() {
 				l.Info(ctx, "msg", "i", i)
-			}(i)
+			})
 		}
 		wg.Wait()
 	})
@@ -120,16 +109,13 @@ func TestRace_Logging_StdLogger(t *testing.T) {
 
 		var wg sync.WaitGroup
 		for i := range 200 {
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
-
+			wg.Go(func() {
 				child := l
 				for j := range 10 {
 					child = child.With("lvl", j)
 					child.Debug(ctx, "nested", "i", i)
 				}
-			}(i)
+			})
 		}
 		wg.Wait()
 	})
@@ -142,11 +128,9 @@ func TestRace_Logging_TestLogger(t *testing.T) {
 	t.Run("concurrent writes", func(t *testing.T) {
 		var wg sync.WaitGroup
 		for i := range 200 {
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
+			wg.Go(func() {
 				tl.Info(ctx, "test message", "i", i)
-			}(i)
+			})
 		}
 		wg.Wait()
 	})
@@ -171,16 +155,12 @@ func TestRace_Logging_TestLogger(t *testing.T) {
 		var wg sync.WaitGroup
 
 		for i := range 200 {
-			wg.Add(1)
-
-			go func(i int) {
-				defer wg.Done()
-
+			wg.Go(func() {
 				child := tl.With("child", i)
 				for j := range 5 {
 					child.Warn(ctx, "child chain", "j", j)
 				}
-			}(i)
+			})
 		}
 
 		wg.Wait()
@@ -195,10 +175,7 @@ func TestRace_Logging_NopLogger(t *testing.T) {
 		var wg sync.WaitGroup
 
 		for i := range 500 {
-			wg.Add(1)
-			go func(i int) {
-				defer wg.Done()
-
+			wg.Go(func() {
 				// None of these should race or panic
 				l.Debug(ctx, "ignored", "i", i)
 				l.Info(ctx, "ignored", "i", i)
@@ -206,7 +183,7 @@ func TestRace_Logging_NopLogger(t *testing.T) {
 				l.Error(ctx, "ignored", "i", i)
 
 				_ = l.With("x", i)
-			}(i)
+			})
 		}
 
 		wg.Wait()

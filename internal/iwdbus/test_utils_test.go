@@ -5,9 +5,40 @@ package iwdbus
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stretchr/testify/require"
 )
+
+const (
+	signalTimeout = 1 * time.Second
+	pollInterval  = 5 * time.Millisecond
+)
+
+// requireFired asserts that ch receives a value within signalTimeout.
+func requireFired(t *testing.T, ch <-chan struct{}) {
+	require.Eventually(t, func() bool {
+		select {
+		case <-ch:
+			return true
+		default:
+			return false
+		}
+	}, signalTimeout, pollInterval)
+}
+
+// requireNotFired asserts that ch stays empty for the duration of signalTimeout.
+func requireNotFired(t *testing.T, ch <-chan struct{}) {
+	require.Eventually(t, func() bool {
+		select {
+		case <-ch:
+			return false
+		default:
+			return true
+		}
+	}, signalTimeout, pollInterval)
+}
 
 type fakeSignalSource struct {
 	intro *IntrospectedObject

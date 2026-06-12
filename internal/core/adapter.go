@@ -10,23 +10,23 @@ import (
 	"github.com/chrispypip/spiderw/internal/iwdvalue"
 )
 
-// AdapterMode identifies a normalized iwd adapter operating mode.
-type AdapterMode = iwdvalue.AdapterMode
+// Mode identifies a normalized iwd operating mode.
+type Mode = iwdvalue.Mode
 
-// Adapter mode constants identify normalized adapter modes.
-// AdapterModeUnknown is reserved for invalid or unrecognized values.
+// Mode constants identify normalized modes.
+// ModeUnknown is reserved for invalid or unrecognized values.
 const (
-	// AdapterModeUnknown represents an invalid or unrecognized adapter mode.
-	AdapterModeUnknown = iwdvalue.AdapterModeUnknown
+	// ModeUnknown represents an invalid or unrecognized mode.
+	ModeUnknown = iwdvalue.ModeUnknown
 
-	// AdapterModeStation is the iwd station adapter mode.
-	AdapterModeStation = iwdvalue.AdapterModeStation
+	// ModeStation is the iwd station mode.
+	ModeStation = iwdvalue.ModeStation
 
-	// AdapterModeAP is the iwd access point adapter mode.
-	AdapterModeAP = iwdvalue.AdapterModeAP
+	// ModeAP is the iwd access point mode.
+	ModeAP = iwdvalue.ModeAP
 
-	// AdapterModeAdHoc is the iwd ad-hoc adapter mode.
-	AdapterModeAdHoc = iwdvalue.AdapterModeAdHoc
+	// ModeAdHoc is the iwd ad-hoc mode.
+	ModeAdHoc = iwdvalue.ModeAdHoc
 )
 
 // UnsubscribeFunc unregisters a core-layer subscription callback.
@@ -55,9 +55,9 @@ type adapterRaw interface {
 	GetName(ctx context.Context) (string, error)
 	GetModel(ctx context.Context) (*string, error)
 	GetVendor(ctx context.Context) (*string, error)
-	GetSupportedModes(ctx context.Context) ([]iwdbus.AdapterMode, error)
+	GetSupportedModes(ctx context.Context) ([]iwdbus.Mode, error)
 	GetProperties(ctx context.Context) (*iwdbus.AdapterProperties, error)
-	SupportsMode(ctx context.Context, mode iwdbus.AdapterMode) (bool, error)
+	SupportsMode(ctx context.Context, mode iwdbus.Mode) (bool, error)
 	SupportsStation(ctx context.Context) (bool, error)
 	SupportsAP(ctx context.Context) (bool, error)
 	SupportsAdHoc(ctx context.Context) (bool, error)
@@ -72,9 +72,9 @@ type AdapterIface interface {
 	Name(ctx context.Context) (string, error)
 	Model(ctx context.Context) (*string, error)
 	Vendor(ctx context.Context) (*string, error)
-	SupportedModes(ctx context.Context) ([]AdapterMode, error)
+	SupportedModes(ctx context.Context) ([]Mode, error)
 	Properties(ctx context.Context) (*AdapterProperties, error)
-	SupportsMode(ctx context.Context, mode AdapterMode) (bool, error)
+	SupportsMode(ctx context.Context, mode Mode) (bool, error)
 	SupportsStation(ctx context.Context) (bool, error)
 	SupportsAP(ctx context.Context) (bool, error)
 	SupportsAdHoc(ctx context.Context) (bool, error)
@@ -89,7 +89,7 @@ type AdapterProperties struct {
 	Name           string
 	Model          *string
 	Vendor         *string
-	SupportedModes []AdapterMode
+	SupportedModes []Mode
 }
 
 // Adapter is the core-layer facade over a raw iwd adapter backend.
@@ -210,7 +210,7 @@ func (a *Adapter) Vendor(ctx context.Context) (*string, error) {
 }
 
 // SupportedModes returns normalized adapter modes.
-func (a *Adapter) SupportedModes(ctx context.Context) ([]AdapterMode, error) {
+func (a *Adapter) SupportedModes(ctx context.Context) ([]Mode, error) {
 	const op = "Adapter.SupportedModes"
 
 	rawAdapter, err := a.rawAdapter(op)
@@ -271,7 +271,7 @@ func (a *Adapter) Properties(ctx context.Context) (*AdapterProperties, error) {
 }
 
 // SupportsMode reports whether the adapter supports mode.
-func (a *Adapter) SupportsMode(ctx context.Context, mode AdapterMode) (bool, error) {
+func (a *Adapter) SupportsMode(ctx context.Context, mode Mode) (bool, error) {
 	const op = "Adapter.SupportsMode"
 
 	rawAdapter, err := a.rawAdapter(op)
@@ -279,9 +279,9 @@ func (a *Adapter) SupportsMode(ctx context.Context, mode AdapterMode) (bool, err
 		return false, err
 	}
 
-	if !iwdvalue.ValidAdapterMode(mode) {
+	if !iwdvalue.ValidMode(mode) {
 		err := fmt.Errorf("unknown supported mode %q", mode)
-		return false, WrapInvalidArgument(ResourceAdapter, op, "unknown adapter mode", err)
+		return false, WrapInvalidArgument(ResourceAdapter, op, "unknown mode", err)
 	}
 
 	raw, err := rawAdapter.SupportsMode(ctx, mode)
@@ -396,19 +396,19 @@ func (a *Adapter) SubscribePoweredChanged(ctx context.Context, fn func(bool)) (U
 	return UnsubscribeFunc(unsub), nil
 }
 
-// ParseAdapterMode converts a canonical iwd mode string to an AdapterMode.
-func ParseAdapterMode(s string) (AdapterMode, error) {
-	mode, ok := iwdvalue.ParseAdapterMode(s)
+// ParseMode converts a canonical iwd mode string to an Mode.
+func ParseMode(s string) (Mode, error) {
+	mode, ok := iwdvalue.ParseMode(s)
 	if !ok {
-		details := fmt.Sprintf("invalid adapter mode %q", s)
-		return AdapterModeUnknown, &Error{Kind: KindInvalidArgument, Resource: ResourceAdapter, Op: "Adapter.ParseAdapterMode", Details: details, Err: ErrCore}
+		details := fmt.Sprintf("invalid mode %q", s)
+		return ModeUnknown, &Error{Kind: KindInvalidArgument, Resource: ResourceAdapter, Op: "Adapter.ParseMode", Details: details, Err: ErrCore}
 	}
 	return mode, nil
 }
 
-func validateSupportedModes(modes []iwdbus.AdapterMode) ([]AdapterMode, error) {
+func validateSupportedModes(modes []iwdbus.Mode) ([]Mode, error) {
 	for _, mode := range modes {
-		if !iwdvalue.ValidAdapterMode(mode) {
+		if !iwdvalue.ValidMode(mode) {
 			details := fmt.Sprintf("unknown supported mode %q", mode)
 			return nil, &Error{Kind: KindInvalidArgument, Resource: ResourceAdapter, Op: "Adapter.validateSupportedModes", Details: details, Err: ErrCore}
 		}

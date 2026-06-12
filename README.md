@@ -44,7 +44,8 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
 
 - **Structured errors**
   Public errors expose a stable category, resource, operation, and wrapped
-  cause, so callers can use `errors.Is` and `errors.As` without parsing text.
+  cause, so callers can use `errors.Is`, `errors.As`, and `errors.AsType`
+  without parsing text.
 
 - **Mockable runtime**
   A pure-Go iwd mock enables end-to-end and integration testing without
@@ -138,8 +139,7 @@ to distinguish daemon, adapter, network, or client failures.
 ```go
 info, err := client.Daemon().Info(ctx)
 if err != nil {
-    var swerr *spiderw.Error
-    if errors.As(err, &swerr) {
+    if swerr, ok := errors.AsType[*spiderw.Error](err); ok {
         switch {
         case errors.Is(err, spiderw.ErrUnavailable) &&
             swerr.Resource == spiderw.ResourceDaemon:

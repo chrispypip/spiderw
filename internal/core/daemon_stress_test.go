@@ -15,11 +15,9 @@ func TestStress_Core_Daemon_MixedContexts(t *testing.T) {
 
 	const N = 800
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			var ctx context.Context
 			var cancel context.CancelFunc
 
@@ -35,7 +33,7 @@ func TestStress_Core_Daemon_MixedContexts(t *testing.T) {
 			defer cancel()
 
 			_, _ = daemon.Info(ctx)
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -46,11 +44,9 @@ func TestStress_Core_Daemon_MixedMethods(t *testing.T) {
 
 	const N = 1000
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for i := range N {
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
@@ -66,7 +62,7 @@ func TestStress_Core_Daemon_MixedMethods(t *testing.T) {
 			case 4:
 				_, _ = daemon.Adapters(ctx)
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -77,13 +73,11 @@ func TestStress_Core_Daemon_Nil(t *testing.T) {
 
 	const N = 500
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, _ = d.Info(context.Background())
-		}()
+		})
 	}
 
 	wg.Wait()

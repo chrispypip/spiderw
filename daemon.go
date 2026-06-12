@@ -18,6 +18,15 @@ type AdapterRef struct {
 	Name string
 }
 
+// DeviceRef is a lightweight reference to a device discovered by the iwd daemon.
+type DeviceRef struct {
+	// Path is the canonical D-Bus object path for the device.
+	Path string
+
+	// Name is the device's human-friendly Name property.
+	Name string
+}
+
 // DaemonInfo is the public API view of the iwd daemon metadata.
 //
 // This intentionally mirrors core.DaemonInfo but is separate to avoid leaking
@@ -114,6 +123,21 @@ func (d *Daemon) Adapters(ctx context.Context) ([]AdapterRef, error) {
 		out := make([]AdapterRef, 0, len(refs))
 		for _, r := range refs {
 			out = append(out, AdapterRef{Path: r.Path, Name: r.Name})
+		}
+		return out, nil
+	})
+}
+
+// Devices returns lightweight references to the devices currently exposed by iwd.
+func (d *Daemon) Devices(ctx context.Context) ([]DeviceRef, error) {
+	return delegate(ctx, "Daemon.Devices", d.coreDaemon, func(ctx context.Context, c core.DaemonIface) ([]DeviceRef, error) {
+		refs, err := c.Devices(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]DeviceRef, 0, len(refs))
+		for _, r := range refs {
+			out = append(out, DeviceRef{Path: r.Path, Name: r.Name})
 		}
 		return out, nil
 	})

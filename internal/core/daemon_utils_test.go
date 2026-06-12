@@ -25,6 +25,7 @@ type fakeIwdbusDaemon struct {
 
 	info     atomic.Pointer[iwdbus.DaemonInfo]
 	adapters atomic.Pointer[[]iwdbus.AdapterRef]
+	devices  atomic.Pointer[[]iwdbus.DeviceRef]
 	err      atomic.Pointer[fakeIwdbusDaemonError]
 }
 
@@ -42,6 +43,12 @@ func (f *fakeIwdbusDaemon) setInfo(info *iwdbus.DaemonInfo) *fakeIwdbusDaemon {
 func (f *fakeIwdbusDaemon) setAdapters(adapters []iwdbus.AdapterRef) *fakeIwdbusDaemon {
 	cloned := cloneIwdbusAdapterRefs(adapters)
 	f.adapters.Store(&cloned)
+	return f
+}
+
+func (f *fakeIwdbusDaemon) setDevices(devices []iwdbus.DeviceRef) *fakeIwdbusDaemon {
+	cloned := cloneIwdbusDeviceRefs(devices)
+	f.devices.Store(&cloned)
 	return f
 }
 
@@ -72,6 +79,14 @@ func (f *fakeIwdbusDaemon) GetAdapters(ctx context.Context) ([]iwdbus.AdapterRef
 		return nil, f.loadErr()
 	}
 	return cloneIwdbusAdapterRefs(*ptr), f.loadErr()
+}
+
+func (f *fakeIwdbusDaemon) GetDevices(ctx context.Context) ([]iwdbus.DeviceRef, error) {
+	ptr := f.devices.Load()
+	if ptr == nil {
+		return nil, f.loadErr()
+	}
+	return cloneIwdbusDeviceRefs(*ptr), f.loadErr()
 }
 
 // newTestDaemon mirrors helpers used by internal/iwdbus tests.
@@ -106,6 +121,15 @@ func cloneIwdbusAdapterRefs(refs []iwdbus.AdapterRef) []iwdbus.AdapterRef {
 		return nil
 	}
 	out := make([]iwdbus.AdapterRef, len(refs))
+	copy(out, refs)
+	return out
+}
+
+func cloneIwdbusDeviceRefs(refs []iwdbus.DeviceRef) []iwdbus.DeviceRef {
+	if refs == nil {
+		return nil
+	}
+	out := make([]iwdbus.DeviceRef, len(refs))
 	copy(out, refs)
 	return out
 }

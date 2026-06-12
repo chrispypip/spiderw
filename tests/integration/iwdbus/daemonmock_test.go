@@ -3,103 +3,132 @@
 package integration_test
 
 import (
-	"fmt"
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/chrispypip/spiderw"
 	"github.com/chrispypip/spiderw/tests/testutil/iwdmock"
 )
 
-func TestDaemonMock_GetInfo(t *testing.T) {
-	tmpDir := t.TempDir()
+// These tests exercise the daemon against a real D-Bus round trip. Per the
+// integration testing convention, the public Go API is the baseline (it is the
+// primary product surface and carries typed errors), while the CLI gets a
+// thin layer covering only CLI-specific behavior (routing, output, exit codes).
+// Exhaustive daemon parsing/normalization/error matrices live in the iwdbus and
+// core unit tests and are not re-tested here.
 
-	iwdmock.StartMockNormal(t, tmpDir)
+// -----------------------------------------------------------------------------
+// Public API against the mock
+// -----------------------------------------------------------------------------
 
-	m, out, err := runSpiderDaemonJSON(t, "info")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, "1.0.0", jsonGetString(t, m, "Version"))
-	require.Equal(t, "/test/iwd/state", jsonGetString(t, m, "StateDirectory"))
-	require.Equal(t, true, jsonGetBool(t, m, "NetworkConfigurationEnabled"))
+func newMockClient(t *testing.T, ctx context.Context) *spiderw.Client {
+	t.Helper()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, client.Close()) })
+	return client
 }
 
-func TestDaemonMock_GetVersion(t *testing.T) {
+func TestDaemonMock_Info(t *testing.T) {
 	tmpDir := t.TempDir()
-
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	m, out, err := runSpiderDaemonJSON(t, "version")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, "1.0.0", jsonGetString(t, m, "Version"))
+	ctx := context.Background()
+	daemon := newMockClient(t, ctx).Daemon()
+	require.NotNil(t, daemon)
+
+	info, err := daemon.Info(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "1.0.0", info.Version)
+	require.Equal(t, "/test/iwd/state", info.StateDirectory)
+	require.True(t, info.NetworkConfigurationEnabled)
+
+	// Convenience accessors agree with Info.
+	version, err := daemon.Version(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "1.0.0", version)
+
+	stateDir, err := daemon.StateDirectory(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "/test/iwd/state", stateDir)
+
+	netConf, err := daemon.NetworkConfigurationEnabled(ctx)
+	require.NoError(t, err)
+	require.True(t, netConf)
 }
 
-func TestDaemonMock_GetStateDirectory(t *testing.T) {
+func TestDaemonMock_Adapters(t *testing.T) {
 	tmpDir := t.TempDir()
-
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	m, out, err := runSpiderDaemonJSON(t, "state-dir")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, "/test/iwd/state", jsonGetString(t, m, "StateDirectory"))
+	ctx := context.Background()
+	refs, err := newMockClient(t, ctx).Daemon().Adapters(ctx)
+	require.NoError(t, err)
+	require.Equal(t, []spiderw.AdapterRef{
+		{Path: "/net/connman/iwd/phy0", Name: "phy0"},
+	}, refs)
 }
 
-func TestDaemonMock_IsNetworkConfigurationEnabled(t *testing.T) {
-	tmpDir := t.TempDir()
+// TestDaemonMock_MalformedReply is the representative end-to-end malformed-reply
+// case: a real D-Bus Info payload missing Version must surface as a typed
+// invalid-state error through the public API. The full field/type matrix is
+// unit-tested in internal/iwdbus and internal/core.
+func TestDaemonMock_MalformedReply(t *testing.T) {
+	iwdmock.StartMockWithMissingDaemonInfoFields(t, true, false, false)
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	ctx := context.Background()
+	_, err := newMockClient(t, ctx).Daemon().Version(ctx)
+	require.Error(t, err)
+	require.ErrorIs(t, err, spiderw.ErrInvalidState)
 
-	m, out, err := runSpiderDaemonJSON(t, "net-conf")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, true, jsonGetBool(t, m, "NetworkConfigurationEnabled"))
+	var pe *spiderw.Error
+	require.ErrorAs(t, err, &pe)
+	require.Equal(t, spiderw.ResourceDaemon, pe.Resource)
 }
 
 func TestDaemonMock_NoDaemon(t *testing.T) {
 	tmpDir := t.TempDir()
-
 	iwdmock.StartMockWithoutDaemon(t, tmpDir)
 
-	out, err := runSpiderDaemon(t, "info")
+	// With no daemon object exported, client construction itself fails.
+	_, err := spiderw.NewClient(context.Background(), spiderw.SessionBus)
 	require.Error(t, err)
-	// Note: the public message surfaces the public kind ("internal error") and
-	// no longer leaks the internal core label ("operation failed"), which only
-	// appeared via the previously-duplicated core frame.
-	mustContainAll(t, out, []string{"internal error", "Op=NewClient", "iwd daemon interface not available"})
+	require.ErrorIs(t, err, spiderw.ErrInternal)
 }
 
-func TestDaemonMock_MissingVersion(t *testing.T) {
-	iwdmock.StartMockWithMissingDaemonInfoFields(t, true, false, false)
+// TestDaemonMock_ConcurrentInfo exercises concurrency safety of a single client
+// against the real bus. (This replaces a former variant that spawned 100 CLI
+// subprocesses; one shared client is both cheaper and a more direct test.)
+func TestDaemonMock_ConcurrentInfo(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
 
-	out, err := runSpiderDaemon(t, "version")
-	require.Error(t, err)
-	mustContainAll(t, out, []string{"invalid state", "missing or invalid Version field", "daemon returned empty Version"})
+	ctx := context.Background()
+	daemon := newMockClient(t, ctx).Daemon()
+
+	const N = 100
+	errCh := make(chan error, N)
+	for range N {
+		go func() {
+			_, err := daemon.Info(ctx)
+			errCh <- err
+		}()
+	}
+	for range N {
+		require.NoError(t, <-errCh)
+	}
 }
 
-func TestDaemonMock_MissingStateDir(t *testing.T) {
-	iwdmock.StartMockWithMissingDaemonInfoFields(t, false, true, false)
+// -----------------------------------------------------------------------------
+// CLI (`spiderw daemon …`) against the mock — thin, CLI-specific coverage only
+// -----------------------------------------------------------------------------
 
-	out, err := runSpiderDaemon(t, "state-dir")
-	require.Error(t, err)
-	mustContainAll(t, out, []string{"invalid state", "missing or invalid StateDirectory field", "daemon returned empty StateDirectory"})
-}
-
-func TestDaemonMock_MissingNetConf(t *testing.T) {
-	iwdmock.StartMockWithMissingDaemonInfoFields(t, false, false, true)
-
-	out, err := runSpiderDaemon(t, "net-conf")
-	require.NoError(t, err)
-	mustContain(t, out, "false")
-}
-
-func TestDaemonMock_GetInfo_MissingInfo(t *testing.T) {
-	iwdmock.StartMockWithMissingDaemonInfoFields(t, true, false, true)
-
-	out, err := runSpiderDaemon(t, "info")
-	require.Error(t, err)
-	mustContainAll(t, out, []string{"invalid state", "missing or invalid", "daemon returned empty"})
-}
-
-func TestDaemonMock_GetInfo_ExtraFields(t *testing.T) {
-	iwdmock.StartMockWithExtraDaemonInfoFields(t)
+func TestDaemonMock_CLI_Info(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
 
 	m, out, err := runSpiderDaemonJSON(t, "info")
 	require.NoError(t, err, "output:\n%s", out)
@@ -108,78 +137,22 @@ func TestDaemonMock_GetInfo_ExtraFields(t *testing.T) {
 	require.Equal(t, true, jsonGetBool(t, m, "NetworkConfigurationEnabled"))
 }
 
-func TestDaemonMock_GetVersion_WrongType(t *testing.T) {
-	iwdmock.StartMockWithBadDaemonInfoFields(t, true, false, false)
-
-	out, err := runSpiderDaemon(t, "version")
-	require.Error(t, err)
-	mustContainAll(t, out, []string{"Version", "expected string"})
-}
-
-func TestDaemonMock_GetStateDirectory_WrongType(t *testing.T) {
-	iwdmock.StartMockWithBadDaemonInfoFields(t, false, true, false)
-
-	out, err := runSpiderDaemon(t, "state-dir")
-	require.Error(t, err)
-	mustContainAll(t, out, []string{"StateDirectory", "expected string"})
-}
-
-func TestDaemonMock_GetNetConf_WrongType(t *testing.T) {
-	iwdmock.StartMockWithBadDaemonInfoFields(t, false, false, true)
-
-	out, err := runSpiderDaemon(t, "net-conf")
-	require.Error(t, err)
-	mustContainAll(t, out, []string{"NetworkConfigurationEnabled", "expected bool"})
-}
-
-func TestDaemonMock_ConcurrentGetInfo(t *testing.T) {
+// TestDaemonMock_CLI_Error verifies the CLI surfaces a failure as a non-nil exit
+// and a rendered error message rather than a stack trace or empty output.
+func TestDaemonMock_CLI_Error(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	const N = 100
-	errCh := make(chan error, N)
-
-	for range N {
-		go func() {
-			out, err := runSpiderDaemon(t, "info")
-			if err != nil {
-				errCh <- fmt.Errorf("call failed: %w: %s", err, out)
-			} else {
-				errCh <- nil
-			}
-		}()
-	}
-
-	for range N {
-		err := <-errCh
-		require.NoError(t, err)
-	}
-}
-
-func TestDaemonMock_GetInfo_BadPayloadType(t *testing.T) {
-	iwdmock.StartMockWithDaemonGetInfoReturningBadType(t)
+	iwdmock.StartMockWithoutDaemon(t, tmpDir)
 
 	out, err := runSpiderDaemon(t, "info")
 	require.Error(t, err)
-	mustContainAll(t, out, []string{"failed", "parse", "Version", "expected string"})
+	mustContainAll(t, out, []string{"internal error", "Op=NewClient", "iwd daemon interface not available"})
 }
 
-func TestDaemonMock_GetInfo_DBusFailure(t *testing.T) {
-	iwdmock.StartMockWithDaemonFailingCalls(t)
-
-	out, err := runSpiderDaemon(t, "info")
-	require.Error(t, err)
-	mustContainAll(t, out, []string{"GetInfo", "fail"})
-}
-
-func TestDaemonMock_InvalidSubcommand(t *testing.T) {
+func TestDaemonMock_CLI_InvalidSubcommand(t *testing.T) {
 	tmpDir := t.TempDir()
-
 	iwdmock.StartMockNormal(t, tmpDir)
 
 	out, err := runSpiderDaemon(t, "info", "bogus")
-
 	require.Error(t, err)
 	mustContain(t, out, "unknown")
 }

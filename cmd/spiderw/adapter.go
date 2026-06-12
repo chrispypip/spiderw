@@ -146,17 +146,17 @@ func printAdapterPoweredLine(app *App, ref string, powered bool, mu *sync.Mutex)
 	return err
 }
 
-func parseAdapterModeArg(raw string) (spiderw.AdapterMode, error) {
+func parseModeArg(raw string) (spiderw.Mode, error) {
 	mode := strings.ToLower(strings.TrimSpace(raw))
 	switch mode {
 	case "station", "sta":
-		return spiderw.AdapterModeStation, nil
+		return spiderw.ModeStation, nil
 	case "ap", "access-point", "accesspoint":
-		return spiderw.AdapterModeAP, nil
+		return spiderw.ModeAP, nil
 	case "ad-hoc", "adhoc", "ad_hoc", "ibss":
-		return spiderw.AdapterModeAdHoc, nil
+		return spiderw.ModeAdHoc, nil
 	default:
-		return spiderw.AdapterModeUnknown, fmt.Errorf("invalid adapter mode %q (expected station, ap, or ad-hoc)", raw)
+		return spiderw.ModeUnknown, fmt.Errorf("invalid mode %q (expected station, ap, or ad-hoc)", raw)
 	}
 }
 
@@ -445,7 +445,7 @@ func runAdapterSupportsMode(app *App, ctx context.Context, adapterRef string, ar
 		return fmt.Errorf("usage: spiderw adapter <adapter> supports-mode <station|ap|ad-hoc>")
 	}
 
-	mode, err := parseAdapterModeArg(args[0])
+	mode, err := parseModeArg(args[0])
 	if err != nil {
 		return err
 	}

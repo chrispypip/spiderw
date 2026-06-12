@@ -13,16 +13,14 @@ func TestRace_Core_Daemon_Info_ContextCancel(t *testing.T) {
 
 	const N = 50
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
 			_, _ = daemon.Info(ctx)
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -33,11 +31,9 @@ func TestRace_Core_Daemon_MixedCalls(t *testing.T) {
 
 	const N = 100
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for i := range N {
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			ctx := context.Background()
 
 			switch i % 5 {
@@ -52,7 +48,7 @@ func TestRace_Core_Daemon_MixedCalls(t *testing.T) {
 			case 4:
 				_, _ = daemon.Adapters(ctx)
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -63,13 +59,11 @@ func TestRace_Core_Daemon_NilReceiver(t *testing.T) {
 
 	const N = 50
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, _ = d.Info(context.Background())
-		}()
+		})
 	}
 
 	wg.Wait()

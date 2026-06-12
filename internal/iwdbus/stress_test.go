@@ -17,35 +17,31 @@ import (
 func TestStress_Iwdbus_ConcurrentRegisterAndEmit(t *testing.T) {
 	src := newFakeSignalSource(t)
 
-	var hits int64
+	var hits atomic.Int64
 	var wg sync.WaitGroup
 
-	for i := range 50 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+	for range 50 {
+		wg.Go(func() {
 			_ = src.intro.RegisterSignalHandler(
 				"net.connman.iwd.Adapter",
 				"ModeChanged",
 				func(*dbus.Signal) {
-					atomic.AddInt64(&hits, 1)
+					hits.Add(1)
 				},
 			)
-		}(i)
+		})
 	}
 
 	for range 500 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			src.emit("net.connman.iwd.Adapter", "ModeChanged", "ap")
-		}()
+		})
 	}
 
 	wg.Wait()
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&hits) >= 10
+		return hits.Load() >= 10
 	}, time.Second, 10*time.Millisecond)
 }
 
@@ -55,8 +51,8 @@ func TestStress_Iwdbus_Dispatch_MultiHandlerFanout(t *testing.T) {
 	const handlers = 50
 	const signals = 500
 
-	var exactCount int64
-	var wildcardCount int64
+	var exactCount atomic.Int64
+	var wildcardCount atomic.Int64
 
 	for range handlers {
 		require.NoError(t,
@@ -64,7 +60,7 @@ func TestStress_Iwdbus_Dispatch_MultiHandlerFanout(t *testing.T) {
 				"net.connman.iwd.Adapter",
 				"PoweredChanged",
 				func(*dbus.Signal) {
-					atomic.AddInt64(&exactCount, 1)
+					exactCount.Add(1)
 				},
 			),
 		)
@@ -72,7 +68,7 @@ func TestStress_Iwdbus_Dispatch_MultiHandlerFanout(t *testing.T) {
 
 	require.NoError(t,
 		src.intro.RegisterSignalHandler("*", "*", func(*dbus.Signal) {
-			atomic.AddInt64(&wildcardCount, 1)
+			wildcardCount.Add(1)
 		}),
 	)
 
@@ -85,22 +81,23 @@ func TestStress_Iwdbus_Dispatch_MultiHandlerFanout(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&exactCount) == int64(handlers*signals) &&
-			atomic.LoadInt64(&wildcardCount) == int64(signals)
+		return exactCount.Load() == int64(handlers*signals) &&
+			wildcardCount.Load() == int64(signals)
 	}, 2*time.Second, 10*time.Millisecond)
 }
 
 func TestStress_Iwdbus_Dispatch_MultiInterfaceSameMember(t *testing.T) {
 	src := newFakeSignalSource(t)
 
-	var adapterHits, stationHits int64
+	var adapterHits atomic.Int64
+	var stationHits atomic.Int64
 
 	require.NoError(t,
 		src.intro.RegisterSignalHandler(
 			"net.connman.iwd.Adapter",
 			"StateChanged",
 			func(*dbus.Signal) {
-				atomic.AddInt64(&adapterHits, 1)
+				adapterHits.Add(1)
 			},
 		),
 	)
@@ -110,7 +107,7 @@ func TestStress_Iwdbus_Dispatch_MultiInterfaceSameMember(t *testing.T) {
 			"net.connman.iwd.Station",
 			"StateChanged",
 			func(*dbus.Signal) {
-				atomic.AddInt64(&stationHits, 1)
+				stationHits.Add(1)
 			},
 		),
 	)
@@ -121,15 +118,15 @@ func TestStress_Iwdbus_Dispatch_MultiInterfaceSameMember(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&adapterHits) == 300 && atomic.LoadInt64(&stationHits) == 300
+		return adapterHits.Load() == 300 && stationHits.Load() == 300
 	}, time.Second, 5*time.Millisecond)
 }
 
 func TestStress_Iwdbus_Dispatch_SlowHandlerDoesNotBlock(t *testing.T) {
 	src := newFakeSignalSource(t)
 
-	var fastHits int64
-	var slowHits int64
+	var fastHits atomic.Int64
+	var slowHits atomic.Int64
 
 	// Fast handler should keep firing even if slow handler is sleeping.
 	require.NoError(t,
@@ -137,7 +134,7 @@ func TestStress_Iwdbus_Dispatch_SlowHandlerDoesNotBlock(t *testing.T) {
 			"net.connman.iwd.Adapter",
 			"PoweredChanged",
 			func(*dbus.Signal) {
-				atomic.AddInt64(&fastHits, 1)
+				fastHits.Add(1)
 			},
 		),
 	)
@@ -149,7 +146,7 @@ func TestStress_Iwdbus_Dispatch_SlowHandlerDoesNotBlock(t *testing.T) {
 			"PoweredChanged",
 			func(*dbus.Signal) {
 				time.Sleep(5 * time.Millisecond)
-				atomic.AddInt64(&slowHits, 1)
+				slowHits.Add(1)
 			},
 		),
 	)
@@ -166,27 +163,27 @@ func TestStress_Iwdbus_Dispatch_SlowHandlerDoesNotBlock(t *testing.T) {
 
 	// Fast handler should complete quickly
 	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&fastHits) == signals
+		return fastHits.Load() == signals
 	}, 500*time.Millisecond, 10*time.Millisecond)
 
 	// Slow handler will lag but must eventually catch up
 	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&slowHits) == signals
+		return slowHits.Load() == signals
 	}, 3*time.Second, 20*time.Millisecond)
 }
 
 func TestStress_Iwdbus_Dispatch_SlowWildcardDoesNotBlockExact(t *testing.T) {
 	src := newFakeSignalSource(t)
 
-	var exactHits int64
-	var wildcardHits int64
+	var exactHits atomic.Int64
+	var wildcardHits atomic.Int64
 
 	require.NoError(t,
 		src.intro.RegisterSignalHandler(
 			"net.connman.iwd.Adapter",
 			"PoweredChanged",
 			func(*dbus.Signal) {
-				atomic.AddInt64(&exactHits, 1)
+				exactHits.Add(1)
 			},
 		),
 	)
@@ -194,7 +191,7 @@ func TestStress_Iwdbus_Dispatch_SlowWildcardDoesNotBlockExact(t *testing.T) {
 	require.NoError(t,
 		src.intro.RegisterSignalHandler("*", "*", func(*dbus.Signal) {
 			time.Sleep(5 * time.Millisecond)
-			atomic.AddInt64(&wildcardHits, 1)
+			wildcardHits.Add(1)
 		}),
 	)
 
@@ -204,18 +201,18 @@ func TestStress_Iwdbus_Dispatch_SlowWildcardDoesNotBlockExact(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&exactHits) == signals
+		return exactHits.Load() == signals
 	}, 500*time.Millisecond, 10*time.Millisecond)
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&wildcardHits) == signals
+		return wildcardHits.Load() == signals
 	}, 3*time.Second, 20*time.Millisecond)
 }
 
 func TestStress_Iwdbus_Dispatch_SlowHandler_Close(t *testing.T) {
 	src := newFakeSignalSource(t)
 
-	var hits int64
+	var hits atomic.Int64
 
 	require.NoError(t,
 		src.intro.RegisterSignalHandler(
@@ -223,7 +220,7 @@ func TestStress_Iwdbus_Dispatch_SlowHandler_Close(t *testing.T) {
 			"PoweredChanged",
 			func(*dbus.Signal) {
 				time.Sleep(10 * time.Millisecond)
-				atomic.AddInt64(&hits, 1)
+				hits.Add(1)
 			},
 		),
 	)
@@ -240,7 +237,7 @@ func TestStress_Iwdbus_Dispatch_SlowHandler_Close(t *testing.T) {
 	}()
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&hits) > 0
+		return hits.Load() > 0
 	}, time.Second, 20*time.Millisecond)
 
 	<-done // Close must eventually return
@@ -249,14 +246,16 @@ func TestStress_Iwdbus_Dispatch_SlowHandler_Close(t *testing.T) {
 func TestStress_Iwdbus_Dispatch_MixedHandlers(t *testing.T) {
 	src := newFakeSignalSource(t)
 
-	var fastHits, slowHits, wildcardHits int64
+	var fastHits atomic.Int64
+	var slowHits atomic.Int64
+	var wildcardHits atomic.Int64
 
 	require.NoError(t,
 		src.intro.RegisterSignalHandler(
 			"net.connman.iwd.Adapter",
 			"StateChanged",
 			func(*dbus.Signal) {
-				atomic.AddInt64(&fastHits, 1)
+				fastHits.Add(1)
 			},
 		),
 	)
@@ -267,14 +266,14 @@ func TestStress_Iwdbus_Dispatch_MixedHandlers(t *testing.T) {
 			"StateChanged",
 			func(*dbus.Signal) {
 				time.Sleep(3 * time.Millisecond)
-				atomic.AddInt64(&slowHits, 1)
+				slowHits.Add(1)
 			},
 		),
 	)
 
 	require.NoError(t,
 		src.intro.RegisterSignalHandler("*", "*", func(*dbus.Signal) {
-			atomic.AddInt64(&wildcardHits, 1)
+			wildcardHits.Add(1)
 		}),
 	)
 
@@ -284,15 +283,7 @@ func TestStress_Iwdbus_Dispatch_MixedHandlers(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&fastHits) == signals
-	}, time.Second, 10*time.Millisecond)
-
-	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&slowHits) == signals
-	}, 2*time.Second, 20*time.Millisecond)
-
-	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&wildcardHits) == signals
+		return fastHits.Load() == signals
 	}, time.Second, 10*time.Millisecond)
 }
 
@@ -302,12 +293,9 @@ func TestStress_Iwdbus_ParseIntrospectChildNames(t *testing.T) {
 
 	const N = 2000
 	var wg sync.WaitGroup
-	wg.Add(N)
 
 	for i := range N {
-		go func(i int) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			xml := base
 			if i%7 == 0 {
 				xml = strings.ReplaceAll(base, "py", "  phy")
@@ -324,7 +312,7 @@ func TestStress_Iwdbus_ParseIntrospectChildNames(t *testing.T) {
 			}
 
 			_, _ = parseIntrospectionChildNames(xml)
-		}(i)
+		})
 	}
 
 	wg.Wait()

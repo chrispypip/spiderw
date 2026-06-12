@@ -5,6 +5,7 @@ package spiderw
 import (
 	"context"
 	"errors"
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -63,7 +64,7 @@ func TestAdapter_Public(t *testing.T) {
 			name: "SupportedModes",
 			op:   func(a *Adapter) (any, error) { return a.SupportedModes(ctx) },
 			newBackend: func() *fakeCoreAdapter {
-				modes := []core.AdapterMode{core.AdapterModeAP, core.AdapterModeStation}
+				modes := []core.Mode{core.ModeAP, core.ModeStation}
 				f := &fakeCoreAdapter{}
 				f.modes.Store(modes)
 				return f
@@ -71,10 +72,10 @@ func TestAdapter_Public(t *testing.T) {
 		},
 		{
 			name: "SupportsMode",
-			op:   func(a *Adapter) (any, error) { return a.SupportsMode(ctx, AdapterModeAP) },
+			op:   func(a *Adapter) (any, error) { return a.SupportsMode(ctx, ModeAP) },
 			newBackend: func() *fakeCoreAdapter {
 				f := &fakeCoreAdapter{}
-				f.modes.Store([]core.AdapterMode{core.AdapterModeAP})
+				f.modes.Store([]core.Mode{core.ModeAP})
 				return f
 			},
 		},
@@ -167,7 +168,7 @@ func TestAdapter_Public(t *testing.T) {
 			t.Run(c.name, func(t *testing.T) {
 				t.Run("Yes", func(t *testing.T) {
 					f := &fakeCoreAdapter{}
-					f.modes.Store([]core.AdapterMode{core.AdapterModeStation, core.AdapterModeAP, core.AdapterModeAdHoc})
+					f.modes.Store([]core.Mode{core.ModeStation, core.ModeAP, core.ModeAdHoc})
 					t.Run("Success", func(t *testing.T) {
 						a := &Adapter{core: f}
 						out, err := c.op(a)
@@ -360,9 +361,7 @@ func TestAdapter_SubscribePropertiesChanged_Public_CopiesPayload(t *testing.T) {
 
 		// Snapshot what the user received before mutating it.
 		got.Changed = make(map[string]any, len(ev.Changed))
-		for k, v := range ev.Changed {
-			got.Changed[k] = v
-		}
+		maps.Copy(got.Changed, ev.Changed)
 		got.Invalidated = append([]string(nil), ev.Invalidated...)
 
 		// Simulate typical user behavior: mutate what they receive.
@@ -417,7 +416,7 @@ func TestAdapter_Properties(t *testing.T) {
 		f.powered.Store(true)
 		f.name.Store("phy0")
 		f.model.Store(&model)
-		f.modes.Store([]core.AdapterMode{core.AdapterModeStation, core.AdapterModeAP})
+		f.modes.Store([]core.Mode{core.ModeStation, core.ModeAP})
 		a := newAdapter(f, "/net/connman/iwd/phy0")
 
 		props, err := a.Properties(ctx)
@@ -427,7 +426,7 @@ func TestAdapter_Properties(t *testing.T) {
 		require.NotNil(t, props.Model)
 		require.Equal(t, "Broadcom", *props.Model)
 		require.Nil(t, props.Vendor)
-		require.Equal(t, []AdapterMode{AdapterModeStation, AdapterModeAP}, props.SupportedModes)
+		require.Equal(t, []Mode{ModeStation, ModeAP}, props.SupportedModes)
 	})
 
 	t.Run("ErrorPropagates", func(t *testing.T) {

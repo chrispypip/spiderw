@@ -190,8 +190,8 @@ layer boundaries.
 - Do not add new combined kind or sentinel names such as
   `KindDeviceUnavailable` or `ErrStationUnavailable`.
 - Public callers should use `errors.Is(err, spiderw.ErrUnavailable)` for the
-  category and `errors.As` with `*spiderw.Error` to inspect `Resource`, `Kind`,
-  `Op`, and `Details`.
+  category and `errors.AsType` with `*spiderw.Error` to inspect `Resource`,
+  `Kind`, `Op`, and `Details`.
 - Resource-specific convenience wrappers are acceptable inside a layer when
   they make call sites clearer, but they should delegate to the shared
   taxonomy.

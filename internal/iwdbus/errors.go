@@ -28,6 +28,9 @@ var (
 
 	// ErrAdapterUninitialized indicates that an Adapter was used before initialization.
 	ErrAdapterUninitialized = errors.New("adapter is not initialized")
+
+	// ErrDeviceUninitialized indicates that a Device was used before initialization.
+	ErrDeviceUninitialized = errors.New("device is not initialized")
 )
 
 // Error is the internal structured error type used for all D-Bus-layer failures.
@@ -49,7 +52,8 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("%s: %s: %v", e.Kind.Error(), e.Context, e.Err)
 }
 
-// Unwrap returns the sentinel and underlying errors for errors.Is and errors.As.
+// Unwrap returns the sentinel and underlying errors for errors.Is, errors.As,
+// and errors.AsType.
 func (e *Error) Unwrap() error {
 	return errors.Join(e.Kind, e.Err)
 }

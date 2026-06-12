@@ -17,8 +17,10 @@ var (
 	connectSessionBusFn = dbus.ConnectSessionBus
 	newIwdDaemonFn      = iwdbus.NewDaemon
 	newIwdAdapterFn     = iwdbus.NewAdapter
+	newIwdDeviceFn      = iwdbus.NewDevice
 	newCoreDaemonFn     = func(raw *iwdbus.Daemon) *core.Daemon { return core.NewDaemon(raw) }
 	newCoreAdapterFn    = func(raw *iwdbus.Adapter) *core.Adapter { return core.NewAdapter(raw) }
+	newCoreDeviceFn     = func(raw *iwdbus.Device) *core.Device { return core.NewDevice(raw) }
 	closeConnFn         = func(c *dbus.Conn) error { return c.Close() }
 )
 
@@ -87,6 +89,9 @@ type Wiring struct {
 
 	// AdapterFactory optionally overrides adapter construction for tests.
 	AdapterFactory func(ctx context.Context, path string) (core.AdapterIface, error)
+
+	// DeviceFactory optionally overrides device construction for tests.
+	DeviceFactory func(ctx context.Context, path string) (core.DeviceIface, error)
 }
 
 // NewAdapter constructs a core adapter wrapper for the given iwd object path.
@@ -122,4 +127,39 @@ func (w *Wiring) NewAdapter(ctx context.Context, path string) (core.AdapterIface
 		return nil, core.WrapAdapterUnavailable("NewAdapter", "adapter unavailable", fmt.Errorf("core adapter interface not available"))
 	}
 	return coreAdapter, nil
+}
+
+// NewDevice constructs a core device wrapper for the given iwd object path.
+func (w *Wiring) NewDevice(ctx context.Context, path string) (core.DeviceIface, error) {
+	const op = "NewDevice"
+
+	if w == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "wiring cannot be nil", core.ErrCore)
+	}
+	if path == "" {
+		return nil, core.WrapInvalidArgument(core.ResourceDevice, op, "device path cannot be empty", core.ErrCore)
+	}
+	if path[0] != '/' {
+		return nil, core.WrapInvalidArgument(core.ResourceDevice, op, "device path must be absolute", core.ErrCore)
+	}
+	if w.DeviceFactory != nil {
+		return w.DeviceFactory(ctx, path)
+	}
+	if w.Conn == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "D-Bus conn cannot be nil", core.ErrCore)
+	}
+
+	iwdDevice, err := newIwdDeviceFn(ctx, w.Conn, dbus.ObjectPath(path))
+	if err != nil {
+		return nil, core.WrapDeviceUnavailable(op, "device unavailable", err)
+	}
+	if iwdDevice == nil {
+		return nil, core.WrapDeviceUnavailable(op, "device unavailable", iwdbus.WrapIntrospection(path, fmt.Errorf("iwd device interface not available")))
+	}
+
+	coreDevice := newCoreDeviceFn(iwdDevice)
+	if coreDevice == nil {
+		return nil, core.WrapDeviceUnavailable(op, "device unavailable", fmt.Errorf("core device interface not available"))
+	}
+	return coreDevice, nil
 }

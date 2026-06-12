@@ -8,23 +8,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAdapterMode(t *testing.T) {
+func TestMode(t *testing.T) {
 	t.Run("ParseValid", func(t *testing.T) {
 		tests := []struct {
 			input string
-			want  AdapterMode
+			want  Mode
 		}{
-			{input: "station", want: AdapterModeStation},
-			{input: "ap", want: AdapterModeAP},
-			{input: "ad-hoc", want: AdapterModeAdHoc},
+			{input: "station", want: ModeStation},
+			{input: "ap", want: ModeAP},
+			{input: "ad-hoc", want: ModeAdHoc},
 		}
 
 		for _, tt := range tests {
 			t.Run(tt.input, func(t *testing.T) {
-				got, ok := ParseAdapterMode(tt.input)
+				got, ok := ParseMode(tt.input)
 				require.True(t, ok)
 				require.Equal(t, tt.want, got)
-				require.True(t, ValidAdapterMode(got))
+				require.True(t, ValidMode(got))
 				require.Equal(t, tt.input, got.String())
 			})
 		}
@@ -35,16 +35,16 @@ func TestAdapterMode(t *testing.T) {
 
 		for _, input := range tests {
 			t.Run(input, func(t *testing.T) {
-				got, ok := ParseAdapterMode(input)
+				got, ok := ParseMode(input)
 				require.False(t, ok)
-				require.Equal(t, AdapterModeUnknown, got)
-				require.False(t, ValidAdapterMode(got))
+				require.Equal(t, ModeUnknown, got)
+				require.False(t, ValidMode(got))
 			})
 		}
 	})
 
 	t.Run("UnknownString", func(t *testing.T) {
-		require.Equal(t, "unknown", AdapterModeUnknown.String())
-		require.Equal(t, "unknown", AdapterMode("bad-mode").String())
+		require.Equal(t, "unknown", ModeUnknown.String())
+		require.Equal(t, "unknown", Mode("bad-mode").String())
 	})
 }

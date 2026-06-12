@@ -151,8 +151,7 @@ func (c *Client) Close() error {
 			return
 		}
 
-		var publicErr *Error
-		if errors.As(err, &publicErr) {
+		if _, ok := errors.AsType[*Error](err); ok {
 			c.closeErr = err
 			return
 		}
@@ -264,4 +263,92 @@ func (c *Client) AllAdapters(ctx context.Context) ([]*Adapter, error) {
 	}
 
 	return adapters, nil
+}
+
+// Device creates a Device wrapper for a specific iwd device object path.
+//
+// Use Daemon.Devices to discover valid device paths.
+func (c *Client) Device(ctx context.Context, path string) (*Device, error) {
+	const op = "Client.Device"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op, "path", path)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	coreDevice, err := c.wire.NewDevice(ctx, path)
+	if err != nil {
+		log.Error(ctx, "device wiring failed", "op", op, "path", path, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	pub := newDevice(coreDevice, path)
+	if pub == nil {
+		log.Error(ctx, "device wrapper unexpectedly nil", "op", op, "path", path)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+	return pub, nil
+}
+
+// AllDevices mints live Device handles for every device iwd currently exposes.
+//
+// It enumerates devices via the daemon, then constructs a handle for each,
+// preserving the daemon's enumeration order. Use Device to obtain a single
+// device by path, or Daemon.Devices for lightweight references without
+// constructing handles.
+func (c *Client) AllDevices(ctx context.Context) ([]*Device, error) {
+	const op = "Client.AllDevices"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil || c.daemon == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	// Enumeration is the daemon's job; construction is the client's.
+	refs, err := c.daemon.Devices(ctx)
+	if err != nil {
+		log.Error(ctx, "device enumeration failed", "op", op, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	devices := make([]*Device, 0, len(refs))
+	for _, ref := range refs {
+		coreDevice, err := c.wire.NewDevice(ctx, ref.Path)
+		if err != nil {
+			log.Error(ctx, "device wiring failed", "op", op, "path", ref.Path, "err", err)
+			return nil, wrapPublicError(op, err)
+		}
+		pub := newDevice(coreDevice, ref.Path)
+		if pub == nil {
+			log.Error(ctx, "device wrapper unexpectedly nil", "op", op, "path", ref.Path)
+			return nil, wrapPublicError(op, ErrInternal)
+		}
+		devices = append(devices, pub)
+	}
+
+	return devices, nil
 }

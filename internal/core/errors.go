@@ -83,6 +83,10 @@ var (
 	// ErrAdapterNotInitialized indicates that an Adapter wrapper has no raw
 	// backend.
 	ErrAdapterNotInitialized = errors.New("adapter not initialized")
+
+	// ErrDeviceNotInitialized indicates that a Device wrapper has no raw
+	// backend.
+	ErrDeviceNotInitialized = errors.New("device not initialized")
 )
 
 func newError(kind Kind, resource Resource, op, details string, err error) error {
@@ -132,7 +136,8 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("%s: Op=%s: %v", label, e.Op, e.Err)
 }
 
-// Unwrap returns the sentinel and underlying errors for errors.Is and errors.As.
+// Unwrap returns the sentinel and underlying errors for errors.Is, errors.As,
+// and errors.AsType.
 func (e *Error) Unwrap() error {
 	return errors.Join(ErrCore, e.Err)
 }
@@ -145,6 +150,7 @@ type unavailablePolicy struct {
 var (
 	daemonUnavailablePolicy  = unavailablePolicy{resource: ResourceDaemon}
 	adapterUnavailablePolicy = unavailablePolicy{resource: ResourceAdapter, includeDBusProperty: true}
+	deviceUnavailablePolicy  = unavailablePolicy{resource: ResourceDevice, includeDBusProperty: true}
 	networkUnavailablePolicy = unavailablePolicy{resource: ResourceNetwork}
 )
 
@@ -176,6 +182,11 @@ func WrapDaemonUnavailable(op, details string, err error) error {
 // WrapAdapterUnavailable classifies D-Bus adapter failures by kind and resource.
 func WrapAdapterUnavailable(op, details string, err error) error {
 	return wrapUnavailable(op, details, err, adapterUnavailablePolicy)
+}
+
+// WrapDeviceUnavailable classifies D-Bus device failures by kind and resource.
+func WrapDeviceUnavailable(op, details string, err error) error {
+	return wrapUnavailable(op, details, err, deviceUnavailablePolicy)
 }
 
 // WrapNetworkUnavailable classifies D-Bus network failures by kind and resource.

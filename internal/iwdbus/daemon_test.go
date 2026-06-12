@@ -337,3 +337,114 @@ func TestDaemon_GetAdapters_Guards(t *testing.T) {
 		require.True(t, errors.Is(err, ErrDaemonUninitialized))
 	})
 }
+
+func TestDaemon_GetDevices_Guards(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NilReceiver", func(t *testing.T) {
+		t.Parallel()
+
+		var d *Daemon
+		_, err := d.GetDevices(context.Background())
+		require.Error(t, err)
+		require.True(t, errors.Is(err, ErrDBusConnection))
+		require.True(t, errors.Is(err, ErrDaemonUninitialized))
+	})
+
+	t.Run("NilConn", func(t *testing.T) {
+		t.Parallel()
+
+		d := &Daemon{conn: nil}
+		_, err := d.GetDevices(context.Background())
+		require.Error(t, err)
+		require.True(t, errors.Is(err, ErrDBusConnection))
+		require.True(t, errors.Is(err, ErrDaemonUninitialized))
+	})
+}
+
+// TestObjectNameFromManagedObject covers the name-extraction/validation helper
+// shared by GetAdapters and GetDevices. Its error branches are not reachable
+// through the mock (which always reports a valid Name), so they are exercised
+// directly here.
+func TestObjectNameFromManagedObject(t *testing.T) {
+	t.Parallel()
+
+	const validPath = dbus.ObjectPath("/net/connman/iwd/phy0")
+
+	tests := []struct {
+		name            string
+		label           string
+		path            dbus.ObjectPath
+		props           map[string]dbus.Variant
+		want            string
+		wantErrContains []string
+	}{
+		{
+			name:  "valid",
+			label: "adapter",
+			path:  validPath,
+			props: map[string]dbus.Variant{"Name": dbus.MakeVariant("phy0")},
+			want:  "phy0",
+		},
+		{
+			name:  "name is trimmed",
+			label: "device",
+			path:  validPath,
+			props: map[string]dbus.Variant{"Name": dbus.MakeVariant("  wlan0  ")},
+			want:  "wlan0",
+		},
+		{
+			name:            "invalid path",
+			label:           "adapter",
+			path:            dbus.ObjectPath(""),
+			props:           map[string]dbus.Variant{"Name": dbus.MakeVariant("phy0")},
+			wantErrContains: []string{"variant=Path", "invalid adapter path"},
+		},
+		{
+			name:            "missing Name property",
+			label:           "device",
+			path:            validPath,
+			props:           map[string]dbus.Variant{},
+			wantErrContains: []string{"variant=Name", "missing Name property"},
+		},
+		{
+			name:            "Name wrong type",
+			label:           "adapter",
+			path:            validPath,
+			props:           map[string]dbus.Variant{"Name": dbus.MakeVariant(42)},
+			wantErrContains: []string{"variant=Name", "expected string, got int"},
+		},
+		{
+			name:            "empty Name",
+			label:           "device",
+			path:            validPath,
+			props:           map[string]dbus.Variant{"Name": dbus.MakeVariant("")},
+			wantErrContains: []string{"variant=Name", "device Name was empty"},
+		},
+		{
+			name:            "whitespace Name",
+			label:           "adapter",
+			path:            validPath,
+			props:           map[string]dbus.Variant{"Name": dbus.MakeVariant("   \t ")},
+			wantErrContains: []string{"variant=Name", "adapter Name was empty"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := objectNameFromManagedObject(tc.label, tc.path, tc.props)
+			if len(tc.wantErrContains) > 0 {
+				require.Error(t, err)
+				require.True(t, errors.Is(err, ErrDBusVariant))
+				for _, sub := range tc.wantErrContains {
+					require.Contains(t, err.Error(), sub)
+				}
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}

@@ -20,7 +20,7 @@ func Benchmark_Logging_Debug_NoFields(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		l.Debug(benchCtx, "msg")
 	}
 }
@@ -35,7 +35,7 @@ func Benchmark_Logging_Debug_WithFewFields(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		l.Debug(benchCtx, "msg")
 	}
 }
@@ -51,7 +51,7 @@ func Benchmark_Logging_Debug_WithManyFields(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		l.Debug(benchCtx, "msg")
 	}
 }
