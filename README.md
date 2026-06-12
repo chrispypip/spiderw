@@ -285,10 +285,11 @@ D-Bus decoding is handled internally; public methods return standard Go types
 
 ## CLI Quick Start
 
-The `spiderw` command can query the daemon and adapters through the same public
-API used by library callers. It uses the system bus by default, which is where
-real iwd runs, so the examples below need no bus flag. The Go mock registers on
-the session bus, so pass `--session` when testing against `iwdmock`.
+The `spiderw` command can query the daemon, adapters, and devices through the
+same public API used by library callers. It uses the system bus by default,
+which is where real iwd runs, so the examples below need no bus flag. The Go
+mock registers on the session bus, so pass `--session` when testing against
+`iwdmock`.
 
 Global flags may be placed anywhere in the command:
 
@@ -305,15 +306,17 @@ spiderw daemon state-dir
 spiderw daemon net-conf
 ```
 
-List adapters:
+List adapters, or print a full snapshot for every adapter:
 
 ```bash
 spiderw adapter list
+spiderw adapter status
 ```
 
 Use the adapter name or path from `adapter list` as the adapter reference:
 
 ```bash
+spiderw adapter phy0 status
 spiderw adapter phy0 powered
 spiderw adapter phy0 powered true
 spiderw adapter phy0 name
@@ -327,14 +330,36 @@ spiderw adapter phy0 supports-ad-hoc
 spiderw adapter phy0 monitor powered
 ```
 
+List devices, or print a full snapshot for every device:
+
+```bash
+spiderw device list
+spiderw device status
+```
+
+Use the device name or path from `device list` as the device reference:
+
+```bash
+spiderw device wlan0 status
+spiderw device wlan0 powered
+spiderw device wlan0 powered false
+spiderw device wlan0 mode
+spiderw device wlan0 mode ap
+spiderw device wlan0 name
+spiderw device wlan0 address
+spiderw device wlan0 adapter
+spiderw device wlan0 monitor powered
+spiderw device wlan0 monitor mode
+```
+
 To target the Go mock instead of a real daemon, add `--session`:
 
 ```bash
 spiderw --session daemon info
 ```
 
-`monitor powered` prints the current value and then streams future powered
-changes until interrupted.
+Monitor commands print the current value and then stream future changes until
+interrupted.
 
 ---
 
