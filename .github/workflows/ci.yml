@@ -11,10 +11,11 @@ permissions:
   contents: read
 
 # The Go version is single-sourced from go.mod (jobs use go-version-file), so it
-# never drifts from the module's declared toolchain. golangci-lint is pinned here
-# and in dev/Dockerfile.dev; Renovate keeps the two in sync (see renovate.json).
+# never drifts from the module's declared toolchain. golangci-lint is pinned
+# here and in dev/Dockerfile.dev; Renovate keeps the two in sync
+# (see renovate.json).
 env:
-  GOLANGCI_LINT_VERSION: "v2.11.4"
+  GOLANGCI_LINT_VERSION: "v2.12.2"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -28,8 +29,8 @@ jobs:
     name: build & vet
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - run: go build ./...
@@ -43,11 +44,11 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
@@ -75,8 +76,8 @@ jobs:
             cmd: go test -tags=bench -bench=. -benchmem -benchtime=1x
                  -run='^$' ./...
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: ${{ matrix.suite.name }}
@@ -95,8 +96,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: Install D-Bus
