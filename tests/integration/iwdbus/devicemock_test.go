@@ -345,3 +345,23 @@ func TestDeviceMock_StatusJSON(t *testing.T) {
 	require.Equal(t, "station", jsonGetString(t, entry, "Mode"))
 	require.Equal(t, "/net/connman/iwd/phy0", jsonGetString(t, entry, "Adapter"))
 }
+
+// TestDeviceMock_ScopedStatusJSON exercises `device <device> status --json`
+// through the real D-Bus stack and verifies it keeps the same one-entry array
+// shape as aggregate `device status --json`.
+func TestDeviceMock_ScopedStatusJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	list, out, err := runSpiderJSONArray(t, "device", "wlan0", "status")
+	require.NoError(t, err, "output:\n%s", out)
+	require.Len(t, list, 1, "output:\n%s", out)
+
+	entry := list[0]
+	require.Equal(t, devicePath, jsonGetString(t, entry, "Path"))
+	require.Equal(t, "wlan0", jsonGetString(t, entry, "Name"))
+	require.Equal(t, "aa:bb:cc:dd:ee:ff", jsonGetString(t, entry, "Address"))
+	require.Equal(t, true, jsonGetBool(t, entry, "Powered"))
+	require.Equal(t, "station", jsonGetString(t, entry, "Mode"))
+	require.Equal(t, "/net/connman/iwd/phy0", jsonGetString(t, entry, "Adapter"))
+}

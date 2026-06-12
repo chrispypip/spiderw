@@ -307,6 +307,30 @@ func (r adapterStatusResult) String() string {
 	return strings.Join(blocks, "\n\n")
 }
 
+func adapterStatusEntryFromAdapter(ctx context.Context, a adapterAPI) (adapterStatusEntry, error) {
+	// One Properties.GetAll call per adapter instead of one Get per property.
+	// An absent optional (Model/Vendor) is simply missing from the reply and
+	// stays nil; any error is a real failure and surfaces.
+	props, err := a.Properties(ctx)
+	if err != nil {
+		return adapterStatusEntry{}, err
+	}
+
+	modeStrs := make([]string, 0, len(props.SupportedModes))
+	for _, mode := range props.SupportedModes {
+		modeStrs = append(modeStrs, mode.String())
+	}
+
+	return adapterStatusEntry{
+		Path:           a.Path(),
+		Name:           props.Name,
+		Powered:        props.Powered,
+		Model:          props.Model,
+		Vendor:         props.Vendor,
+		SupportedModes: modeStrs,
+	}, nil
+}
+
 func runAdapterStatus(app *App, args []string) error {
 	if len(args) > 0 {
 		return fmt.Errorf("unknown adapter status argument: %s", args[0])
@@ -327,29 +351,29 @@ func runAdapterStatus(app *App, args []string) error {
 
 	out := make(adapterStatusResult, 0, len(adapters))
 	for _, a := range adapters {
-		// One Properties.GetAll call per adapter instead of one Get per
-		// property. An absent optional (Model/Vendor) is simply missing from
-		// the reply and stays nil; any error is a real failure and surfaces.
-		props, err := a.Properties(ctx)
+		entry, err := adapterStatusEntryFromAdapter(ctx, a)
 		if err != nil {
 			return err
 		}
 
-		modeStrs := make([]string, 0, len(props.SupportedModes))
-		for _, mode := range props.SupportedModes {
-			modeStrs = append(modeStrs, mode.String())
-		}
-
-		out = append(out, adapterStatusEntry{
-			Path:           a.Path(),
-			Name:           props.Name,
-			Powered:        props.Powered,
-			Model:          props.Model,
-			Vendor:         props.Vendor,
-			SupportedModes: modeStrs,
-		})
+		out = append(out, entry)
 	}
 	return app.printOutput(out)
+}
+
+func runAdapterSingleStatus(app *App, ctx context.Context, adapterRef string, args []string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("usage: spiderw adapter <adapter> status")
+	}
+
+	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a adapterAPI) error {
+		entry, err := adapterStatusEntryFromAdapter(ctx, a)
+		if err != nil {
+			return err
+		}
+
+		return app.printOutput(adapterStatusResult{entry})
+	})
 }
 
 func runAdapterPowered(app *App, ctx context.Context, adapterRef string, args []string) error {
@@ -472,6 +496,8 @@ func runAdapterWithRef(app *App, args []string) error {
 	ctx := context.Background()
 
 	switch op {
+	case "status":
+		return runAdapterSingleStatus(app, ctx, adapterRef, rest)
 	case "powered":
 		return runAdapterPowered(app, ctx, adapterRef, rest)
 	case "name":
@@ -529,6 +555,7 @@ func runAdapter(app *App, args []string) error {
 const adapterHelpText = `Commands:
   list                              List adapters (name and path)
   status                            Show a snapshot of every adapter
+  <adapter> status                  Show a snapshot of one adapter
   <adapter> powered [true|false]    Get or set the adapter's powered state
   <adapter> name                    Show the adapter name
   <adapter> model                   Show the adapter model

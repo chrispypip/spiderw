@@ -19,8 +19,8 @@ func TestHelp_ListsCommands(t *testing.T) {
 		want []string
 	}{
 		{"daemon", []string{"Usage:", "spiderw daemon", "Commands:", "info", "version", "state-dir", "net-conf"}},
-		{"adapter", []string{"Usage:", "spiderw adapter", "Commands:", "list", "status", "powered", "supported-modes", "supports-station", "monitor"}},
-		{"device", []string{"Usage:", "spiderw device", "Commands:", "list", "status", "powered", "mode", "address", "adapter", "monitor"}},
+		{"adapter", []string{"Usage:", "spiderw adapter", "Commands:", "list", "status", "<adapter> status", "powered", "supported-modes", "supports-station", "monitor"}},
+		{"device", []string{"Usage:", "spiderw device", "Commands:", "list", "status", "<device> status", "powered", "mode", "address", "adapter", "monitor"}},
 	}
 
 	for _, tc := range cases {

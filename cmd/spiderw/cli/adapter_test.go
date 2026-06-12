@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -40,6 +41,34 @@ func TestAdapterCmd_Status_Human(t *testing.T) {
 	for _, want := range []string{"phy0", "MockModel", "MockVendor", "station, ap", "/net/connman/iwd/phy0"} {
 		require.Contains(t, out, want)
 	}
+}
+
+func TestAdapterCmd_ScopedStatus_JSON(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithAdapter(), nil, true, "adapter", "phy0", "status")
+	require.Equal(t, 0, code, out)
+
+	var list []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &list))
+	require.Len(t, list, 1)
+
+	entry := list[0]
+	require.Equal(t, "/net/connman/iwd/phy0", entry["Path"])
+	require.Equal(t, "phy0", entry["Name"])
+	require.Equal(t, true, entry["Powered"])
+	require.Equal(t, "MockModel", entry["Model"])
+	require.Equal(t, "MockVendor", entry["Vendor"])
+	require.Equal(t, []any{"station", "ap"}, entry["SupportedModes"])
+}
+
+func TestAdapterCmd_ScopedStatus_UsageError(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "status", "extra")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "usage: spiderw adapter <adapter> status")
+	require.NotContains(t, out, "Commands:")
 }
 
 func TestAdapterCmd_PoweredGetAndSet(t *testing.T) {

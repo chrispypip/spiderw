@@ -322,6 +322,25 @@ func TestAdapterMock_Status(t *testing.T) {
 	})
 }
 
+// TestAdapterMock_ScopedStatusJSON exercises `adapter <adapter> status --json`
+// through the real D-Bus stack and verifies it keeps the same one-entry array
+// shape as aggregate `adapter status --json`.
+func TestAdapterMock_ScopedStatusJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	list, out, err := runSpiderJSONArray(t, "adapter", "phy0", "status")
+	require.NoError(t, err, "output:\n%s", out)
+	require.Len(t, list, 1, "output:\n%s", out)
+
+	entry := list[0]
+	require.Equal(t, "/net/connman/iwd/phy0", jsonGetString(t, entry, "Path"))
+	require.Equal(t, "phy0", jsonGetString(t, entry, "Name"))
+	require.Equal(t, true, jsonGetBool(t, entry, "Powered"))
+	require.Equal(t, "MockModel", jsonGetString(t, entry, "Model"))
+	require.Equal(t, "MockVendor", jsonGetString(t, entry, "Vendor"))
+}
+
 // TestAdapterMock_ErrorMessageNotDuplicated guards end-to-end against the public
 // error message restating a wrapped layer's frame. A bad SupportedModes payload
 // produces a multi-layer error (variant conversion -> core -> public); the

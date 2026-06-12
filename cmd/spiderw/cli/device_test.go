@@ -56,6 +56,34 @@ func TestDeviceCmd_Status_JSON(t *testing.T) {
 	require.Equal(t, "/net/connman/iwd/phy0", list[0]["Adapter"])
 }
 
+func TestDeviceCmd_ScopedStatus_JSON(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithDevice(), nil, true, "device", "wlan0", "status")
+	require.Equal(t, 0, code, out)
+
+	var list []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &list))
+	require.Len(t, list, 1)
+
+	entry := list[0]
+	require.Equal(t, "/net/connman/iwd/phy0/wlan0", entry["Path"])
+	require.Equal(t, "wlan0", entry["Name"])
+	require.Equal(t, "aa:bb:cc:dd:ee:ff", entry["Address"])
+	require.Equal(t, true, entry["Powered"])
+	require.Equal(t, "station", entry["Mode"])
+	require.Equal(t, "/net/connman/iwd/phy0", entry["Adapter"])
+}
+
+func TestDeviceCmd_ScopedStatus_UsageError(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithDevice(), nil, false, "device", "wlan0", "status", "extra")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "usage: spiderw device <device> status")
+	require.NotContains(t, out, "Commands:")
+}
+
 func TestDeviceCmd_Status_BackendError(t *testing.T) {
 	t.Parallel()
 

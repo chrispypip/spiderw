@@ -123,6 +123,23 @@ func (r deviceStatusResult) String() string {
 	return strings.Join(blocks, "\n\n")
 }
 
+func deviceStatusEntryFromDevice(ctx context.Context, d deviceAPI) (deviceStatusEntry, error) {
+	// One Properties.GetAll call per device instead of one Get per property.
+	props, err := d.Properties(ctx)
+	if err != nil {
+		return deviceStatusEntry{}, err
+	}
+
+	return deviceStatusEntry{
+		Path:    d.Path(),
+		Name:    props.Name,
+		Address: props.Address,
+		Powered: props.Powered,
+		Mode:    props.Mode.String(),
+		Adapter: props.Adapter,
+	}, nil
+}
+
 func runDeviceStatus(app *App, args []string) error {
 	if len(args) > 0 {
 		return fmt.Errorf("unknown device status argument: %s", args[0])
@@ -143,22 +160,29 @@ func runDeviceStatus(app *App, args []string) error {
 
 	out := make(deviceStatusResult, 0, len(devices))
 	for _, d := range devices {
-		// One Properties.GetAll call per device instead of one Get per property.
-		props, err := d.Properties(ctx)
+		entry, err := deviceStatusEntryFromDevice(ctx, d)
 		if err != nil {
 			return err
 		}
 
-		out = append(out, deviceStatusEntry{
-			Path:    d.Path(),
-			Name:    props.Name,
-			Address: props.Address,
-			Powered: props.Powered,
-			Mode:    props.Mode.String(),
-			Adapter: props.Adapter,
-		})
+		out = append(out, entry)
 	}
 	return app.printOutput(out)
+}
+
+func runDeviceSingleStatus(app *App, ctx context.Context, deviceRef string, args []string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("usage: spiderw device <device> status")
+	}
+
+	return withDevice(app, ctx, deviceRef, func(ctx context.Context, d deviceAPI) error {
+		entry, err := deviceStatusEntryFromDevice(ctx, d)
+		if err != nil {
+			return err
+		}
+
+		return app.printOutput(deviceStatusResult{entry})
+	})
 }
 
 func deviceByRef(ctx context.Context, client clientAPI, ref string) (deviceAPI, error) {
@@ -423,6 +447,8 @@ func runDeviceWithRef(app *App, args []string) error {
 	ctx := context.Background()
 
 	switch op {
+	case "status":
+		return runDeviceSingleStatus(app, ctx, deviceRef, rest)
 	case "powered":
 		return runDevicePowered(app, ctx, deviceRef, rest)
 	case "mode":
@@ -466,6 +492,7 @@ func runDevice(app *App, args []string) error {
 const deviceHelpText = `Commands:
   list                                 List devices (name and path)
   status                               Show a snapshot of every device
+  <device> status                      Show a snapshot of one device
   <device> powered [true|false]        Get or set the device's powered state
   <device> mode [station|ap|ad-hoc]    Get or set the device's mode
   <device> name                        Show the device name
