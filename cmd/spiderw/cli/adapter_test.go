@@ -74,6 +74,38 @@ func TestAdapterCmd_InvalidModeArg(t *testing.T) {
 	require.Contains(t, out, "invalid mode")
 }
 
+func TestAdapterCmd_MissingNestedCommandPrintsHelp(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "Usage:")
+	require.Contains(t, out, "spiderw adapter <command>")
+	require.Contains(t, out, "Commands:")
+	require.Contains(t, out, "<adapter> powered")
+	require.Contains(t, out, "missing adapter command for \"phy0\"")
+}
+
+func TestAdapterCmd_UnknownNestedCommandPrintsHelp(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "bogus")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "Usage:")
+	require.Contains(t, out, "Commands:")
+	require.Contains(t, out, "supported-modes")
+	require.Contains(t, out, "unknown adapter command \"bogus\" for adapter \"phy0\"")
+}
+
+func TestAdapterCmd_LeafUsageErrorStaysFocused(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "powered", "on", "extra")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "usage: spiderw adapter <adapter> powered [true|false]")
+	require.NotContains(t, out, "Commands:")
+}
+
 func TestAdapterCmd_RefNotFound(t *testing.T) {
 	t.Parallel()
 

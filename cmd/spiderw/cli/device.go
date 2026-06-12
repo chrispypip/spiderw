@@ -413,7 +413,8 @@ func monitorDevice(app *App, deviceRef string, args []string) error {
 
 func runDeviceWithRef(app *App, args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("usage: spiderw device <device> <command>")
+		printDeviceUsage(app)
+		return fmt.Errorf("missing device command for %q", args[0])
 	}
 
 	deviceRef := args[0]
@@ -441,13 +442,15 @@ func runDeviceWithRef(app *App, args []string) error {
 	case "monitor":
 		return monitorDevice(app, deviceRef, rest)
 	default:
+		printDeviceUsage(app)
 		return fmt.Errorf("unknown device command %q for device %q", op, deviceRef)
 	}
 }
 
 func runDevice(app *App, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: spiderw device list OR spiderw device status OR spiderw device <device> <command>")
+		printDeviceUsage(app)
+		return fmt.Errorf("missing device command")
 	}
 
 	switch args[0] {
@@ -479,4 +482,8 @@ func deviceCommand(app *App) *Command {
 			return runDevice(app, args)
 		},
 	}
+}
+
+func printDeviceUsage(app *App) {
+	deviceCommand(app).printUsage(app)
 }

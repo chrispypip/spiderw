@@ -139,6 +139,29 @@ func TestDeviceCmd_UnknownCommand(t *testing.T) {
 	out, code := driveCLI(fakeWithDevice(), nil, false, "device", "wlan0", "bogus")
 	require.Equal(t, 1, code)
 	require.Contains(t, out, "unknown device command")
+	require.Contains(t, out, "Commands:")
+	require.Contains(t, out, "<device> powered")
+}
+
+func TestDeviceCmd_MissingNestedCommandPrintsHelp(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithDevice(), nil, false, "device", "wlan0")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "Usage:")
+	require.Contains(t, out, "spiderw device <command>")
+	require.Contains(t, out, "Commands:")
+	require.Contains(t, out, "<device> mode")
+	require.Contains(t, out, "missing device command for \"wlan0\"")
+}
+
+func TestDeviceCmd_LeafUsageErrorStaysFocused(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithDevice(), nil, false, "device", "wlan0", "mode", "ap", "extra")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "usage: spiderw device <device> mode [station|ap|ad-hoc]")
+	require.NotContains(t, out, "Commands:")
 }
 
 func TestDeviceCmd_ClientConstructionError(t *testing.T) {

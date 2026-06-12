@@ -462,7 +462,8 @@ func runAdapterSupportsMode(app *App, ctx context.Context, adapterRef string, ar
 
 func runAdapterWithRef(app *App, args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("usage: spiderw adapter <adapter> <command>")
+		printAdapterUsage(app)
+		return fmt.Errorf("missing adapter command for %q", args[0])
 	}
 
 	adapterRef := args[0]
@@ -504,13 +505,15 @@ func runAdapterWithRef(app *App, args []string) error {
 	case "monitor":
 		return monitorAdapterPowered(app, adapterRef, rest)
 	default:
+		printAdapterUsage(app)
 		return fmt.Errorf("unknown adapter command %q for adapter %q", op, adapterRef)
 	}
 }
 
 func runAdapter(app *App, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: spiderw adapter list OR spiderw adapter status OR spiderw adapter <adapter> <command>")
+		printAdapterUsage(app)
+		return fmt.Errorf("missing adapter command")
 	}
 
 	switch args[0] {
@@ -546,4 +549,8 @@ func adapterCommand(app *App) *Command {
 			return runAdapter(app, args)
 		},
 	}
+}
+
+func printAdapterUsage(app *App) {
+	adapterCommand(app).printUsage(app)
 }
