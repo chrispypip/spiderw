@@ -523,10 +523,25 @@ func runAdapter(app *App, args []string) error {
 	return runAdapterWithRef(app, args)
 }
 
+const adapterHelpText = `Commands:
+  list                              List adapters (name and path)
+  status                            Show a snapshot of every adapter
+  <adapter> powered [true|false]    Get or set the adapter's powered state
+  <adapter> name                    Show the adapter name
+  <adapter> model                   Show the adapter model
+  <adapter> vendor                  Show the adapter vendor
+  <adapter> supported-modes         List the adapter's supported modes
+  <adapter> supports-mode <mode>    Check whether a mode is supported
+  <adapter> supports-station        Check station-mode support
+  <adapter> supports-ap             Check access-point-mode support
+  <adapter> supports-ad-hoc         Check ad-hoc-mode support
+  <adapter> monitor powered         Stream powered-state changes`
+
 func adapterCommand(app *App) *Command {
 	return &Command{
 		Name:        "adapter",
 		Description: "Inspect and query iwd adapters",
+		HelpText:    adapterHelpText,
 		Execute: func(args []string) error {
 			return runAdapter(app, args)
 		},

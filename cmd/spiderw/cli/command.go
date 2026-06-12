@@ -3,6 +3,7 @@ package cli
 import (
 	"flag"
 	"fmt"
+	"sort"
 )
 
 // Command is a minimal CLI command node.
@@ -21,6 +22,12 @@ type Command struct {
 
 	// Subcommands contains child commands keyed by command name.
 	Subcommands map[string]*Command
+
+	// HelpText is optional usage text printed verbatim by --help for commands
+	// that dispatch their own positional arguments instead of using Subcommands
+	// (so there is no subcommand map for printUsage to enumerate). It typically
+	// contains a "Commands:" block.
+	HelpText string
 }
 
 // Run executes the spiderw command-line interface.
@@ -96,7 +103,7 @@ func (c *Command) printUsage(app *App) {
 	out := app.stdout()
 	fmt.Fprintf(out, "%s\n\n", c.Description)
 	fmt.Fprintf(out, "Usage:\n  spiderw %s", c.Name)
-	if len(c.Subcommands) > 0 {
+	if len(c.Subcommands) > 0 || c.HelpText != "" {
 		fmt.Fprintf(out, " <command>")
 	}
 	fmt.Fprintln(out)
@@ -104,9 +111,21 @@ func (c *Command) printUsage(app *App) {
 
 	if len(c.Subcommands) > 0 {
 		fmt.Fprintln(out, "Commands:")
-		for _, sub := range c.Subcommands {
-			fmt.Fprintf(out, "  %-12s %s\n", sub.Name, sub.Description)
+		// Display the invocation name (the map key, e.g. "version"), sorted for
+		// stable output. sub.Name holds the fully-qualified path ("daemon
+		// version") used for the subcommand's own usage line, which is too long
+		// for this list.
+		names := make([]string, 0, len(c.Subcommands))
+		for name := range c.Subcommands {
+			names = append(names, name)
 		}
+		sort.Strings(names)
+		for _, name := range names {
+			fmt.Fprintf(out, "  %-12s %s\n", name, c.Subcommands[name].Description)
+		}
+	}
+	if c.HelpText != "" {
+		fmt.Fprintln(out, c.HelpText)
 	}
 }
 

@@ -460,10 +460,21 @@ func runDevice(app *App, args []string) error {
 	return runDeviceWithRef(app, args)
 }
 
+const deviceHelpText = `Commands:
+  list                                 List devices (name and path)
+  status                               Show a snapshot of every device
+  <device> powered [true|false]        Get or set the device's powered state
+  <device> mode [station|ap|ad-hoc]    Get or set the device's mode
+  <device> name                        Show the device name
+  <device> address                     Show the device hardware (MAC) address
+  <device> adapter                     Show the owning adapter object path
+  <device> monitor <powered|mode>      Stream powered or mode changes`
+
 func deviceCommand(app *App) *Command {
 	return &Command{
 		Name:        "device",
 		Description: "Inspect and query iwd devices",
+		HelpText:    deviceHelpText,
 		Execute: func(args []string) error {
 			return runDevice(app, args)
 		},
