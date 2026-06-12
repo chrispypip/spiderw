@@ -1,6 +1,7 @@
 # spiderw
 
 [![CI](https://github.com/chrispypip/spiderw/actions/workflows/ci.yml/badge.svg)](https://github.com/chrispypip/spiderw/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/chrispypip/spiderw/badge)](https://scorecard.dev/viewer/?uri=github.com/chrispypip/spiderw)
 [![Go Reference](https://pkg.go.dev/badge/github.com/chrispypip/spiderw.svg)](https://pkg.go.dev/github.com/chrispypip/spiderw)
 [![Go Report Card](https://goreportcard.com/badge/github.com/chrispypip/spiderw)](https://goreportcard.com/report/github.com/chrispypip/spiderw)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
