@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -40,7 +40,7 @@ func (r adapterListResult) String() string {
 	return b.String()
 }
 
-func adapterRefs(ctx context.Context, client *spiderw.Client) ([]spiderw.AdapterRef, error) {
+func adapterRefs(ctx context.Context, client clientAPI) ([]spiderw.AdapterRef, error) {
 	if client == nil {
 		return nil, fmt.Errorf("client not available")
 	}
@@ -51,7 +51,7 @@ func adapterRefs(ctx context.Context, client *spiderw.Client) ([]spiderw.Adapter
 	return daemon.Adapters(ctx)
 }
 
-func adapterByRef(ctx context.Context, client *spiderw.Client, ref string) (*spiderw.Adapter, error) {
+func adapterByRef(ctx context.Context, client clientAPI, ref string) (adapterAPI, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		return nil, fmt.Errorf("adapter reference required")
@@ -160,8 +160,8 @@ func parseModeArg(raw string) (spiderw.Mode, error) {
 	}
 }
 
-func withAdapter(app *App, ctx context.Context, adapterRef string, fn func(context.Context, *spiderw.Adapter) error) error {
-	return app.withClient(ctx, func(client *spiderw.Client) error {
+func withAdapter(app *App, ctx context.Context, adapterRef string, fn func(context.Context, adapterAPI) error) error {
+	return app.withClient(ctx, func(client clientAPI) error {
 		a, err := adapterByRef(ctx, client, adapterRef)
 		if err != nil {
 			return err
@@ -171,12 +171,12 @@ func withAdapter(app *App, ctx context.Context, adapterRef string, fn func(conte
 	})
 }
 
-func getAdapterBool(app *App, ctx context.Context, adapterRef string, usage string, args []string, op func(context.Context, *spiderw.Adapter) (bool, error)) error {
+func getAdapterBool(app *App, ctx context.Context, adapterRef string, usage string, args []string, op func(context.Context, adapterAPI) (bool, error)) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: %s", usage)
 	}
 
-	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a *spiderw.Adapter) error {
+	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a adapterAPI) error {
 		value, err := op(ctx, a)
 		if err != nil {
 			return err
@@ -357,7 +357,7 @@ func runAdapterPowered(app *App, ctx context.Context, adapterRef string, args []
 		return fmt.Errorf("usage: spiderw adapter <adapter> powered [true|false]")
 	}
 
-	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a *spiderw.Adapter) error {
+	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a adapterAPI) error {
 		if len(args) == 0 {
 			powered, err := a.Powered(ctx)
 			if err != nil {
@@ -390,12 +390,12 @@ func runAdapterPowered(app *App, ctx context.Context, adapterRef string, args []
 	})
 }
 
-func runAdapterString(app *App, ctx context.Context, adapterRef string, args []string, usage string, op func(context.Context, *spiderw.Adapter) (string, error)) error {
+func runAdapterString(app *App, ctx context.Context, adapterRef string, args []string, usage string, op func(context.Context, adapterAPI) (string, error)) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: %s", usage)
 	}
 
-	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a *spiderw.Adapter) error {
+	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a adapterAPI) error {
 		value, err := op(ctx, a)
 		if err != nil {
 			return err
@@ -405,12 +405,12 @@ func runAdapterString(app *App, ctx context.Context, adapterRef string, args []s
 	})
 }
 
-func runAdapterOptionalString(app *App, ctx context.Context, adapterRef string, args []string, usage string, op func(context.Context, *spiderw.Adapter) (*string, error)) error {
+func runAdapterOptionalString(app *App, ctx context.Context, adapterRef string, args []string, usage string, op func(context.Context, adapterAPI) (*string, error)) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: %s", usage)
 	}
 
-	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a *spiderw.Adapter) error {
+	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a adapterAPI) error {
 		value, err := op(ctx, a)
 		if err != nil {
 			return err
@@ -425,7 +425,7 @@ func runAdapterSupportedModes(app *App, ctx context.Context, adapterRef string, 
 		return fmt.Errorf("usage: spiderw adapter <adapter> supported-modes")
 	}
 
-	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a *spiderw.Adapter) error {
+	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a adapterAPI) error {
 		modes, err := a.SupportedModes(ctx)
 		if err != nil {
 			return err
@@ -450,7 +450,7 @@ func runAdapterSupportsMode(app *App, ctx context.Context, adapterRef string, ar
 		return err
 	}
 
-	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a *spiderw.Adapter) error {
+	return withAdapter(app, ctx, adapterRef, func(ctx context.Context, a adapterAPI) error {
 		value, err := a.SupportsMode(ctx, mode)
 		if err != nil {
 			return err
@@ -474,15 +474,15 @@ func runAdapterWithRef(app *App, args []string) error {
 	case "powered":
 		return runAdapterPowered(app, ctx, adapterRef, rest)
 	case "name":
-		return runAdapterString(app, ctx, adapterRef, rest, "spiderw adapter <adapter> name", func(ctx context.Context, a *spiderw.Adapter) (string, error) {
+		return runAdapterString(app, ctx, adapterRef, rest, "spiderw adapter <adapter> name", func(ctx context.Context, a adapterAPI) (string, error) {
 			return a.Name(ctx)
 		})
 	case "model":
-		return runAdapterOptionalString(app, ctx, adapterRef, rest, "spiderw adapter <adapter> model", func(ctx context.Context, a *spiderw.Adapter) (*string, error) {
+		return runAdapterOptionalString(app, ctx, adapterRef, rest, "spiderw adapter <adapter> model", func(ctx context.Context, a adapterAPI) (*string, error) {
 			return a.Model(ctx)
 		})
 	case "vendor":
-		return runAdapterOptionalString(app, ctx, adapterRef, rest, "spiderw adapter <adapter> vendor", func(ctx context.Context, a *spiderw.Adapter) (*string, error) {
+		return runAdapterOptionalString(app, ctx, adapterRef, rest, "spiderw adapter <adapter> vendor", func(ctx context.Context, a adapterAPI) (*string, error) {
 			return a.Vendor(ctx)
 		})
 	case "supported-modes":
@@ -490,15 +490,15 @@ func runAdapterWithRef(app *App, args []string) error {
 	case "supports-mode":
 		return runAdapterSupportsMode(app, ctx, adapterRef, rest)
 	case "supports-station":
-		return getAdapterBool(app, ctx, adapterRef, "spiderw adapter <adapter> supports-station", rest, func(ctx context.Context, a *spiderw.Adapter) (bool, error) {
+		return getAdapterBool(app, ctx, adapterRef, "spiderw adapter <adapter> supports-station", rest, func(ctx context.Context, a adapterAPI) (bool, error) {
 			return a.SupportsStation(ctx)
 		})
 	case "supports-ap":
-		return getAdapterBool(app, ctx, adapterRef, "spiderw adapter <adapter> supports-ap", rest, func(ctx context.Context, a *spiderw.Adapter) (bool, error) {
+		return getAdapterBool(app, ctx, adapterRef, "spiderw adapter <adapter> supports-ap", rest, func(ctx context.Context, a adapterAPI) (bool, error) {
 			return a.SupportsAP(ctx)
 		})
 	case "supports-adhoc", "supports-ad-hoc":
-		return getAdapterBool(app, ctx, adapterRef, "spiderw adapter <adapter> supports-ad-hoc", rest, func(ctx context.Context, a *spiderw.Adapter) (bool, error) {
+		return getAdapterBool(app, ctx, adapterRef, "spiderw adapter <adapter> supports-ad-hoc", rest, func(ctx context.Context, a adapterAPI) (bool, error) {
 			return a.SupportsAdHoc(ctx)
 		})
 	case "monitor":

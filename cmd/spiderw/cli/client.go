@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/chrispypip/spiderw"
 )
 
-type clientFactory func(context.Context, spiderw.Bus) (*spiderw.Client, error)
+type clientFactory func(context.Context, spiderw.Bus) (clientAPI, error)
 
 // App holds per-invocation CLI state.
 type App struct {
@@ -35,13 +35,13 @@ func newApp() *App {
 	return &App{
 		Stdout:    os.Stdout,
 		Stderr:    os.Stderr,
-		NewClient: spiderw.NewClient,
+		NewClient: defaultClientFactory,
 	}
 }
 
-func (a *App) newClient(ctx context.Context) (*spiderw.Client, error) {
+func (a *App) newClient(ctx context.Context) (clientAPI, error) {
 	if a == nil || a.NewClient == nil {
-		return spiderw.NewClient(ctx, spiderw.SystemBus)
+		return defaultClientFactory(ctx, spiderw.SystemBus)
 	}
 	bus := spiderw.SystemBus
 	if a.Session {
@@ -50,7 +50,7 @@ func (a *App) newClient(ctx context.Context) (*spiderw.Client, error) {
 	return a.NewClient(ctx, bus)
 }
 
-func (a *App) withClient(ctx context.Context, fn func(*spiderw.Client) error) error {
+func (a *App) withClient(ctx context.Context, fn func(clientAPI) error) error {
 	client, err := a.newClient(ctx)
 	if err != nil {
 		return err

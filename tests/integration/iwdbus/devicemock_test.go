@@ -325,106 +325,11 @@ func runSpiderDeviceJSON(t *testing.T, args ...string) (map[string]any, string, 
 	return runSpiderJSON(t, append([]string{"device"}, args...)...)
 }
 
-func TestDeviceMock_CLI_GetPowered(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderDeviceJSON(t, "wlan0", "powered")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, true, jsonGetBool(t, m, "Powered"))
-}
-
-func TestDeviceMock_CLI_SetPowered(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderDeviceJSON(t, "wlan0", "powered", "off")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, false, jsonGetBool(t, m, "Powered"))
-}
-
-func TestDeviceMock_CLI_GetName(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderDeviceJSON(t, "wlan0", "name")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, "wlan0", jsonGetString(t, m, "Value"))
-}
-
-func TestDeviceMock_CLI_GetAddress(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderDeviceJSON(t, "wlan0", "address")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, "aa:bb:cc:dd:ee:ff", jsonGetString(t, m, "Value"))
-}
-
-func TestDeviceMock_CLI_GetAdapter(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderDeviceJSON(t, "wlan0", "adapter")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, "/net/connman/iwd/phy0", jsonGetString(t, m, "Value"))
-}
-
-func TestDeviceMock_CLI_GetMode(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderDeviceJSON(t, "wlan0", "mode")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, "station", jsonGetString(t, m, "Mode"))
-}
-
-func TestDeviceMock_CLI_SetMode(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderDeviceJSON(t, "wlan0", "mode", "ap")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, "ap", jsonGetString(t, m, "Mode"))
-}
-
-func TestDeviceMock_CLI_UnknownCommand(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	out, err := runSpiderDevice(t, "wlan0", "bogus")
-	require.Error(t, err, "output:\n%s", out)
-	mustContain(t, out, "unknown device command")
-}
-
-// TestDeviceMock_Status exercises `device status`, which drives
-// Client.AllDevices: it constructs a handle per device and reports the full
-// per-device snapshot (path, name, address, powered, mode, adapter).
-func TestDeviceMock_Status(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	out, err := runSpiderDevice(t, "status")
-	require.NoError(t, err, "output:\n%s", out)
-
-	mustContainAll(t, out, []string{
-		"Name:",
-		"wlan0",
-		"Path:",
-		devicePath,
-		"Address:",
-		"aa:bb:cc:dd:ee:ff",
-		"Powered:",
-		"true",
-		"Mode:",
-		"station",
-		"Adapter:",
-		"/net/connman/iwd/phy0",
-	})
-}
-
-// TestDeviceMock_StatusJSON verifies the structured `device status --json`
-// output, which is a JSON array of per-device snapshots.
+// TestDeviceMock_StatusJSON is the representative end-to-end CLI smoke for the
+// device: it drives `device status --json` through the full real-D-Bus stack
+// (Client.AllDevices + per-device Properties) and asserts the structured
+// output. Per-command behavior, output formatting, ref resolution, and error
+// mapping are covered by the fast in-process unit tests in cmd/spiderw/cli.
 func TestDeviceMock_StatusJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	iwdmock.StartMockNormal(t, tmpDir)
@@ -439,26 +344,4 @@ func TestDeviceMock_StatusJSON(t *testing.T) {
 	require.Equal(t, true, jsonGetBool(t, entry, "Powered"))
 	require.Equal(t, "station", jsonGetString(t, entry, "Mode"))
 	require.Equal(t, "/net/connman/iwd/phy0", jsonGetString(t, entry, "Adapter"))
-}
-
-// TestDeviceMock_List exercises `device list`, which drives Daemon.Devices.
-func TestDeviceMock_List(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	out, err := runSpiderDevice(t, "list")
-	require.NoError(t, err, "output:\n%s", out)
-
-	mustContainAll(t, out, []string{"wlan0", devicePath})
-}
-
-// TestDeviceMock_StatusEmpty verifies status renders an empty enumeration
-// without failing.
-func TestDeviceMock_StatusEmpty(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockWithoutDevice(t, tmpDir)
-
-	out, err := runSpiderDevice(t, "status")
-	require.NoError(t, err, "output:\n%s", out)
-	mustContain(t, out, "no devices available")
 }

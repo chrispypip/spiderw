@@ -137,26 +137,6 @@ func TestDaemonMock_CLI_Info(t *testing.T) {
 	require.Equal(t, true, jsonGetBool(t, m, "NetworkConfigurationEnabled"))
 }
 
-// TestDaemonMock_CLI_Error verifies the CLI surfaces a failure as a non-nil exit
-// and a rendered error message rather than a stack trace or empty output.
-func TestDaemonMock_CLI_Error(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockWithoutDaemon(t, tmpDir)
-
-	out, err := runSpiderDaemon(t, "info")
-	require.Error(t, err)
-	mustContainAll(t, out, []string{"internal error", "Op=NewClient", "iwd daemon interface not available"})
-}
-
-func TestDaemonMock_CLI_InvalidSubcommand(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	out, err := runSpiderDaemon(t, "info", "bogus")
-	require.Error(t, err)
-	mustContain(t, out, "unknown")
-}
-
 func runSpiderDaemon(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 

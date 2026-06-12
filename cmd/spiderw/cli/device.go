@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -40,7 +40,7 @@ func (r deviceListResult) String() string {
 	return b.String()
 }
 
-func deviceRefs(ctx context.Context, client *spiderw.Client) ([]spiderw.DeviceRef, error) {
+func deviceRefs(ctx context.Context, client clientAPI) ([]spiderw.DeviceRef, error) {
 	if client == nil {
 		return nil, fmt.Errorf("client not available")
 	}
@@ -161,7 +161,7 @@ func runDeviceStatus(app *App, args []string) error {
 	return app.printOutput(out)
 }
 
-func deviceByRef(ctx context.Context, client *spiderw.Client, ref string) (*spiderw.Device, error) {
+func deviceByRef(ctx context.Context, client clientAPI, ref string) (deviceAPI, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		return nil, fmt.Errorf("device reference required")
@@ -191,8 +191,8 @@ func deviceByRef(ctx context.Context, client *spiderw.Client, ref string) (*spid
 	return client.Device(ctx, matches[0].Path)
 }
 
-func withDevice(app *App, ctx context.Context, deviceRef string, fn func(context.Context, *spiderw.Device) error) error {
-	return app.withClient(ctx, func(client *spiderw.Client) error {
+func withDevice(app *App, ctx context.Context, deviceRef string, fn func(context.Context, deviceAPI) error) error {
+	return app.withClient(ctx, func(client clientAPI) error {
 		d, err := deviceByRef(ctx, client, deviceRef)
 		if err != nil {
 			return err
@@ -237,7 +237,7 @@ func runDevicePowered(app *App, ctx context.Context, deviceRef string, args []st
 		return fmt.Errorf("usage: spiderw device <device> powered [true|false]")
 	}
 
-	return withDevice(app, ctx, deviceRef, func(ctx context.Context, d *spiderw.Device) error {
+	return withDevice(app, ctx, deviceRef, func(ctx context.Context, d deviceAPI) error {
 		if len(args) == 0 {
 			powered, err := d.Powered(ctx)
 			if err != nil {
@@ -275,7 +275,7 @@ func runDeviceMode(app *App, ctx context.Context, deviceRef string, args []strin
 		return fmt.Errorf("usage: spiderw device <device> mode [station|ap|ad-hoc]")
 	}
 
-	return withDevice(app, ctx, deviceRef, func(ctx context.Context, d *spiderw.Device) error {
+	return withDevice(app, ctx, deviceRef, func(ctx context.Context, d deviceAPI) error {
 		if len(args) == 0 {
 			mode, err := d.Mode(ctx)
 			if err != nil {
@@ -302,12 +302,12 @@ func runDeviceMode(app *App, ctx context.Context, deviceRef string, args []strin
 	})
 }
 
-func runDeviceString(app *App, ctx context.Context, deviceRef string, args []string, usage string, op func(context.Context, *spiderw.Device) (string, error)) error {
+func runDeviceString(app *App, ctx context.Context, deviceRef string, args []string, usage string, op func(context.Context, deviceAPI) (string, error)) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: %s", usage)
 	}
 
-	return withDevice(app, ctx, deviceRef, func(ctx context.Context, d *spiderw.Device) error {
+	return withDevice(app, ctx, deviceRef, func(ctx context.Context, d deviceAPI) error {
 		value, err := op(ctx, d)
 		if err != nil {
 			return err
@@ -427,15 +427,15 @@ func runDeviceWithRef(app *App, args []string) error {
 	case "mode":
 		return runDeviceMode(app, ctx, deviceRef, rest)
 	case "name":
-		return runDeviceString(app, ctx, deviceRef, rest, "spiderw device <device> name", func(ctx context.Context, d *spiderw.Device) (string, error) {
+		return runDeviceString(app, ctx, deviceRef, rest, "spiderw device <device> name", func(ctx context.Context, d deviceAPI) (string, error) {
 			return d.Name(ctx)
 		})
 	case "address":
-		return runDeviceString(app, ctx, deviceRef, rest, "spiderw device <device> address", func(ctx context.Context, d *spiderw.Device) (string, error) {
+		return runDeviceString(app, ctx, deviceRef, rest, "spiderw device <device> address", func(ctx context.Context, d deviceAPI) (string, error) {
 			return d.Address(ctx)
 		})
 	case "adapter":
-		return runDeviceString(app, ctx, deviceRef, rest, "spiderw device <device> adapter", func(ctx context.Context, d *spiderw.Device) (string, error) {
+		return runDeviceString(app, ctx, deviceRef, rest, "spiderw device <device> adapter", func(ctx context.Context, d deviceAPI) (string, error) {
 			return d.Adapter(ctx)
 		})
 	case "monitor":

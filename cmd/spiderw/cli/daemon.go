@@ -1,10 +1,8 @@
-package main
+package cli
 
 import (
 	"context"
 	"fmt"
-
-	"github.com/chrispypip/spiderw"
 )
 
 // Result wrappers for JSON-stable CLI output.
@@ -48,7 +46,7 @@ func daemonCommand(app *App) *Command {
 						return fmt.Errorf("unknown daemon info argument: %s", args[0])
 					}
 					ctx := context.Background()
-					return app.withClient(ctx, func(client *spiderw.Client) error {
+					return app.withClient(ctx, func(client clientAPI) error {
 						info, err := client.Daemon().Info(ctx)
 						if err != nil {
 							return err
@@ -66,7 +64,7 @@ func daemonCommand(app *App) *Command {
 						return fmt.Errorf("unknown daemon version argument: %s", args[0])
 					}
 					ctx := context.Background()
-					return app.withClient(ctx, func(client *spiderw.Client) error {
+					return app.withClient(ctx, func(client clientAPI) error {
 						version, err := client.Daemon().Version(ctx)
 						if err != nil {
 							return err
@@ -84,7 +82,7 @@ func daemonCommand(app *App) *Command {
 						return fmt.Errorf("unknown daemon state-dir argument: %s", args[0])
 					}
 					ctx := context.Background()
-					return app.withClient(ctx, func(client *spiderw.Client) error {
+					return app.withClient(ctx, func(client clientAPI) error {
 						dir, err := client.Daemon().StateDirectory(ctx)
 						if err != nil {
 							return err
@@ -102,7 +100,7 @@ func daemonCommand(app *App) *Command {
 						return fmt.Errorf("unknown daemon net-conf argument: %s", args[0])
 					}
 					ctx := context.Background()
-					return app.withClient(ctx, func(client *spiderw.Client) error {
+					return app.withClient(ctx, func(client clientAPI) error {
 						enabled, err := client.Daemon().NetworkConfigurationEnabled(ctx)
 						if err != nil {
 							return err

@@ -3,13 +3,16 @@
 package integration_test
 
 import (
+	"bytes"
 	"encoding/json"
-	"os/exec"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/chrispypip/spiderw/cmd/spiderw/cli"
 )
 
 const (
@@ -17,15 +20,24 @@ const (
 	pollInterval  = 10 * time.Millisecond
 )
 
+// runSpider drives the spiderw CLI in-process against the running mock, instead
+// of spawning a `go run` subprocess. cli.Run accepts injected writers, so stdout
+// and stderr are captured into one buffer (mirroring the old CombinedOutput
+// behavior) and a non-zero exit code is surfaced as an error.
 func runSpider(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
 	// The CLI defaults to the system bus; --session points it at the session
 	// bus, where the iwd mock under test is registered.
-	cliArgs := append([]string{"run", "github.com/chrispypip/spiderw/cmd/spiderw", "--session"}, args...)
-	out, err := exec.Command("go", cliArgs...).CombinedOutput()
-	outString := string(out)
-	return outString, err
+	full := append([]string{"--session"}, args...)
+
+	var buf bytes.Buffer
+	code := cli.Run(full, &buf, &buf)
+	out := buf.String()
+	if code != 0 {
+		return out, fmt.Errorf("spiderw exited with code %d", code)
+	}
+	return out, nil
 }
 
 // runSpiderJSON runs the spiderw CLI with --json enabled and returns the parsed
@@ -105,16 +117,6 @@ func jsonGetBool(t *testing.T, m map[string]any, key string) bool {
 	b, ok := v.(bool)
 	require.True(t, ok, "key %q expected bool, got %T (%v)", key, v, v)
 	return b
-}
-
-func jsonGetArray(t *testing.T, m map[string]any, key string) []any {
-	t.Helper()
-
-	v, ok := m[key]
-	require.True(t, ok, "missing key %q in JSON: %#v", key, m)
-	a, ok := v.([]any)
-	require.True(t, ok, "key %q expected list, got %T (%v)", key, v, v)
-	return a
 }
 
 func mustContain(t *testing.T, out, substr string) {

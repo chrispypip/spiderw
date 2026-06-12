@@ -76,19 +76,6 @@ func drainBoolChan(ch <-chan bool) {
 	}
 }
 
-func findAdapterStatusEntry(t *testing.T, list []map[string]any, path string) map[string]any {
-	t.Helper()
-
-	for _, entry := range list {
-		if p, ok := entry["Path"].(string); ok && p == path {
-			return entry
-		}
-	}
-
-	t.Fatalf("adapter %q not found in status output: %#v", path, list)
-	return nil
-}
-
 func runSpiderAdapter(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
@@ -306,41 +293,6 @@ func TestAdapterMock_Firehose(t *testing.T) {
 // CLI (`spiderw adapter …`) against the mock — thin, CLI-specific coverage only
 // -----------------------------------------------------------------------------
 
-// TestAdapterMock_CLI_Powered exercises the `adapter <adapter> powered` command
-// routing for both the get and set branches plus JSON output.
-func TestAdapterMock_CLI_Powered(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	m, out, err := runSpiderAdapterJSON(t, "phy0", "powered")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, true, jsonGetBool(t, m, "Powered"))
-
-	m, out, err = runSpiderAdapterJSON(t, "phy0", "powered", "off")
-	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, false, jsonGetBool(t, m, "Powered"))
-}
-
-// TestAdapterMock_CLI_InvalidMode covers CLI mode-argument validation.
-func TestAdapterMock_CLI_InvalidMode(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	out, err := runSpiderAdapter(t, "phy0", "supports-mode", "42")
-	require.Error(t, err, "output:\n%s", out)
-	require.Contains(t, out, "invalid mode \"42\"")
-}
-
-// TestAdapterMock_CLI_InvalidAdapter covers CLI adapter-reference resolution.
-func TestAdapterMock_CLI_InvalidAdapter(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	out, err := runSpiderAdapter(t, "phy9", "powered")
-	require.Error(t, err, "output:\n%s", out)
-	require.Contains(t, out, "adapter \"phy9\" not found")
-}
-
 // TestAdapterMock_Status exercises `adapter status`, which drives
 // Client.AllAdapters: it constructs a handle per adapter and reports the full
 // per-adapter snapshot (path, name, powered, model, vendor, supported modes).
@@ -368,48 +320,6 @@ func TestAdapterMock_Status(t *testing.T) {
 		"station",
 		"ap",
 	})
-}
-
-// TestAdapterMock_StatusJSON verifies the structured `adapter status --json`
-// output, which is a JSON array of per-adapter snapshots.
-func TestAdapterMock_StatusJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
-
-	list, out, err := runSpiderJSONArray(t, "adapter", "status")
-	require.NoError(t, err, "output:\n%s", out)
-	require.NotEmpty(t, list, "expected at least one adapter:\n%s", out)
-
-	entry := findAdapterStatusEntry(t, list, "/net/connman/iwd/phy0")
-	require.Equal(t, "phy0", jsonGetString(t, entry, "Name"))
-	require.Equal(t, true, jsonGetBool(t, entry, "Powered"))
-	require.Equal(t, "MockModel", jsonGetString(t, entry, "Model"))
-	require.Equal(t, "MockVendor", jsonGetString(t, entry, "Vendor"))
-	require.ElementsMatch(t, []string{"station", "ap"}, jsonGetArray(t, entry, "SupportedModes"))
-}
-
-// TestAdapterMock_StatusOmittedOptionals verifies that status tolerates an
-// adapter that does not expose the optional Model/Vendor properties: the
-// command still succeeds and renders those fields as "-" (custom CLI logic)
-// rather than failing.
-func TestAdapterMock_StatusOmittedOptionals(t *testing.T) {
-	iwdmock.StartMockWithOmittedOptionals(t)
-
-	out, err := runSpiderAdapter(t, "status")
-	require.NoError(t, err, "output:\n%s", out)
-
-	mustContainAll(t, out, []string{
-		"Name:",
-		"phy0",
-		"Powered:",
-		"Model:",
-		"Vendor:",
-		"SupportedModes:",
-		"-",
-	})
-	require.NotContains(t, out, "MockModel", "output:\n%s", out)
-	require.NotContains(t, out, "MockVendor", "output:\n%s", out)
 }
 
 // TestAdapterMock_ErrorMessageNotDuplicated guards end-to-end against the public

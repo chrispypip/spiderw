@@ -1,19 +1,14 @@
+// Command spiderw is a small CLI for interacting with iwd through the spiderw
+// public API. It is a thin wrapper around the importable cmd/spiderw/cli
+// package; see that package for the CLI implementation.
 package main
 
 import (
-	"errors"
-	"fmt"
 	"os"
+
+	"github.com/chrispypip/spiderw/cmd/spiderw/cli"
 )
 
 func main() {
-	app, args := parseGlobalFlags(os.Args[1:])
-
-	if err := rootCommand(app).Run(app, args); err != nil {
-		if errors.Is(err, ErrHelpShown) {
-			os.Exit(0)
-		}
-		fmt.Fprintln(app.stderr(), err)
-		os.Exit(1)
-	}
+	os.Exit(cli.Run(os.Args[1:], os.Stdout, os.Stderr))
 }
