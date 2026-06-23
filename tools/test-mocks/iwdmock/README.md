@@ -24,7 +24,8 @@ method/property calls, and signal behavior.
   net.connman.iwd
   ```
 
-* Exposes a small set of objects (currently: ObjectManager, daemon, and adapter)
+* Exposes a small set of objects (currently: ObjectManager, daemon, adapter,
+  device, and basic service sets)
 * Can emit signals, including a "firehose" mode to stress the dispatcher
 * Supports session bus only (it connects via `dbus.ConnectSessionBus()`)
 ---
@@ -54,14 +55,18 @@ tools/test-mocks/iwdmock/
 |-- doc.go           # package docs
 |-- internal/mock    # Mock implementations of the iwd API
 |   |-- adapter.go
+|   |-- bss.go
 |   |-- daemon.go
+|   |-- device.go
 |   |-- export.go
 |   |-- firehose.go
 |   |-- objectmanager.go
 |   |-- utils.go
 |   `-- xml          # introspection XML served by Introspectable (go:embed)
 |       |-- adapter.xml
-|       `-- daemon.xml
+|       |-- bss.xml
+|       |-- daemon.xml
+|       `-- device.xml
 `-- README.md        # This file
 ```
 
@@ -187,6 +192,16 @@ defined across:
   Return a malformed payload (still a map, but with multiple wrong/invalid inner variants)
 * `--daemon-fail-calls`
   Make daemon calls return a D-Bus error
+
+### Device and basic service set scenario flags
+
+* `--omit-device`
+  Don't export the device object, exercising empty device enumeration.
+* `--omit-bss`
+  Don't export the basic service set objects, exercising empty BSS enumeration.
+
+The mock exports multiple basic service sets by default, mirroring iwd reporting
+one BSS per access point/radio a device can hear during a scan.
 
 ---
 

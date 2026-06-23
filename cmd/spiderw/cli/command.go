@@ -141,6 +141,7 @@ func rootCommand(app *App) *Command {
 			"daemon":  daemonCommand(app),
 			"adapter": adapterCommand(app),
 			"device":  deviceCommand(app),
+			"bss":     bssCommand(app),
 		},
 	}
 }

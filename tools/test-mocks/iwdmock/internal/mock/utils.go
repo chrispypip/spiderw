@@ -21,6 +21,8 @@ var (
 	adapterBadModesFlag = flag.Bool("adapter-bad-modes", false, "Adapter.GetSupportedModes returns wrong type")
 
 	omitDeviceFlag = flag.Bool("omit-device", false, "Don't export the device object")
+
+	omitBSSFlag = flag.Bool("omit-bss", false, "Don't export the basic service set object")
 )
 
 func emitPropertiesChanged(path dbus.ObjectPath, iface string, changed map[string]dbus.Variant, invalid []string) {

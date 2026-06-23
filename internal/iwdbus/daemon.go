@@ -34,6 +34,16 @@ type DeviceRef struct {
 	Name string
 }
 
+// BasicServiceSetRef is a lightweight reference to a basic service set (BSS)
+// discovered by ObjectManager.
+type BasicServiceSetRef struct {
+	// Path is the canonical D-Bus object path for the BSS.
+	Path dbus.ObjectPath
+
+	// Address is the BasicServiceSet.Address (BSSID) property.
+	Address string
+}
+
 // Daemon provides typed access to the iwd daemon D-Bus interface.
 type Daemon struct {
 	conn  *dbus.Conn
@@ -262,6 +272,66 @@ func (d *Daemon) GetDevices(ctx context.Context) ([]DeviceRef, error) {
 	})
 
 	return refs, nil
+}
+
+// GetBasicServiceSets asks iwd's ObjectManager for managed objects and returns
+// every object that implements net.connman.iwd.BasicServiceSet, along with its
+// Address property. Unlike adapters and devices, a BSS has no Name property, so
+// it is identified by its Address (BSSID).
+func (d *Daemon) GetBasicServiceSets(ctx context.Context) ([]BasicServiceSetRef, error) {
+	const op = "Daemon.GetBasicServiceSets"
+
+	if d == nil || d.conn == nil {
+		return nil, WrapConnection(op, ErrDaemonUninitialized)
+	}
+
+	objects, err := getManagedObjects(ctx, d.conn, IwdService)
+	if err != nil {
+		return nil, WrapIntrospection(DBusObjectManagerGetManagedObjects, err)
+	}
+	refs := make([]BasicServiceSetRef, 0, len(objects))
+	for path, ifaces := range objects {
+		props, ok := ifaces[IwdBasicServiceSetIface]
+		if !ok {
+			continue
+		}
+
+		address, err := bssAddressFromManagedObject(path, props)
+		if err != nil {
+			return nil, err
+		}
+
+		refs = append(refs, BasicServiceSetRef{Path: path, Address: address})
+	}
+
+	sort.Slice(refs, func(i, j int) bool {
+		return string(refs[i].Path) < string(refs[j].Path)
+	})
+
+	return refs, nil
+}
+
+// bssAddressFromManagedObject validates a BSS object path and extracts its
+// required Address property from a managed-object property map.
+func bssAddressFromManagedObject(path dbus.ObjectPath, props map[string]dbus.Variant) (string, error) {
+	if !path.IsValid() || !strings.HasPrefix(string(path), "/") {
+		return "", WrapVariant("Path", fmt.Errorf("invalid basic service set path %q", path))
+	}
+
+	v, ok := props["Address"]
+	if !ok {
+		return "", WrapVariant("Address", fmt.Errorf("basic service set %s missing Address property", path))
+	}
+
+	s, ok := v.Value().(string)
+	if !ok {
+		return "", WrapVariant("Address", fmt.Errorf("expected string, got %T", v.Value()))
+	}
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", WrapVariant("Address", fmt.Errorf("basic service set Address was empty"))
+	}
+	return s, nil
 }
 
 // objectNameFromManagedObject validates an object path and extracts its required

@@ -12,6 +12,7 @@ const objectManagerPath = dbus.ObjectPath("/")
 type ObjectManager struct {
 	adapter *Adapter
 	device  *Device
+	bsses   []*BasicServiceSet
 	daemon  *Daemon
 }
 
@@ -26,6 +27,9 @@ func ExportObjectManager(conn *dbus.Conn) error {
 	}
 	if exportedDevice != nil {
 		om.device = exportedDevice
+	}
+	if exportedBSSes != nil {
+		om.bsses = exportedBSSes
 	}
 	return conn.Export(om, objectManagerPath, iwdbus.DBusObjectManagerIface)
 }
@@ -50,6 +54,12 @@ func (o *ObjectManager) GetManagedObjects() (map[dbus.ObjectPath]map[string]map[
 	if o.device != nil {
 		objects[devicePath] = map[string]map[string]dbus.Variant{
 			iwdbus.IwdDeviceIface: o.device.buildPropertyMap(),
+		}
+	}
+
+	for _, bss := range o.bsses {
+		objects[bss.Path] = map[string]map[string]dbus.Variant{
+			iwdbus.IwdBasicServiceSetIface: bss.buildPropertyMap(),
 		}
 	}
 

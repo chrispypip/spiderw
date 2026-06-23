@@ -333,6 +333,95 @@ func TestDaemon_Core(t *testing.T) {
 		})
 	})
 
+	t.Run("BasicServiceSets", func(t *testing.T) {
+		t.Run("Uninitialized", func(t *testing.T) {
+			tests := []struct {
+				name   string
+				daemon *Daemon
+			}{
+				{name: "nil receiver", daemon: nil},
+				{name: "inner nil", daemon: &Daemon{raw: nil}},
+			}
+
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					_, err := tc.daemon.BasicServiceSets(context.Background())
+					require.Error(t, err)
+					require.True(t, errors.Is(err, ErrDaemonNotInitialized))
+					require.True(t, errors.Is(err, ErrCore))
+				})
+			}
+		})
+
+		t.Run("DBusErrorMapping", func(t *testing.T) {
+			f := &fakeIwdbusDaemon{}
+			f.setErr(iwdbus.ErrDBusIntrospection)
+			d := NewDaemon(f)
+
+			_, err := d.BasicServiceSets(context.Background())
+			require.Error(t, err)
+
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindUnavailable, ce.Kind)
+			require.Equal(t, ResourceDaemon, ce.Resource)
+			require.True(t, errors.Is(err, ErrCore))
+			require.True(t, errors.Is(err, iwdbus.ErrDBusIntrospection))
+		})
+
+		t.Run("InvalidFields", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				bsses    []iwdbus.BasicServiceSetRef
+				wantKind Kind
+				wantSub  string
+			}{
+				{name: "empty path", bsses: []iwdbus.BasicServiceSetRef{{Path: "", Address: "11:22:33:44:55:66"}}, wantKind: KindInvalidState, wantSub: "invalid path"},
+				{name: "path not absolute", bsses: []iwdbus.BasicServiceSetRef{{Path: "not/abs", Address: "11:22:33:44:55:66"}}, wantKind: KindInvalidState, wantSub: "invalid path"},
+				{name: "empty address", bsses: []iwdbus.BasicServiceSetRef{{Path: "/net/connman/iwd/phy0/wlan0/bss", Address: ""}}, wantKind: KindInvalidState, wantSub: "empty Address"},
+				{name: "address whitespace", bsses: []iwdbus.BasicServiceSetRef{{Path: "/net/connman/iwd/phy0/wlan0/bss", Address: "  \t "}}, wantKind: KindInvalidState, wantSub: "empty Address"},
+			}
+
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					f := &fakeIwdbusDaemon{}
+					f.setBasicServiceSets(tc.bsses)
+					d := NewDaemon(f)
+					_, err := d.BasicServiceSets(context.Background())
+					require.Error(t, err)
+
+					var ce *Error
+					require.ErrorAs(t, err, &ce)
+					require.Equal(t, tc.wantKind, ce.Kind)
+					require.Equal(t, ResourceBasicServiceSet, ce.Resource)
+					require.Contains(t, err.Error(), tc.wantSub)
+				})
+			}
+		})
+
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeIwdbusDaemon{}
+			f.setBasicServiceSets([]iwdbus.BasicServiceSetRef{
+				{
+					Path:    "/net/connman/iwd/phy0/wlan0/bss0",
+					Address: "11:22:33:44:55:66",
+				},
+				{
+					Path:    "  /net/connman/iwd/phy0/wlan0/bss1  ",
+					Address: "  aa:bb:cc:dd:ee:ff  ",
+				},
+			})
+			d := NewDaemon(f)
+
+			out, err := d.BasicServiceSets(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, []BasicServiceSetRef{
+				{Path: "/net/connman/iwd/phy0/wlan0/bss0", Address: "11:22:33:44:55:66"},
+				{Path: "/net/connman/iwd/phy0/wlan0/bss1", Address: "aa:bb:cc:dd:ee:ff"},
+			}, out)
+		})
+	})
+
 	t.Run("ConvenienceMethods", func(t *testing.T) {
 		tests := []struct {
 			name string

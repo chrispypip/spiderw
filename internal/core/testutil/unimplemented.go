@@ -25,3 +25,8 @@ func (UnimplementedCoreDaemon) Adapters(ctx context.Context) ([]core.AdapterRef,
 func (UnimplementedCoreDaemon) Devices(ctx context.Context) ([]core.DeviceRef, error) {
 	panic("fakeCoreDaemon.Devices not implemented")
 }
+
+// BasicServiceSets panics when a test fake does not implement BSS enumeration.
+func (UnimplementedCoreDaemon) BasicServiceSets(ctx context.Context) ([]core.BasicServiceSetRef, error) {
+	panic("fakeCoreDaemon.BasicServiceSets not implemented")
+}

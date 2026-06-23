@@ -352,3 +352,93 @@ func (c *Client) AllDevices(ctx context.Context) ([]*Device, error) {
 
 	return devices, nil
 }
+
+// BasicServiceSet creates a BasicServiceSet wrapper for a specific iwd BSS
+// object path.
+//
+// Use Daemon.BasicServiceSets to discover valid BSS paths.
+func (c *Client) BasicServiceSet(ctx context.Context, path string) (*BasicServiceSet, error) {
+	const op = "Client.BasicServiceSet"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op, "path", path)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	coreBSS, err := c.wire.NewBasicServiceSet(ctx, path)
+	if err != nil {
+		log.Error(ctx, "basic service set wiring failed", "op", op, "path", path, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	pub := newBasicServiceSet(coreBSS, path)
+	if pub == nil {
+		log.Error(ctx, "basic service set wrapper unexpectedly nil", "op", op, "path", path)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+	return pub, nil
+}
+
+// AllBasicServiceSets mints live BasicServiceSet handles for every BSS iwd
+// currently exposes.
+//
+// It enumerates BSSes via the daemon, then constructs a handle for each,
+// preserving the daemon's enumeration order. Use BasicServiceSet to obtain a
+// single BSS by path, or Daemon.BasicServiceSets for lightweight references
+// without constructing handles.
+func (c *Client) AllBasicServiceSets(ctx context.Context) ([]*BasicServiceSet, error) {
+	const op = "Client.AllBasicServiceSets"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil || c.daemon == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	// Enumeration is the daemon's job; construction is the client's.
+	refs, err := c.daemon.BasicServiceSets(ctx)
+	if err != nil {
+		log.Error(ctx, "basic service set enumeration failed", "op", op, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	bsses := make([]*BasicServiceSet, 0, len(refs))
+	for _, ref := range refs {
+		coreBSS, err := c.wire.NewBasicServiceSet(ctx, ref.Path)
+		if err != nil {
+			log.Error(ctx, "basic service set wiring failed", "op", op, "path", ref.Path, "err", err)
+			return nil, wrapPublicError(op, err)
+		}
+		pub := newBasicServiceSet(coreBSS, ref.Path)
+		if pub == nil {
+			log.Error(ctx, "basic service set wrapper unexpectedly nil", "op", op, "path", ref.Path)
+			return nil, wrapPublicError(op, ErrInternal)
+		}
+		bsses = append(bsses, pub)
+	}
+
+	return bsses, nil
+}

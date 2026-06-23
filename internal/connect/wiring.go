@@ -18,9 +18,11 @@ var (
 	newIwdDaemonFn      = iwdbus.NewDaemon
 	newIwdAdapterFn     = iwdbus.NewAdapter
 	newIwdDeviceFn      = iwdbus.NewDevice
+	newIwdBSSFn         = iwdbus.NewBasicServiceSet
 	newCoreDaemonFn     = func(raw *iwdbus.Daemon) *core.Daemon { return core.NewDaemon(raw) }
 	newCoreAdapterFn    = func(raw *iwdbus.Adapter) *core.Adapter { return core.NewAdapter(raw) }
 	newCoreDeviceFn     = func(raw *iwdbus.Device) *core.Device { return core.NewDevice(raw) }
+	newCoreBSSFn        = func(raw *iwdbus.BasicServiceSet) *core.BasicServiceSet { return core.NewBasicServiceSet(raw) }
 	closeConnFn         = func(c *dbus.Conn) error { return c.Close() }
 )
 
@@ -92,6 +94,9 @@ type Wiring struct {
 
 	// DeviceFactory optionally overrides device construction for tests.
 	DeviceFactory func(ctx context.Context, path string) (core.DeviceIface, error)
+
+	// BasicServiceSetFactory optionally overrides BSS construction for tests.
+	BasicServiceSetFactory func(ctx context.Context, path string) (core.BasicServiceSetIface, error)
 }
 
 // NewAdapter constructs a core adapter wrapper for the given iwd object path.
@@ -162,4 +167,39 @@ func (w *Wiring) NewDevice(ctx context.Context, path string) (core.DeviceIface, 
 		return nil, core.WrapDeviceUnavailable(op, "device unavailable", fmt.Errorf("core device interface not available"))
 	}
 	return coreDevice, nil
+}
+
+// NewBasicServiceSet constructs a core BSS wrapper for the given iwd object path.
+func (w *Wiring) NewBasicServiceSet(ctx context.Context, path string) (core.BasicServiceSetIface, error) {
+	const op = "NewBasicServiceSet"
+
+	if w == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "wiring cannot be nil", core.ErrCore)
+	}
+	if path == "" {
+		return nil, core.WrapInvalidArgument(core.ResourceBasicServiceSet, op, "basic service set path cannot be empty", core.ErrCore)
+	}
+	if path[0] != '/' {
+		return nil, core.WrapInvalidArgument(core.ResourceBasicServiceSet, op, "basic service set path must be absolute", core.ErrCore)
+	}
+	if w.BasicServiceSetFactory != nil {
+		return w.BasicServiceSetFactory(ctx, path)
+	}
+	if w.Conn == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "D-Bus conn cannot be nil", core.ErrCore)
+	}
+
+	iwdBSS, err := newIwdBSSFn(ctx, w.Conn, dbus.ObjectPath(path))
+	if err != nil {
+		return nil, core.WrapBasicServiceSetUnavailable(op, "basic service set unavailable", err)
+	}
+	if iwdBSS == nil {
+		return nil, core.WrapBasicServiceSetUnavailable(op, "basic service set unavailable", iwdbus.WrapIntrospection(path, fmt.Errorf("iwd basic service set interface not available")))
+	}
+
+	coreBSS := newCoreBSSFn(iwdBSS)
+	if coreBSS == nil {
+		return nil, core.WrapBasicServiceSetUnavailable(op, "basic service set unavailable", fmt.Errorf("core basic service set interface not available"))
+	}
+	return coreBSS, nil
 }

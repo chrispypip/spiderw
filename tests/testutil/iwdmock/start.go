@@ -312,3 +312,9 @@ func StartMockAdapterWithBadModes(t *testing.T) {
 func StartMockWithoutDevice(t *testing.T, dir string) {
 	startMockWithT(t, dir, []string{"--omit-device"})
 }
+
+// StartMockWithoutBSS starts an iwd mock that does not export a basic service set
+// object, which exercises empty BSS enumeration.
+func StartMockWithoutBSS(t *testing.T, dir string) {
+	startMockWithT(t, dir, []string{"--omit-bss"})
+}

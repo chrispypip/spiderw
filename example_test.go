@@ -126,6 +126,68 @@ func ExampleClient_Device() {
 		props.Name, props.Address, props.Mode, props.Powered, props.Adapter)
 }
 
+// ExampleClient_BasicServiceSet discovers a basic service set (BSS) and reads
+// its address. A BSS is a single access point/radio the device can see; iwd
+// reports one per detected AP.
+func ExampleClient_BasicServiceSet() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	refs, err := client.Daemon().BasicServiceSets(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no basic service sets found")
+	}
+
+	bss, err := client.BasicServiceSet(ctx, refs[0].Path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	address, err := bss.Address(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(address)
+}
+
+// ExampleClient_AllBasicServiceSets constructs a handle for every basic service
+// set iwd exposes and prints each one's address. A device typically sees many
+// BSSes — one per access point/radio heard during a scan.
+func ExampleClient_AllBasicServiceSets() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	// AllBasicServiceSets enumerates via the daemon and returns a live handle per
+	// BSS, in enumeration order. Use Daemon.BasicServiceSets for lightweight
+	// references only.
+	bsses, err := client.AllBasicServiceSets(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, bss := range bsses {
+		address, err := bss.Address(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// Path is static identity and needs no D-Bus call.
+		fmt.Printf("%s (%s)\n", address, bss.Path())
+	}
+}
+
 // ExampleClient_AllAdapters constructs a handle for every adapter iwd exposes
 // and reports each one's powered state.
 func ExampleClient_AllAdapters() {

@@ -16,10 +16,11 @@ Wi-Fi interfaces, iwd, and mockable runtime behavior. It provides:
 
 > **Project status: early development (pre-v1).** The public API is **unstable**
 > and may change without notice until the first tagged release. The implemented
-> surface today is intentionally small — `Client`, `Daemon`, and `Adapter`
-> (powered state, identity, supported modes, and property subscriptions) — with
-> much more of the iwd API planned. Issues are welcome; pull requests for new
-> features are not being accepted yet (see [CONTRIBUTING](CONTRIBUTING.md)).
+> surface today is intentionally small — `Client`, `Daemon`, `Adapter`, `Device`,
+> and `BasicServiceSet` (identity, powered/mode state, supported modes, and
+> property subscriptions) — with much more of the iwd API planned. Issues are
+> welcome; pull requests for new features are not being accepted yet (see
+> [CONTRIBUTING](CONTRIBUTING.md)).
 
 **Pronunciation:** **spider double u**.
 
@@ -159,7 +160,7 @@ if err != nil {
 The public error categories are `KindUnavailable`, `KindInvalidState`,
 `KindInvalidArgument`, and `KindInternal`. Resource values include
 `ResourceClient`, `ResourceDaemon`, `ResourceAdapter`, `ResourceDevice`,
-`ResourceStation`, and `ResourceNetwork`.
+`ResourceBasicServiceSet`, `ResourceStation`, and `ResourceNetwork`.
 
 ---
 
@@ -286,11 +287,11 @@ D-Bus decoding is handled internally; public methods return standard Go types
 
 ## CLI Quick Start
 
-The `spiderw` command can query the daemon, adapters, and devices through the
-same public API used by library callers. It uses the system bus by default,
-which is where real iwd runs, so the examples below need no bus flag. The Go
-mock registers on the session bus, so pass `--session` when testing against
-`iwdmock`.
+The `spiderw` command can query the daemon, adapters, devices, and basic service
+sets through the same public API used by library callers. It uses the system bus
+by default, which is where real iwd runs, so the examples below need no bus flag.
+The Go mock registers on the session bus, so pass `--session` when testing
+against `iwdmock`.
 
 Global flags may be placed anywhere in the command:
 
@@ -351,6 +352,21 @@ spiderw device wlan0 address
 spiderw device wlan0 adapter
 spiderw device wlan0 monitor powered
 spiderw device wlan0 monitor mode
+```
+
+List basic service sets (BSSes), or print a full snapshot for every BSS. A
+device usually sees many BSSes — one per access point/radio heard during a scan:
+
+```bash
+spiderw bss list
+spiderw bss status
+```
+
+Use the address or path from `bss list` as the BSS reference:
+
+```bash
+spiderw bss 11:22:33:44:55:66 status
+spiderw bss 11:22:33:44:55:66 address
 ```
 
 To target the Go mock instead of a real daemon, add `--session`:

@@ -17,8 +17,10 @@ type clientAPI interface {
 	Daemon() daemonAPI
 	Adapter(ctx context.Context, path string) (adapterAPI, error)
 	Device(ctx context.Context, path string) (deviceAPI, error)
+	BasicServiceSet(ctx context.Context, path string) (bssAPI, error)
 	AllAdapters(ctx context.Context) ([]adapterAPI, error)
 	AllDevices(ctx context.Context) ([]deviceAPI, error)
+	AllBasicServiceSets(ctx context.Context) ([]bssAPI, error)
 	Close() error
 }
 
@@ -29,6 +31,7 @@ type daemonAPI interface {
 	NetworkConfigurationEnabled(ctx context.Context) (bool, error)
 	Adapters(ctx context.Context) ([]spiderw.AdapterRef, error)
 	Devices(ctx context.Context) ([]spiderw.DeviceRef, error)
+	BasicServiceSets(ctx context.Context) ([]spiderw.BasicServiceSetRef, error)
 }
 
 type adapterAPI interface {
@@ -61,6 +64,12 @@ type deviceAPI interface {
 	SubscribeModeChanged(ctx context.Context, fn func(spiderw.Mode)) (spiderw.UnsubscribeFunc, error)
 }
 
+type bssAPI interface {
+	Path() string
+	Address(ctx context.Context) (string, error)
+	Properties(ctx context.Context) (*spiderw.BasicServiceSetProperties, error)
+}
+
 // realClient adapts a concrete *spiderw.Client to clientAPI, converting the
 // concrete return types into the interface forms the CLI consumes.
 type realClient struct {
@@ -91,6 +100,14 @@ func (r realClient) Device(ctx context.Context, path string) (deviceAPI, error) 
 	return d, err
 }
 
+func (r realClient) BasicServiceSet(ctx context.Context, path string) (bssAPI, error) {
+	b, err := r.c.BasicServiceSet(ctx, path)
+	if b == nil {
+		return nil, err
+	}
+	return b, err
+}
+
 func (r realClient) AllAdapters(ctx context.Context) ([]adapterAPI, error) {
 	as, err := r.c.AllAdapters(ctx)
 	if err != nil {
@@ -111,6 +128,18 @@ func (r realClient) AllDevices(ctx context.Context) ([]deviceAPI, error) {
 	out := make([]deviceAPI, 0, len(ds))
 	for _, d := range ds {
 		out = append(out, d)
+	}
+	return out, nil
+}
+
+func (r realClient) AllBasicServiceSets(ctx context.Context) ([]bssAPI, error) {
+	bs, err := r.c.AllBasicServiceSets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]bssAPI, 0, len(bs))
+	for _, b := range bs {
+		out = append(out, b)
 	}
 	return out, nil
 }

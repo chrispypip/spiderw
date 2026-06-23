@@ -18,12 +18,16 @@ type fakeClient struct {
 	daemon       daemonAPI
 	adapters     map[string]adapterAPI // keyed by Path
 	devices      map[string]deviceAPI  // keyed by Path
+	bsses        map[string]bssAPI     // keyed by Path
 	adapterErr   error                 // returned by Adapter(...)
 	deviceErr    error                 // returned by Device(...)
+	bssErr       error                 // returned by BasicServiceSet(...)
 	allAdapters  []adapterAPI
 	allDevices   []deviceAPI
+	allBSSes     []bssAPI
 	allAdaptErr  error
 	allDeviceErr error
+	allBSSErr    error
 	closed       bool
 }
 
@@ -43,12 +47,23 @@ func (f *fakeClient) Device(_ context.Context, path string) (deviceAPI, error) {
 	return f.devices[path], nil
 }
 
+func (f *fakeClient) BasicServiceSet(_ context.Context, path string) (bssAPI, error) {
+	if f.bssErr != nil {
+		return nil, f.bssErr
+	}
+	return f.bsses[path], nil
+}
+
 func (f *fakeClient) AllAdapters(context.Context) ([]adapterAPI, error) {
 	return f.allAdapters, f.allAdaptErr
 }
 
 func (f *fakeClient) AllDevices(context.Context) ([]deviceAPI, error) {
 	return f.allDevices, f.allDeviceErr
+}
+
+func (f *fakeClient) AllBasicServiceSets(context.Context) ([]bssAPI, error) {
+	return f.allBSSes, f.allBSSErr
 }
 
 func (f *fakeClient) Close() error {
@@ -60,6 +75,7 @@ type fakeDaemon struct {
 	info     *spiderw.DaemonInfo
 	adapters []spiderw.AdapterRef
 	devices  []spiderw.DeviceRef
+	bsses    []spiderw.BasicServiceSetRef
 	err      error
 }
 
@@ -94,6 +110,10 @@ func (f *fakeDaemon) Adapters(context.Context) ([]spiderw.AdapterRef, error) {
 
 func (f *fakeDaemon) Devices(context.Context) ([]spiderw.DeviceRef, error) {
 	return f.devices, f.err
+}
+
+func (f *fakeDaemon) BasicServiceSets(context.Context) ([]spiderw.BasicServiceSetRef, error) {
+	return f.bsses, f.err
 }
 
 type fakeAdapter struct {
@@ -245,6 +265,25 @@ func (f *fakeDevice) SubscribePoweredChanged(context.Context, func(bool)) (spide
 
 func (f *fakeDevice) SubscribeModeChanged(context.Context, func(spiderw.Mode)) (spiderw.UnsubscribeFunc, error) {
 	return func() error { return nil }, f.err
+}
+
+type fakeBSS struct {
+	path  string
+	props *spiderw.BasicServiceSetProperties
+	err   error
+}
+
+func (f *fakeBSS) Path() string { return f.path }
+
+func (f *fakeBSS) Address(context.Context) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.props.Address, nil
+}
+
+func (f *fakeBSS) Properties(context.Context) (*spiderw.BasicServiceSetProperties, error) {
+	return f.props, f.err
 }
 
 // driveCLI runs the CLI in-process against a faked client, capturing combined

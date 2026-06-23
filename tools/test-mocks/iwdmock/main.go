@@ -62,6 +62,10 @@ func main() {
 		log.Fatalf("[mock-iwd] ERROR: exportDevice: %s", err)
 	}
 
+	if err := mock.ExportBasicServiceSet(conn); err != nil {
+		log.Fatalf("[mock-iwd] ERROR: exportBasicServiceSet: %s", err)
+	}
+
 	if err := mock.ExportObjectManager(conn); err != nil {
 		log.Fatalf("[mock-iwd] ERROR: exportObjectManager: %s", err)
 	}

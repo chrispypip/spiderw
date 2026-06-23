@@ -64,6 +64,10 @@ const (
 	// ResourceDevice identifies failures involving an iwd device object.
 	ResourceDevice = failure.ResourceDevice
 
+	// ResourceBasicServiceSet identifies failures involving an iwd basic service
+	// set (BSS) object.
+	ResourceBasicServiceSet = failure.ResourceBasicServiceSet
+
 	// ResourceStation identifies failures involving an iwd station object.
 	ResourceStation = failure.ResourceStation
 
@@ -87,6 +91,10 @@ var (
 	// ErrDeviceNotInitialized indicates that a Device wrapper has no raw
 	// backend.
 	ErrDeviceNotInitialized = errors.New("device not initialized")
+
+	// ErrBasicServiceSetNotInitialized indicates that a BasicServiceSet wrapper
+	// has no raw backend.
+	ErrBasicServiceSetNotInitialized = errors.New("basic service set not initialized")
 )
 
 func newError(kind Kind, resource Resource, op, details string, err error) error {
@@ -151,6 +159,7 @@ var (
 	daemonUnavailablePolicy  = unavailablePolicy{resource: ResourceDaemon}
 	adapterUnavailablePolicy = unavailablePolicy{resource: ResourceAdapter, includeDBusProperty: true}
 	deviceUnavailablePolicy  = unavailablePolicy{resource: ResourceDevice, includeDBusProperty: true}
+	bssUnavailablePolicy     = unavailablePolicy{resource: ResourceBasicServiceSet, includeDBusProperty: true}
 	networkUnavailablePolicy = unavailablePolicy{resource: ResourceNetwork}
 )
 
@@ -187,6 +196,12 @@ func WrapAdapterUnavailable(op, details string, err error) error {
 // WrapDeviceUnavailable classifies D-Bus device failures by kind and resource.
 func WrapDeviceUnavailable(op, details string, err error) error {
 	return wrapUnavailable(op, details, err, deviceUnavailablePolicy)
+}
+
+// WrapBasicServiceSetUnavailable classifies D-Bus basic-service-set failures by
+// kind and resource.
+func WrapBasicServiceSetUnavailable(op, details string, err error) error {
+	return wrapUnavailable(op, details, err, bssUnavailablePolicy)
 }
 
 // WrapNetworkUnavailable classifies D-Bus network failures by kind and resource.

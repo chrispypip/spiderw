@@ -9,7 +9,7 @@ useful, mock integration coverage, and race/stress testing where appropriate.
 
 ## Current Focus
 
-- Keep the daemon and adapter vertical slices stable.
+- Keep the daemon, adapter, device, and basic service set vertical slices stable.
 - Improve documentation, contribution workflow, CI, and release hygiene.
 - Preserve a small, strongly typed public API while avoiding D-Bus details in
   user code.
@@ -28,7 +28,10 @@ The following areas are currently implemented and tested end to end:
 - Adapter powered state changes.
 - Adapter property-change and powered-change subscriptions.
 - Adapter unsubscribe behavior.
-- CLI coverage for daemon and adapter operations.
+- Device discovery, construction, properties (name, address, powered state,
+  mode, owning adapter), powered/mode changes, and property subscriptions.
+- Basic service set (BSS) discovery, construction, and address lookup.
+- CLI coverage for daemon, adapter, device, and basic service set operations.
 - Mock iwd integration tests, including signal firehose coverage.
 - Shared adapter mode parsing and formatting across layers.
 - Structured error handling using generic error kinds plus resource metadata
@@ -43,9 +46,9 @@ The following areas are currently implemented and tested end to end:
 
 Likely future vertical slices include:
 
-- Devices.
 - Stations.
-- Networks.
+- Networks, including their basic service set membership
+  (`Network.ExtendedServiceSet`).
 - Known networks.
 - Network scanning and connection flows.
 - Agent support, if it can be represented cleanly and safely.
@@ -92,7 +95,7 @@ The following are not current goals:
 
 Before the first tagged release, spiderw should have:
 
-- A stable public API for the daemon and adapter slices.
+- A stable public API for the daemon, adapter, device, and basic service set slices.
 - Passing local and CI test suites.
 - Clear README examples.
 - Complete GoDoc for exported public API.

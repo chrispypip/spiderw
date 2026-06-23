@@ -59,6 +59,10 @@ const (
 	// ResourceDevice identifies failures involving an iwd device object.
 	ResourceDevice Resource = "device"
 
+	// ResourceBasicServiceSet identifies failures involving an iwd basic service
+	// set (BSS) object.
+	ResourceBasicServiceSet Resource = "basic service set"
+
 	// ResourceStation identifies failures involving an iwd station object.
 	ResourceStation Resource = "station"
 

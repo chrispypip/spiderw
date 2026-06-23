@@ -26,6 +26,9 @@ var (
 
 	//go:embed xml/device.xml
 	deviceIntrospectionXML []byte
+
+	//go:embed xml/bss.xml
+	bssIntrospectionXML []byte
 )
 
 func exportDaemonIntrospection(conn *dbus.Conn) error {
@@ -38,4 +41,8 @@ func exportAdapterIntrospection(conn *dbus.Conn) error {
 
 func exportDeviceIntrospection(conn *dbus.Conn) error {
 	return conn.Export(introspectStub(deviceIntrospectionXML), devicePath, iwdbus.DBusIntrospectableIface)
+}
+
+func exportBSSIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {
+	return conn.Export(introspectStub(bssIntrospectionXML), path, iwdbus.DBusIntrospectableIface)
 }

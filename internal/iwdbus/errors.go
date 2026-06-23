@@ -31,6 +31,10 @@ var (
 
 	// ErrDeviceUninitialized indicates that a Device was used before initialization.
 	ErrDeviceUninitialized = errors.New("device is not initialized")
+
+	// ErrBasicServiceSetUninitialized indicates that a BasicServiceSet was used
+	// before initialization.
+	ErrBasicServiceSetUninitialized = errors.New("basic service set is not initialized")
 )
 
 // Error is the internal structured error type used for all D-Bus-layer failures.

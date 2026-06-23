@@ -26,6 +26,16 @@ type DeviceRef struct {
 	Name string
 }
 
+// BasicServiceSetRef is a lightweight reference to a basic service set (BSS)
+// discovered by the iwd daemon.
+type BasicServiceSetRef struct {
+	// Path is the canonical D-Bus object path for the BSS.
+	Path string
+
+	// Address is the BSS's Address (BSSID) property.
+	Address string
+}
+
 // DaemonIface defines the core daemon operations used by the public layer.
 type DaemonIface interface {
 	Info(ctx context.Context) (*DaemonInfo, error)
@@ -34,6 +44,7 @@ type DaemonIface interface {
 	NetworkConfigurationEnabled(ctx context.Context) (bool, error)
 	Adapters(ctx context.Context) ([]AdapterRef, error)
 	Devices(ctx context.Context) ([]DeviceRef, error)
+	BasicServiceSets(ctx context.Context) ([]BasicServiceSetRef, error)
 }
 
 // DaemonInfo is the normalized core-layer view of daemon metadata.
@@ -52,6 +63,7 @@ type daemonRaw interface {
 	GetInfo(ctx context.Context) (*iwdbus.DaemonInfo, error)
 	GetAdapters(ctx context.Context) ([]iwdbus.AdapterRef, error)
 	GetDevices(ctx context.Context) ([]iwdbus.DeviceRef, error)
+	GetBasicServiceSets(ctx context.Context) ([]iwdbus.BasicServiceSetRef, error)
 }
 
 // Daemon is the core-layer facade over a raw iwd daemon backend.
@@ -195,6 +207,37 @@ func (d *Daemon) Devices(ctx context.Context) ([]DeviceRef, error) {
 		}
 
 		refs = append(refs, DeviceRef{Path: p, Name: n})
+	}
+	return refs, nil
+}
+
+// BasicServiceSets returns the basic service sets currently exposed by the iwd
+// daemon.
+func (d *Daemon) BasicServiceSets(ctx context.Context) ([]BasicServiceSetRef, error) {
+	const op = "Daemon.BasicServiceSets"
+
+	rawDaemon, err := d.rawDaemon(op)
+	if err != nil {
+		return nil, err
+	}
+
+	rawRefs, err := rawDaemon.GetBasicServiceSets(ctx)
+	if err != nil {
+		return nil, WrapDaemonUnavailable(op, "failed getting basic service sets", err)
+	}
+	refs := make([]BasicServiceSetRef, 0, len(rawRefs))
+	for _, r := range rawRefs {
+		p := strings.TrimSpace(string(r.Path))
+		if p == "" || !strings.HasPrefix(p, "/") {
+			return nil, WrapInvalidState(ResourceBasicServiceSet, op, "basic service set returned invalid path", fmt.Errorf("invalid basic service set path %q", p))
+		}
+
+		a := strings.TrimSpace(r.Address)
+		if a == "" {
+			return nil, WrapInvalidState(ResourceBasicServiceSet, op, "basic service set returned empty Address", fmt.Errorf("missing or invalid Address field"))
+		}
+
+		refs = append(refs, BasicServiceSetRef{Path: p, Address: a})
 	}
 	return refs, nil
 }

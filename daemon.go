@@ -27,6 +27,16 @@ type DeviceRef struct {
 	Name string
 }
 
+// BasicServiceSetRef is a lightweight reference to a basic service set (BSS)
+// discovered by the iwd daemon.
+type BasicServiceSetRef struct {
+	// Path is the canonical D-Bus object path for the BSS.
+	Path string
+
+	// Address is the BSS's hardware (BSSID) address.
+	Address string
+}
+
 // DaemonInfo is the public API view of the iwd daemon metadata.
 //
 // This intentionally mirrors core.DaemonInfo but is separate to avoid leaking
@@ -138,6 +148,22 @@ func (d *Daemon) Devices(ctx context.Context) ([]DeviceRef, error) {
 		out := make([]DeviceRef, 0, len(refs))
 		for _, r := range refs {
 			out = append(out, DeviceRef{Path: r.Path, Name: r.Name})
+		}
+		return out, nil
+	})
+}
+
+// BasicServiceSets returns lightweight references to the basic service sets
+// currently exposed by iwd.
+func (d *Daemon) BasicServiceSets(ctx context.Context) ([]BasicServiceSetRef, error) {
+	return delegate(ctx, "Daemon.BasicServiceSets", d.coreDaemon, func(ctx context.Context, c core.DaemonIface) ([]BasicServiceSetRef, error) {
+		refs, err := c.BasicServiceSets(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]BasicServiceSetRef, 0, len(refs))
+		for _, r := range refs {
+			out = append(out, BasicServiceSetRef{Path: r.Path, Address: r.Address})
 		}
 		return out, nil
 	})
