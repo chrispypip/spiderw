@@ -19,15 +19,19 @@ type fakeClient struct {
 	adapters     map[string]adapterAPI // keyed by Path
 	devices      map[string]deviceAPI  // keyed by Path
 	bsses        map[string]bssAPI     // keyed by Path
+	networks     map[string]networkAPI // keyed by Path
 	adapterErr   error                 // returned by Adapter(...)
 	deviceErr    error                 // returned by Device(...)
 	bssErr       error                 // returned by BasicServiceSet(...)
+	networkErr   error                 // returned by Network(...)
 	allAdapters  []adapterAPI
 	allDevices   []deviceAPI
 	allBSSes     []bssAPI
+	allNetworks  []networkAPI
 	allAdaptErr  error
 	allDeviceErr error
 	allBSSErr    error
+	allNetErr    error
 	closed       bool
 }
 
@@ -54,6 +58,13 @@ func (f *fakeClient) BasicServiceSet(_ context.Context, path string) (bssAPI, er
 	return f.bsses[path], nil
 }
 
+func (f *fakeClient) Network(_ context.Context, path string) (networkAPI, error) {
+	if f.networkErr != nil {
+		return nil, f.networkErr
+	}
+	return f.networks[path], nil
+}
+
 func (f *fakeClient) AllAdapters(context.Context) ([]adapterAPI, error) {
 	return f.allAdapters, f.allAdaptErr
 }
@@ -66,6 +77,10 @@ func (f *fakeClient) AllBasicServiceSets(context.Context) ([]bssAPI, error) {
 	return f.allBSSes, f.allBSSErr
 }
 
+func (f *fakeClient) AllNetworks(context.Context) ([]networkAPI, error) {
+	return f.allNetworks, f.allNetErr
+}
+
 func (f *fakeClient) Close() error {
 	f.closed = true
 	return nil
@@ -76,6 +91,7 @@ type fakeDaemon struct {
 	adapters []spiderw.AdapterRef
 	devices  []spiderw.DeviceRef
 	bsses    []spiderw.BasicServiceSetRef
+	networks []spiderw.NetworkRef
 	err      error
 }
 
@@ -114,6 +130,10 @@ func (f *fakeDaemon) Devices(context.Context) ([]spiderw.DeviceRef, error) {
 
 func (f *fakeDaemon) BasicServiceSets(context.Context) ([]spiderw.BasicServiceSetRef, error) {
 	return f.bsses, f.err
+}
+
+func (f *fakeDaemon) Networks(context.Context) ([]spiderw.NetworkRef, error) {
+	return f.networks, f.err
 }
 
 type fakeAdapter struct {
@@ -284,6 +304,73 @@ func (f *fakeBSS) Address(context.Context) (string, error) {
 
 func (f *fakeBSS) Properties(context.Context) (*spiderw.BasicServiceSetProperties, error) {
 	return f.props, f.err
+}
+
+type fakeNetwork struct {
+	path       string
+	props      *spiderw.NetworkProperties
+	connectErr error
+	err        error
+}
+
+func (f *fakeNetwork) Path() string { return f.path }
+
+func (f *fakeNetwork) Name(context.Context) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.props.Name, nil
+}
+
+func (f *fakeNetwork) Connected(context.Context) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.props.Connected, nil
+}
+
+func (f *fakeNetwork) Device(context.Context) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.props.Device, nil
+}
+
+func (f *fakeNetwork) Type(context.Context) (spiderw.SecurityType, error) {
+	if f.err != nil {
+		return spiderw.SecurityTypeUnknown, f.err
+	}
+	return f.props.Type, nil
+}
+
+func (f *fakeNetwork) KnownNetwork(context.Context) (*string, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.props.KnownNetwork, nil
+}
+
+func (f *fakeNetwork) ExtendedServiceSet(context.Context) ([]string, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.props.ExtendedServiceSet, nil
+}
+
+func (f *fakeNetwork) Connect(context.Context) error {
+	if f.connectErr != nil {
+		return f.connectErr
+	}
+	f.props.Connected = true
+	return nil
+}
+
+func (f *fakeNetwork) Properties(context.Context) (*spiderw.NetworkProperties, error) {
+	return f.props, f.err
+}
+
+func (f *fakeNetwork) SubscribeConnectedChanged(context.Context, func(bool)) (spiderw.UnsubscribeFunc, error) {
+	return func() error { return nil }, f.err
 }
 
 // driveCLI runs the CLI in-process against a faked client, capturing combined

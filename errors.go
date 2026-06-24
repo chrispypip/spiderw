@@ -95,6 +95,24 @@ var (
 
 	// ErrSpiderw matches all structured errors returned by the public API.
 	ErrSpiderw = errors.New("spiderw api error")
+
+	// ErrNoAgent matches errors caused by iwd rejecting an operation because no
+	// credentials agent is registered. Connecting to a secured network that is
+	// not already known requires a registered agent; until then, Network.Connect
+	// returns an error matching ErrNoAgent.
+	ErrNoAgent = core.ErrNoAgent
+
+	// The following sentinels match named iwd D-Bus errors surfaced by operations
+	// such as Network.Connect. Use errors.Is to react to a specific iwd outcome
+	// (for example, retry on ErrBusy or ErrInProgress, give up on
+	// ErrNotSupported) without parsing error text.
+	ErrAborted       = core.ErrAborted
+	ErrBusy          = core.ErrBusy
+	ErrFailed        = core.ErrFailed
+	ErrNotSupported  = core.ErrNotSupported
+	ErrTimeout       = core.ErrTimeout
+	ErrInProgress    = core.ErrInProgress
+	ErrNotConfigured = core.ErrNotConfigured
 )
 
 // -----------------------------------------------------------------------------

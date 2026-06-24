@@ -442,3 +442,92 @@ func (c *Client) AllBasicServiceSets(ctx context.Context) ([]*BasicServiceSet, e
 
 	return bsses, nil
 }
+
+// Network creates a Network wrapper for a specific iwd network object path.
+//
+// Use Daemon.Networks to discover valid network paths.
+func (c *Client) Network(ctx context.Context, path string) (*Network, error) {
+	const op = "Client.Network"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op, "path", path)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	coreNetwork, err := c.wire.NewNetwork(ctx, path)
+	if err != nil {
+		log.Error(ctx, "network wiring failed", "op", op, "path", path, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	pub := newNetwork(coreNetwork, path)
+	if pub == nil {
+		log.Error(ctx, "network wrapper unexpectedly nil", "op", op, "path", path)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+	return pub, nil
+}
+
+// AllNetworks mints live Network handles for every network iwd currently
+// exposes.
+//
+// It enumerates networks via the daemon, then constructs a handle for each,
+// preserving the daemon's enumeration order. Use Network to obtain a single
+// network by path, or Daemon.Networks for lightweight references without
+// constructing handles.
+func (c *Client) AllNetworks(ctx context.Context) ([]*Network, error) {
+	const op = "Client.AllNetworks"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil || c.daemon == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	// Enumeration is the daemon's job; construction is the client's.
+	refs, err := c.daemon.Networks(ctx)
+	if err != nil {
+		log.Error(ctx, "network enumeration failed", "op", op, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	networks := make([]*Network, 0, len(refs))
+	for _, ref := range refs {
+		coreNetwork, err := c.wire.NewNetwork(ctx, ref.Path)
+		if err != nil {
+			log.Error(ctx, "network wiring failed", "op", op, "path", ref.Path, "err", err)
+			return nil, wrapPublicError(op, err)
+		}
+		pub := newNetwork(coreNetwork, ref.Path)
+		if pub == nil {
+			log.Error(ctx, "network wrapper unexpectedly nil", "op", op, "path", ref.Path)
+			return nil, wrapPublicError(op, ErrInternal)
+		}
+		networks = append(networks, pub)
+	}
+
+	return networks, nil
+}

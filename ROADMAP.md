@@ -31,11 +31,20 @@ The following areas are currently implemented and tested end to end:
 - Device discovery, construction, properties (name, address, powered state,
   mode, owning adapter), powered/mode changes, and property subscriptions.
 - Basic service set (BSS) discovery, construction, and address lookup.
-- CLI coverage for daemon, adapter, device, and basic service set operations.
+- Network discovery, construction, and properties (SSID, connected state,
+  security type, owning device, optional known-network record, and basic service
+  set membership via `ExtendedServiceSet`).
+- Connecting to open and already-known networks via `Network.Connect`, with
+  connected-state subscriptions. Connecting to a not-yet-known secured network
+  reports a mapped `ErrNoAgent` until agent support lands.
+- CLI coverage for daemon, adapter, device, basic service set, and network
+  operations.
 - Mock iwd integration tests, including signal firehose coverage.
-- Shared adapter mode parsing and formatting across layers.
-- Structured error handling using generic error kinds plus resource metadata
-  across the core and public API.
+- Shared adapter mode and network security-type parsing and formatting across
+  layers.
+- Structured error handling using generic error kinds plus resource metadata,
+  including matchable sentinels for named iwd errors (for example `ErrNoAgent`,
+  `ErrBusy`, `ErrFailed`), across the core and public API.
 
 ## Near-Term Goals
 
@@ -46,13 +55,11 @@ The following areas are currently implemented and tested end to end:
 
 Likely future vertical slices include:
 
-- Stations.
-- Networks, including their basic service set membership
-  (`Network.ExtendedServiceSet`).
+- Stations, including station-driven network scanning.
 - Known networks.
-- Network scanning and connection flows.
-- Agent support, if it can be represented cleanly and safely.
-- Additional signal subscriptions for objects beyond adapters.
+- Agent support (`net.connman.iwd.Agent`), required to connect to secured
+  networks that are not already known.
+- Additional signal subscriptions for objects beyond adapters and networks.
 
 Each new slice should follow the established pattern:
 

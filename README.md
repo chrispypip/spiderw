@@ -16,11 +16,13 @@ Wi-Fi interfaces, iwd, and mockable runtime behavior. It provides:
 
 > **Project status: early development (pre-v1).** The public API is **unstable**
 > and may change without notice until the first tagged release. The implemented
-> surface today is intentionally small — `Client`, `Daemon`, `Adapter`, `Device`,
-> and `BasicServiceSet` (identity, powered/mode state, supported modes, and
-> property subscriptions) — with much more of the iwd API planned. Issues are
-> welcome; pull requests for new features are not being accepted yet (see
-> [CONTRIBUTING](CONTRIBUTING.md)).
+> surface today covers `Client`, `Daemon`, `Adapter`, `Device`,
+> `BasicServiceSet`, and `Network` (identity, powered/mode state, supported
+> modes, property subscriptions, and connecting to open or already-known
+> networks) — with much more of the iwd API planned. It is developed and tested
+> against **iwd 3.12** (see [Compatibility & Requirements](#compatibility--requirements)).
+> Issues are welcome; pull requests for new features are not being accepted yet
+> (see [CONTRIBUTING](CONTRIBUTING.md)).
 
 **Pronunciation:** **spider double u**.
 
@@ -35,6 +37,30 @@ without changing the Go module path.
 ## License
 
 spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+
+---
+
+## Compatibility & Requirements
+
+- **iwd:** Developed and tested against **iwd 3.12**. spiderw talks to iwd over
+  its stable D-Bus API (`net.connman.iwd`) using **runtime introspection** rather
+  than compiled-in interface definitions, so other iwd releases that expose a
+  compatible D-Bus surface are expected to work. iwd 3.12 is the reference
+  version the project targets and validates against; the bundled mock's
+  introspection XML is modeled on it.
+- **Supported iwd interfaces:** `Daemon`, `Adapter`, `Device`,
+  `BasicServiceSet`, and `Network`. Network `Connect()` works for open and
+  already-known networks; connecting to a not-yet-known secured network requires
+  a credentials agent (`net.connman.iwd.Agent`), which is **not yet implemented**
+  and surfaces as an error matching `spiderw.ErrNoAgent`. More of the iwd API is
+  planned — see the [Roadmap](ROADMAP.md).
+- **Operating system:** **Linux only.** iwd is a Linux wireless daemon; spiderw
+  has no support for other platforms.
+- **D-Bus:** Requires access to a D-Bus bus. Real iwd runs on the **system bus**
+  (the default); the bundled Go mock runs on the **session bus** (pass
+  `--session` on the CLI, or `spiderw.SessionBus` in the library).
+- **Go:** Built with the toolchain declared in `go.mod` (currently **Go 1.26+**).
+- **Runtime dependency:** [`github.com/godbus/dbus/v5`](https://pkg.go.dev/github.com/godbus/dbus/v5).
 
 ---
 
@@ -162,6 +188,13 @@ The public error categories are `KindUnavailable`, `KindInvalidState`,
 `ResourceClient`, `ResourceDaemon`, `ResourceAdapter`, `ResourceDevice`,
 `ResourceBasicServiceSet`, `ResourceStation`, and `ResourceNetwork`.
 
+Some operations also map specific iwd D-Bus errors to matchable sentinels, so you
+can react to a precise outcome without parsing text. For example,
+`Network.Connect` surfaces `spiderw.ErrNoAgent` (no credentials agent
+registered), `spiderw.ErrBusy`, `spiderw.ErrInProgress`, `spiderw.ErrFailed`,
+`spiderw.ErrTimeout`, `spiderw.ErrAborted`, `spiderw.ErrNotSupported`, and
+`spiderw.ErrNotConfigured` — all usable with `errors.Is`.
+
 ---
 
 ## Development Quick Start
@@ -287,8 +320,8 @@ D-Bus decoding is handled internally; public methods return standard Go types
 
 ## CLI Quick Start
 
-The `spiderw` command can query the daemon, adapters, devices, and basic service
-sets through the same public API used by library callers. It uses the system bus
+The `spiderw` command can query the daemon, adapters, devices, basic service
+sets, and networks through the same public API used by library callers. It uses the system bus
 by default, which is where real iwd runs, so the examples below need no bus flag.
 The Go mock registers on the session bus, so pass `--session` when testing
 against `iwdmock`.
@@ -367,6 +400,28 @@ Use the address or path from `bss list` as the BSS reference:
 ```bash
 spiderw bss 11:22:33:44:55:66 status
 spiderw bss 11:22:33:44:55:66 address
+```
+
+List networks, or print a full snapshot for every network:
+
+```bash
+spiderw network list
+spiderw network status
+```
+
+Use the SSID or path from `network list` as the network reference. `connect`
+works for open and already-known networks; other secured networks need a
+credentials agent (not yet implemented):
+
+```bash
+spiderw network OpenNet status
+spiderw network OpenNet connect
+spiderw network OpenNet connected
+spiderw network OpenNet type
+spiderw network OpenNet device
+spiderw network OpenNet known-network
+spiderw network OpenNet bsses
+spiderw network OpenNet monitor connected
 ```
 
 To target the Go mock instead of a real daemon, add `--session`:

@@ -44,6 +44,15 @@ type BasicServiceSetRef struct {
 	Address string
 }
 
+// NetworkRef is a lightweight reference to a network discovered by ObjectManager.
+type NetworkRef struct {
+	// Path is the canonical D-Bus object path for the network.
+	Path dbus.ObjectPath
+
+	// Name is the Network.Name (SSID) property.
+	Name string
+}
+
 // Daemon provides typed access to the iwd daemon D-Bus interface.
 type Daemon struct {
 	conn  *dbus.Conn
@@ -332,6 +341,42 @@ func bssAddressFromManagedObject(path dbus.ObjectPath, props map[string]dbus.Var
 		return "", WrapVariant("Address", fmt.Errorf("basic service set Address was empty"))
 	}
 	return s, nil
+}
+
+// GetNetworks asks iwd's ObjectManager for managed objects and returns every
+// object that implements net.connman.iwd.Network, along with its Name (SSID)
+// property.
+func (d *Daemon) GetNetworks(ctx context.Context) ([]NetworkRef, error) {
+	const op = "Daemon.GetNetworks"
+
+	if d == nil || d.conn == nil {
+		return nil, WrapConnection(op, ErrDaemonUninitialized)
+	}
+
+	objects, err := getManagedObjects(ctx, d.conn, IwdService)
+	if err != nil {
+		return nil, WrapIntrospection(DBusObjectManagerGetManagedObjects, err)
+	}
+	refs := make([]NetworkRef, 0, len(objects))
+	for path, ifaces := range objects {
+		props, ok := ifaces[IwdNetworkIface]
+		if !ok {
+			continue
+		}
+
+		name, err := objectNameFromManagedObject("network", path, props)
+		if err != nil {
+			return nil, err
+		}
+
+		refs = append(refs, NetworkRef{Path: path, Name: name})
+	}
+
+	sort.Slice(refs, func(i, j int) bool {
+		return string(refs[i].Path) < string(refs[j].Path)
+	})
+
+	return refs, nil
 }
 
 // objectNameFromManagedObject validates an object path and extracts its required

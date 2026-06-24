@@ -188,6 +188,116 @@ func ExampleClient_AllBasicServiceSets() {
 	}
 }
 
+// ExampleClient_Network discovers a network and reads its properties.
+func ExampleClient_Network() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	refs, err := client.Daemon().Networks(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no networks found")
+	}
+
+	network, err := client.Network(ctx, refs[0].Path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	props, err := network.Properties(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s type=%s connected=%t\n", props.Name, props.Type, props.Connected)
+}
+
+// ExampleNetwork_Connect connects to a network. Open and already-known networks
+// connect without a credentials agent; a not-yet-known secured network fails
+// with an error matching spiderw.ErrNoAgent.
+func ExampleNetwork_Connect() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	refs, err := client.Daemon().Networks(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no networks found")
+	}
+
+	network, err := client.Network(ctx, refs[0].Path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	switch err := network.Connect(ctx); {
+	case err == nil:
+		fmt.Println("connected")
+	case errors.Is(err, spiderw.ErrNoAgent):
+		// Connecting to this secured network needs a credentials agent.
+		fmt.Println("a credentials agent is required to connect to this network")
+	default:
+		log.Fatal(err)
+	}
+}
+
+// ExampleNetwork_ExtendedServiceSet lists the basic service sets (access points)
+// that make up a network and resolves each path to a live BasicServiceSet handle.
+func ExampleNetwork_ExtendedServiceSet() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	refs, err := client.Daemon().Networks(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no networks found")
+	}
+
+	network, err := client.Network(ctx, refs[0].Path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// ExtendedServiceSet returns BSS object paths; resolve each with
+	// Client.BasicServiceSet. A single network may be served by several BSSes
+	// (for example a 2.4 GHz and a 5 GHz radio).
+	paths, err := network.ExtendedServiceSet(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, path := range paths {
+		bss, err := client.BasicServiceSet(ctx, path)
+		if err != nil {
+			log.Fatal(err)
+		}
+		address, err := bss.Address(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(address)
+	}
+}
+
 // ExampleClient_AllAdapters constructs a handle for every adapter iwd exposes
 // and reports each one's powered state.
 func ExampleClient_AllAdapters() {

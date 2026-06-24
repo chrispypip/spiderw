@@ -30,3 +30,8 @@ func (UnimplementedCoreDaemon) Devices(ctx context.Context) ([]core.DeviceRef, e
 func (UnimplementedCoreDaemon) BasicServiceSets(ctx context.Context) ([]core.BasicServiceSetRef, error) {
 	panic("fakeCoreDaemon.BasicServiceSets not implemented")
 }
+
+// Networks panics when a test fake does not implement network enumeration.
+func (UnimplementedCoreDaemon) Networks(ctx context.Context) ([]core.NetworkRef, error) {
+	panic("fakeCoreDaemon.Networks not implemented")
+}

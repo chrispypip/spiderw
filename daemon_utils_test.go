@@ -24,6 +24,7 @@ type fakeCoreDaemon struct {
 	adapters atomic.Pointer[[]core.AdapterRef]
 	devices  atomic.Pointer[[]core.DeviceRef]
 	bsses    atomic.Pointer[[]core.BasicServiceSetRef]
+	networks atomic.Pointer[[]core.NetworkRef]
 	err      atomic.Pointer[fakeCoreDaemonError]
 }
 
@@ -79,6 +80,16 @@ func (f *fakeCoreDaemon) setBasicServiceSets(bsses []core.BasicServiceSetRef) {
 
 	bssesCopy := append([]core.BasicServiceSetRef(nil), bsses...)
 	f.bsses.Store(&bssesCopy)
+}
+
+func (f *fakeCoreDaemon) setNetworks(networks []core.NetworkRef) {
+	if networks == nil {
+		f.networks.Store(nil)
+		return
+	}
+
+	networksCopy := append([]core.NetworkRef(nil), networks...)
+	f.networks.Store(&networksCopy)
 }
 
 func (f *fakeCoreDaemon) setErr(err error) {
@@ -177,4 +188,16 @@ func (f *fakeCoreDaemon) BasicServiceSets(ctx context.Context) ([]core.BasicServ
 		return nil, nil
 	}
 	return append([]core.BasicServiceSetRef(nil), (*bsses)...), nil
+}
+
+func (f *fakeCoreDaemon) Networks(ctx context.Context) ([]core.NetworkRef, error) {
+	if err := f.loadErr(); err != nil {
+		return nil, err
+	}
+
+	networks := f.networks.Load()
+	if networks == nil {
+		return nil, nil
+	}
+	return append([]core.NetworkRef(nil), (*networks)...), nil
 }

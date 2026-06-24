@@ -91,6 +91,41 @@ func TestSignalFirehose_DeviceSurvives(t *testing.T) {
 	}
 }
 
+func TestSignalFirehose_NetworkSurvives(t *testing.T) {
+	iwdmock.StartMockFirehose(t)
+
+	for range 20 {
+		out, err := runSpiderNetwork(t, "list")
+		require.NoError(t, err, "network list failed under firehose load: %s", out)
+		require.Contains(t, out, "OpenNet")
+
+		out, err = runSpiderNetwork(t, "OpenNet", "connected")
+		require.NoError(t, err, "network connected failed under firehose load: %s", out)
+		require.Contains(t, []string{"true\n", "false\n"}, out)
+	}
+}
+
+func TestSignalFirehose_PublicNetworkSubscribeReceivesSignals(t *testing.T) {
+	iwdmock.StartMockFirehose(t)
+
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+	network := newPublicMockNetwork(t, ctx, client, "OpenNet")
+
+	connectedFired := make(chan struct{}, 10)
+
+	unsubscribe, err := network.SubscribeConnectedChanged(ctx, func(bool) {
+		select {
+		case connectedFired <- struct{}{}:
+		default:
+		}
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, unsubscribe.Unsubscribe()) })
+
+	requireFired(t, connectedFired, "network connected subscription did not receive firehose signal")
+}
+
 func TestSignalFirehose_PublicDeviceSubscribeReceivesSignals(t *testing.T) {
 	iwdmock.StartMockFirehose(t)
 

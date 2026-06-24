@@ -142,6 +142,7 @@ func rootCommand(app *App) *Command {
 			"adapter": adapterCommand(app),
 			"device":  deviceCommand(app),
 			"bss":     bssCommand(app),
+			"network": networkCommand(app),
 		},
 	}
 }

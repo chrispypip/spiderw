@@ -95,6 +95,25 @@ var (
 	// ErrBasicServiceSetNotInitialized indicates that a BasicServiceSet wrapper
 	// has no raw backend.
 	ErrBasicServiceSetNotInitialized = errors.New("basic service set not initialized")
+
+	// ErrNetworkNotInitialized indicates that a Network wrapper has no raw
+	// backend.
+	ErrNetworkNotInitialized = errors.New("network not initialized")
+
+	// ErrNoAgent indicates that iwd rejected an operation because no credentials
+	// agent is registered. It is re-exported from the iwdbus layer so callers can
+	// match it with errors.Is through the core and public error chains.
+	ErrNoAgent = iwdbus.ErrNoAgent
+
+	// The following sentinels mirror named iwd D-Bus errors (e.g. from
+	// Network.Connect), re-exported so callers can match them with errors.Is.
+	ErrAborted       = iwdbus.ErrAborted
+	ErrBusy          = iwdbus.ErrBusy
+	ErrFailed        = iwdbus.ErrFailed
+	ErrNotSupported  = iwdbus.ErrNotSupported
+	ErrTimeout       = iwdbus.ErrTimeout
+	ErrInProgress    = iwdbus.ErrInProgress
+	ErrNotConfigured = iwdbus.ErrNotConfigured
 )
 
 func newError(kind Kind, resource Resource, op, details string, err error) error {

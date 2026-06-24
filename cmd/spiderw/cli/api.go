@@ -18,9 +18,11 @@ type clientAPI interface {
 	Adapter(ctx context.Context, path string) (adapterAPI, error)
 	Device(ctx context.Context, path string) (deviceAPI, error)
 	BasicServiceSet(ctx context.Context, path string) (bssAPI, error)
+	Network(ctx context.Context, path string) (networkAPI, error)
 	AllAdapters(ctx context.Context) ([]adapterAPI, error)
 	AllDevices(ctx context.Context) ([]deviceAPI, error)
 	AllBasicServiceSets(ctx context.Context) ([]bssAPI, error)
+	AllNetworks(ctx context.Context) ([]networkAPI, error)
 	Close() error
 }
 
@@ -32,6 +34,7 @@ type daemonAPI interface {
 	Adapters(ctx context.Context) ([]spiderw.AdapterRef, error)
 	Devices(ctx context.Context) ([]spiderw.DeviceRef, error)
 	BasicServiceSets(ctx context.Context) ([]spiderw.BasicServiceSetRef, error)
+	Networks(ctx context.Context) ([]spiderw.NetworkRef, error)
 }
 
 type adapterAPI interface {
@@ -68,6 +71,19 @@ type bssAPI interface {
 	Path() string
 	Address(ctx context.Context) (string, error)
 	Properties(ctx context.Context) (*spiderw.BasicServiceSetProperties, error)
+}
+
+type networkAPI interface {
+	Path() string
+	Name(ctx context.Context) (string, error)
+	Connected(ctx context.Context) (bool, error)
+	Device(ctx context.Context) (string, error)
+	Type(ctx context.Context) (spiderw.SecurityType, error)
+	KnownNetwork(ctx context.Context) (*string, error)
+	ExtendedServiceSet(ctx context.Context) ([]string, error)
+	Connect(ctx context.Context) error
+	Properties(ctx context.Context) (*spiderw.NetworkProperties, error)
+	SubscribeConnectedChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
 }
 
 // realClient adapts a concrete *spiderw.Client to clientAPI, converting the
@@ -108,6 +124,14 @@ func (r realClient) BasicServiceSet(ctx context.Context, path string) (bssAPI, e
 	return b, err
 }
 
+func (r realClient) Network(ctx context.Context, path string) (networkAPI, error) {
+	n, err := r.c.Network(ctx, path)
+	if n == nil {
+		return nil, err
+	}
+	return n, err
+}
+
 func (r realClient) AllAdapters(ctx context.Context) ([]adapterAPI, error) {
 	as, err := r.c.AllAdapters(ctx)
 	if err != nil {
@@ -140,6 +164,18 @@ func (r realClient) AllBasicServiceSets(ctx context.Context) ([]bssAPI, error) {
 	out := make([]bssAPI, 0, len(bs))
 	for _, b := range bs {
 		out = append(out, b)
+	}
+	return out, nil
+}
+
+func (r realClient) AllNetworks(ctx context.Context) ([]networkAPI, error) {
+	ns, err := r.c.AllNetworks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]networkAPI, 0, len(ns))
+	for _, n := range ns {
+		out = append(out, n)
 	}
 	return out, nil
 }

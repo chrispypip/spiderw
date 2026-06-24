@@ -35,6 +35,15 @@ var (
 	// ErrBasicServiceSetUninitialized indicates that a BasicServiceSet was used
 	// before initialization.
 	ErrBasicServiceSetUninitialized = errors.New("basic service set is not initialized")
+
+	// ErrNetworkUninitialized indicates that a Network was used before
+	// initialization.
+	ErrNetworkUninitialized = errors.New("network is not initialized")
+
+	// ErrNoAgent indicates that iwd rejected an operation because no credentials
+	// agent is registered. Connecting to a secured network that is not already
+	// known requires a registered agent to supply credentials.
+	ErrNoAgent = errors.New("no credentials agent registered")
 )
 
 // Error is the internal structured error type used for all D-Bus-layer failures.

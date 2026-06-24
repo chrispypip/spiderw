@@ -13,6 +13,9 @@ This mock is intentionally deterministic and deliberately simple: it provides
 only what spiderw needs to validate ObjectManager discovery, introspection,
 method/property calls, and signal behavior.
 
+Its introspection XML and object shapes are modeled on the **iwd 3.12** D-Bus
+API, which is the iwd version spiderw is developed and tested against.
+
 ---
 
 ## What This Mock *Is*
@@ -25,7 +28,7 @@ method/property calls, and signal behavior.
   ```
 
 * Exposes a small set of objects (currently: ObjectManager, daemon, adapter,
-  device, and basic service sets)
+  device, basic service sets, and networks)
 * Can emit signals, including a "firehose" mode to stress the dispatcher
 * Supports session bus only (it connects via `dbus.ConnectSessionBus()`)
 ---
@@ -60,13 +63,15 @@ tools/test-mocks/iwdmock/
 |   |-- device.go
 |   |-- export.go
 |   |-- firehose.go
+|   |-- network.go
 |   |-- objectmanager.go
 |   |-- utils.go
 |   `-- xml          # introspection XML served by Introspectable (go:embed)
 |       |-- adapter.xml
 |       |-- bss.xml
 |       |-- daemon.xml
-|       `-- device.xml
+|       |-- device.xml
+|       `-- network.xml
 `-- README.md        # This file
 ```
 
@@ -193,15 +198,21 @@ defined across:
 * `--daemon-fail-calls`
   Make daemon calls return a D-Bus error
 
-### Device and basic service set scenario flags
+### Device, basic service set, and network scenario flags
 
 * `--omit-device`
   Don't export the device object, exercising empty device enumeration.
 * `--omit-bss`
   Don't export the basic service set objects, exercising empty BSS enumeration.
+* `--omit-network`
+  Don't export the network objects, exercising empty network enumeration.
 
 The mock exports multiple basic service sets by default, mirroring iwd reporting
-one BSS per access point/radio a device can hear during a scan.
+one BSS per access point/radio a device can hear during a scan. It also exports
+three networks — an open network, a known (provisioned) secured network, and an
+unknown secured network — so `Network.Connect` exercises both the no-agent
+success paths and the `net.connman.iwd.NoAgent` rejection. The open network's
+`ExtendedServiceSet` lists both mock BSSes, demonstrating multi-BSS membership.
 
 ---
 

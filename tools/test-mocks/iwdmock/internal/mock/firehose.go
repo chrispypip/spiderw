@@ -10,12 +10,13 @@ import (
 	"github.com/chrispypip/spiderw/internal/iwdbus"
 )
 
-// StartSignalFirehose starts background mock daemon, adapter, and device signal
-// emitters.
+// StartSignalFirehose starts background mock daemon, adapter, device, and
+// network signal emitters.
 func StartSignalFirehose() {
 	go firehoseDaemonSignals()
 	go firehoseAdapterSignals()
 	go firehoseDeviceSignals()
+	go firehoseNetworkSignals()
 }
 
 func firehoseDaemonSignals() {
@@ -57,6 +58,22 @@ func firehoseDeviceSignals() {
 			map[string]dbus.Variant{
 				"Powered": dbus.MakeVariant(rand.Intn(2) == 0),
 				"Mode":    dbus.MakeVariant(modes[i%len(modes)]),
+			},
+			[]string{},
+		)
+		time.Sleep(3 * time.Millisecond)
+	}
+}
+
+func firehoseNetworkSignals() {
+	// Emit Connected toggles on the open network so subscribers see churn.
+	networkPath := dbus.ObjectPath("/net/connman/iwd/phy0/wlan0/open")
+	for {
+		emitPropertiesChanged(
+			networkPath,
+			iwdbus.IwdNetworkIface,
+			map[string]dbus.Variant{
+				"Connected": dbus.MakeVariant(rand.Intn(2) == 0),
 			},
 			[]string{},
 		)

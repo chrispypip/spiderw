@@ -19,10 +19,12 @@ var (
 	newIwdAdapterFn     = iwdbus.NewAdapter
 	newIwdDeviceFn      = iwdbus.NewDevice
 	newIwdBSSFn         = iwdbus.NewBasicServiceSet
+	newIwdNetworkFn     = iwdbus.NewNetwork
 	newCoreDaemonFn     = func(raw *iwdbus.Daemon) *core.Daemon { return core.NewDaemon(raw) }
 	newCoreAdapterFn    = func(raw *iwdbus.Adapter) *core.Adapter { return core.NewAdapter(raw) }
 	newCoreDeviceFn     = func(raw *iwdbus.Device) *core.Device { return core.NewDevice(raw) }
 	newCoreBSSFn        = func(raw *iwdbus.BasicServiceSet) *core.BasicServiceSet { return core.NewBasicServiceSet(raw) }
+	newCoreNetworkFn    = func(raw *iwdbus.Network) *core.Network { return core.NewNetwork(raw) }
 	closeConnFn         = func(c *dbus.Conn) error { return c.Close() }
 )
 
@@ -97,6 +99,9 @@ type Wiring struct {
 
 	// BasicServiceSetFactory optionally overrides BSS construction for tests.
 	BasicServiceSetFactory func(ctx context.Context, path string) (core.BasicServiceSetIface, error)
+
+	// NetworkFactory optionally overrides network construction for tests.
+	NetworkFactory func(ctx context.Context, path string) (core.NetworkIface, error)
 }
 
 // NewAdapter constructs a core adapter wrapper for the given iwd object path.
@@ -202,4 +207,39 @@ func (w *Wiring) NewBasicServiceSet(ctx context.Context, path string) (core.Basi
 		return nil, core.WrapBasicServiceSetUnavailable(op, "basic service set unavailable", fmt.Errorf("core basic service set interface not available"))
 	}
 	return coreBSS, nil
+}
+
+// NewNetwork constructs a core network wrapper for the given iwd object path.
+func (w *Wiring) NewNetwork(ctx context.Context, path string) (core.NetworkIface, error) {
+	const op = "NewNetwork"
+
+	if w == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "wiring cannot be nil", core.ErrCore)
+	}
+	if path == "" {
+		return nil, core.WrapInvalidArgument(core.ResourceNetwork, op, "network path cannot be empty", core.ErrCore)
+	}
+	if path[0] != '/' {
+		return nil, core.WrapInvalidArgument(core.ResourceNetwork, op, "network path must be absolute", core.ErrCore)
+	}
+	if w.NetworkFactory != nil {
+		return w.NetworkFactory(ctx, path)
+	}
+	if w.Conn == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "D-Bus conn cannot be nil", core.ErrCore)
+	}
+
+	iwdNetwork, err := newIwdNetworkFn(ctx, w.Conn, dbus.ObjectPath(path))
+	if err != nil {
+		return nil, core.WrapNetworkUnavailable(op, "network unavailable", err)
+	}
+	if iwdNetwork == nil {
+		return nil, core.WrapNetworkUnavailable(op, "network unavailable", iwdbus.WrapIntrospection(path, fmt.Errorf("iwd network interface not available")))
+	}
+
+	coreNetwork := newCoreNetworkFn(iwdNetwork)
+	if coreNetwork == nil {
+		return nil, core.WrapNetworkUnavailable(op, "network unavailable", fmt.Errorf("core network interface not available"))
+	}
+	return coreNetwork, nil
 }

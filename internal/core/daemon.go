@@ -36,6 +36,16 @@ type BasicServiceSetRef struct {
 	Address string
 }
 
+// NetworkRef is a lightweight reference to a network discovered by the iwd
+// daemon.
+type NetworkRef struct {
+	// Path is the canonical D-Bus object path for the network.
+	Path string
+
+	// Name is the network's Name (SSID) property.
+	Name string
+}
+
 // DaemonIface defines the core daemon operations used by the public layer.
 type DaemonIface interface {
 	Info(ctx context.Context) (*DaemonInfo, error)
@@ -45,6 +55,7 @@ type DaemonIface interface {
 	Adapters(ctx context.Context) ([]AdapterRef, error)
 	Devices(ctx context.Context) ([]DeviceRef, error)
 	BasicServiceSets(ctx context.Context) ([]BasicServiceSetRef, error)
+	Networks(ctx context.Context) ([]NetworkRef, error)
 }
 
 // DaemonInfo is the normalized core-layer view of daemon metadata.
@@ -64,6 +75,7 @@ type daemonRaw interface {
 	GetAdapters(ctx context.Context) ([]iwdbus.AdapterRef, error)
 	GetDevices(ctx context.Context) ([]iwdbus.DeviceRef, error)
 	GetBasicServiceSets(ctx context.Context) ([]iwdbus.BasicServiceSetRef, error)
+	GetNetworks(ctx context.Context) ([]iwdbus.NetworkRef, error)
 }
 
 // Daemon is the core-layer facade over a raw iwd daemon backend.
@@ -238,6 +250,36 @@ func (d *Daemon) BasicServiceSets(ctx context.Context) ([]BasicServiceSetRef, er
 		}
 
 		refs = append(refs, BasicServiceSetRef{Path: p, Address: a})
+	}
+	return refs, nil
+}
+
+// Networks returns the networks currently exposed by the iwd daemon.
+func (d *Daemon) Networks(ctx context.Context) ([]NetworkRef, error) {
+	const op = "Daemon.Networks"
+
+	rawDaemon, err := d.rawDaemon(op)
+	if err != nil {
+		return nil, err
+	}
+
+	rawRefs, err := rawDaemon.GetNetworks(ctx)
+	if err != nil {
+		return nil, WrapDaemonUnavailable(op, "failed getting networks", err)
+	}
+	refs := make([]NetworkRef, 0, len(rawRefs))
+	for _, r := range rawRefs {
+		p := strings.TrimSpace(string(r.Path))
+		if p == "" || !strings.HasPrefix(p, "/") {
+			return nil, WrapInvalidState(ResourceNetwork, op, "network returned invalid path", fmt.Errorf("invalid network path %q", p))
+		}
+
+		n := strings.TrimSpace(r.Name)
+		if n == "" {
+			return nil, WrapInvalidState(ResourceNetwork, op, "network returned empty Name", fmt.Errorf("missing or invalid Name field"))
+		}
+
+		refs = append(refs, NetworkRef{Path: p, Name: n})
 	}
 	return refs, nil
 }

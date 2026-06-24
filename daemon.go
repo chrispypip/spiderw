@@ -37,6 +37,16 @@ type BasicServiceSetRef struct {
 	Address string
 }
 
+// NetworkRef is a lightweight reference to a network discovered by the iwd
+// daemon.
+type NetworkRef struct {
+	// Path is the canonical D-Bus object path for the network.
+	Path string
+
+	// Name is the network's SSID.
+	Name string
+}
+
 // DaemonInfo is the public API view of the iwd daemon metadata.
 //
 // This intentionally mirrors core.DaemonInfo but is separate to avoid leaking
@@ -164,6 +174,22 @@ func (d *Daemon) BasicServiceSets(ctx context.Context) ([]BasicServiceSetRef, er
 		out := make([]BasicServiceSetRef, 0, len(refs))
 		for _, r := range refs {
 			out = append(out, BasicServiceSetRef{Path: r.Path, Address: r.Address})
+		}
+		return out, nil
+	})
+}
+
+// Networks returns lightweight references to the networks currently exposed by
+// iwd.
+func (d *Daemon) Networks(ctx context.Context) ([]NetworkRef, error) {
+	return delegate(ctx, "Daemon.Networks", d.coreDaemon, func(ctx context.Context, c core.DaemonIface) ([]NetworkRef, error) {
+		refs, err := c.Networks(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]NetworkRef, 0, len(refs))
+		for _, r := range refs {
+			out = append(out, NetworkRef{Path: r.Path, Name: r.Name})
 		}
 		return out, nil
 	})

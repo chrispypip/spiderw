@@ -318,3 +318,9 @@ func StartMockWithoutDevice(t *testing.T, dir string) {
 func StartMockWithoutBSS(t *testing.T, dir string) {
 	startMockWithT(t, dir, []string{"--omit-bss"})
 }
+
+// StartMockWithoutNetwork starts an iwd mock that does not export any network
+// objects, which exercises empty network enumeration.
+func StartMockWithoutNetwork(t *testing.T, dir string) {
+	startMockWithT(t, dir, []string{"--omit-network"})
+}
