@@ -69,6 +69,7 @@ func TestDaemonMock_Adapters(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []spiderw.AdapterRef{
 		{Path: "/net/connman/iwd/phy0", Name: "phy0"},
+		{Path: "/net/connman/iwd/phy1", Name: "phy1"},
 	}, refs)
 }
 

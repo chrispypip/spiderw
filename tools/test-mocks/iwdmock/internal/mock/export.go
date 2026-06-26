@@ -41,12 +41,12 @@ func exportDaemonIntrospection(conn *dbus.Conn) error {
 	return conn.Export(introspectStub(daemonIntrospectionXML), iwdbus.IwdDaemonPath, iwdbus.DBusIntrospectableIface)
 }
 
-func exportAdapterIntrospection(conn *dbus.Conn) error {
-	return conn.Export(introspectStub(adapterIntrospectionXML), adapterPath, iwdbus.DBusIntrospectableIface)
+func exportAdapterIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {
+	return conn.Export(introspectStub(adapterIntrospectionXML), path, iwdbus.DBusIntrospectableIface)
 }
 
-func exportDeviceIntrospection(conn *dbus.Conn) error {
-	return conn.Export(introspectStub(deviceIntrospectionXML), devicePath, iwdbus.DBusIntrospectableIface)
+func exportDeviceIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {
+	return conn.Export(introspectStub(deviceIntrospectionXML), path, iwdbus.DBusIntrospectableIface)
 }
 
 func exportBSSIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {

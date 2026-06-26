@@ -175,7 +175,7 @@ defined across:
 ### Entrypoint flags
 
 * `--firehose-signals`: Emit rapid `PropertiesChanged` signals for exported mock objects to stress dispatch.
-* `--omit-optionals`: Export the adapter with optional fields (e.g. `Vendor` and `Model` from daemon) omitted.
+* `--omit-optionals`: Export the adapters with optional fields (`Vendor` and `Model`) omitted.
 
 ### Daemon scenario flags
 
@@ -203,7 +203,7 @@ defined across:
 ### Device, basic service set, network, and known-network scenario flags
 
 * `--omit-device`
-  Don't export the device object, exercising empty device enumeration.
+  Don't export the device objects, exercising empty device enumeration.
 * `--omit-bss`
   Don't export the basic service set objects, exercising empty BSS enumeration.
 * `--omit-network`
@@ -223,6 +223,12 @@ Two known networks are exported: one (`psk`, with a last-connected time and
 auto-connect on) at the path the mock network references via its `KnownNetwork`
 property — so that linkage resolves end to end — and one `hotspot` that has never
 been connected to (no `LastConnectedTime`) with auto-connect off.
+
+Two adapters (`phy0`, `phy1`) and two devices (`phy0/wlan0`, `phy1/wlan1`) are
+exported by default, since real systems can have several radios and a device per
+adapter. `phy0`/`wlan0` is the primary pair: the mock networks, BSSes, and known
+networks hang under it, and the firehose emitters target it. `phy1` supports a
+narrower mode set than `phy0`, and `wlan1` reports `phy1` as its owning adapter.
 
 ---
 

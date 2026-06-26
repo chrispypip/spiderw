@@ -8,12 +8,22 @@ import (
 	"github.com/chrispypip/spiderw/internal/iwdbus"
 )
 
+// devicePath is the path of the primary mock device. The mock
+// networks/BSSes/known networks hang under it, and the firehose emitters target
+// it.
 const devicePath = dbus.ObjectPath("/net/connman/iwd/phy0/wlan0")
 
-var exportedDevice *Device
+// device1Path is the path of a second mock device, on the second adapter,
+// exercising multi-device enumeration.
+const device1Path = dbus.ObjectPath("/net/connman/iwd/phy1/wlan1")
+
+var exportedDevices []*Device
 
 // Device represents the mock iwd Device interface exported on D-Bus.
 type Device struct {
+	// Path is the D-Bus object path this device is exported at.
+	Path dbus.ObjectPath
+
 	// Name is the mock Name property.
 	Name string
 
@@ -30,33 +40,51 @@ type Device struct {
 	Adapter dbus.ObjectPath
 }
 
-// ExportDevice exports the mock device object on the D-Bus connection.
+// ExportDevice exports the mock device objects on the D-Bus connection. A single
+// adapter can host several interfaces and a system can have several adapters, so
+// the mock exports two devices (one per adapter).
 //
-// When --omit-device is set, no device object is exported (and the
+// When --omit-device is set, no device objects are exported (and the
 // ObjectManager will report no devices), which exercises empty enumeration.
 func ExportDevice(conn *dbus.Conn) error {
 	if *omitDeviceFlag {
 		return nil
 	}
 
-	d := &Device{
-		Name:    "wlan0",
-		Address: "aa:bb:cc:dd:ee:ff",
-		Powered: true,
-		Mode:    "station",
-		Adapter: adapterPath,
+	devices := []*Device{
+		{
+			Path:    devicePath,
+			Name:    "wlan0",
+			Address: "aa:bb:cc:dd:ee:ff",
+			Powered: true,
+			Mode:    "station",
+			Adapter: adapterPath,
+		},
+		{
+			Path:    device1Path,
+			Name:    "wlan1",
+			Address: "11:22:33:44:55:66",
+			Powered: true,
+			Mode:    "ap",
+			Adapter: adapter1Path,
+		},
 	}
 
-	exportedDevice = d
+	exportedDevices = nil
+	for _, d := range devices {
+		if err := conn.Export(d, d.Path, iwdbus.IwdDeviceIface); err != nil {
+			return err
+		}
+		if err := conn.Export(d, d.Path, "org.freedesktop.DBus.Properties"); err != nil {
+			return err
+		}
+		if err := exportDeviceIntrospection(conn, d.Path); err != nil {
+			return err
+		}
+		exportedDevices = append(exportedDevices, d)
+	}
 
-	// Export methods.
-	if err := conn.Export(d, devicePath, iwdbus.IwdDeviceIface); err != nil {
-		return err
-	}
-	if err := conn.Export(d, devicePath, "org.freedesktop.DBus.Properties"); err != nil {
-		return err
-	}
-	return exportDeviceIntrospection(conn)
+	return nil
 }
 
 func (d *Device) buildPropertyMap() map[string]dbus.Variant {
@@ -104,7 +132,7 @@ func (d *Device) Set(iface, p string, v dbus.Variant) *dbus.Error {
 			return dbus.MakeFailedError(fmt.Errorf("property Powered must be a bool, got %T", v))
 		}
 		d.Powered = b
-		emitPropertiesChanged(devicePath, iwdbus.IwdDeviceIface, map[string]dbus.Variant{"Powered": dbus.MakeVariant(b)}, []string{})
+		emitPropertiesChanged(d.Path, iwdbus.IwdDeviceIface, map[string]dbus.Variant{"Powered": dbus.MakeVariant(b)}, []string{})
 		return nil
 	case "Mode":
 		s, ok := v.Value().(string)
@@ -112,7 +140,7 @@ func (d *Device) Set(iface, p string, v dbus.Variant) *dbus.Error {
 			return dbus.MakeFailedError(fmt.Errorf("property Mode must be a string, got %T", v))
 		}
 		d.Mode = s
-		emitPropertiesChanged(devicePath, iwdbus.IwdDeviceIface, map[string]dbus.Variant{"Mode": dbus.MakeVariant(s)}, []string{})
+		emitPropertiesChanged(d.Path, iwdbus.IwdDeviceIface, map[string]dbus.Variant{"Mode": dbus.MakeVariant(s)}, []string{})
 		return nil
 	default:
 		return dbus.MakeFailedError(fmt.Errorf("cannot set property %q", p))

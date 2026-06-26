@@ -10,8 +10,8 @@ const objectManagerPath = dbus.ObjectPath("/")
 
 // ObjectManager implements the mock D-Bus ObjectManager interface.
 type ObjectManager struct {
-	adapter       *Adapter
-	device        *Device
+	adapters      []*Adapter
+	devices       []*Device
 	bsses         []*BasicServiceSet
 	networks      []*Network
 	knownNetworks []*KnownNetwork
@@ -24,11 +24,11 @@ func ExportObjectManager(conn *dbus.Conn) error {
 	if !*omitDaemonFlag {
 		om.daemon = &Daemon{}
 	}
-	if exportedAdapter != nil {
-		om.adapter = exportedAdapter
+	if exportedAdapters != nil {
+		om.adapters = exportedAdapters
 	}
-	if exportedDevice != nil {
-		om.device = exportedDevice
+	if exportedDevices != nil {
+		om.devices = exportedDevices
 	}
 	if exportedBSSes != nil {
 		om.bsses = exportedBSSes
@@ -53,15 +53,15 @@ func (o *ObjectManager) GetManagedObjects() (map[dbus.ObjectPath]map[string]map[
 		}
 	}
 
-	if o.adapter != nil {
-		objects[adapterPath] = map[string]map[string]dbus.Variant{
-			iwdbus.IwdAdapterIface: o.adapter.buildPropertyMap(),
+	for _, adapter := range o.adapters {
+		objects[adapter.Path] = map[string]map[string]dbus.Variant{
+			iwdbus.IwdAdapterIface: adapter.buildPropertyMap(),
 		}
 	}
 
-	if o.device != nil {
-		objects[devicePath] = map[string]map[string]dbus.Variant{
-			iwdbus.IwdDeviceIface: o.device.buildPropertyMap(),
+	for _, device := range o.devices {
+		objects[device.Path] = map[string]map[string]dbus.Variant{
+			iwdbus.IwdDeviceIface: device.buildPropertyMap(),
 		}
 	}
 

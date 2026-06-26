@@ -236,6 +236,7 @@ func TestDeviceMock_DaemonDevices(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []spiderw.DeviceRef{
 		{Path: devicePath, Name: "wlan0"},
+		{Path: "/net/connman/iwd/phy1/wlan1", Name: "wlan1"},
 	}, refs)
 }
 
@@ -270,12 +271,18 @@ func TestDeviceMock_AllDevices(t *testing.T) {
 
 	devices, err := client.AllDevices(ctx)
 	require.NoError(t, err)
-	require.Len(t, devices, 1)
-	require.Equal(t, devicePath, devices[0].Path())
+	require.Len(t, devices, 2)
 
+	// Enumeration is path-sorted: phy0/wlan0 before phy1/wlan1.
+	require.Equal(t, devicePath, devices[0].Path())
 	name, err := devices[0].Name(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "wlan0", name)
+
+	require.Equal(t, "/net/connman/iwd/phy1/wlan1", devices[1].Path())
+	name1, err := devices[1].Name(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "wlan1", name1)
 }
 
 func TestDeviceMock_AllDevices_Empty(t *testing.T) {
@@ -294,6 +301,33 @@ func TestDeviceMock_AllDevices_Empty(t *testing.T) {
 	devices, err := client.AllDevices(ctx)
 	require.NoError(t, err)
 	require.Empty(t, devices)
+}
+
+// TestDeviceMock_SecondDeviceTopology exercises multi-device enumeration: the
+// second device (wlan1) lives on the second adapter, and its Adapter path
+// resolves to that adapter.
+func TestDeviceMock_SecondDeviceTopology(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	ctx := context.Background()
+	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, client.Close()) })
+
+	wlan1 := newPublicMockDevice(t, ctx, client, "wlan1")
+	props, err := wlan1.Properties(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "11:22:33:44:55:66", props.Address)
+	require.Equal(t, spiderw.ModeAP, props.Mode)
+	require.Equal(t, "/net/connman/iwd/phy1", props.Adapter)
+
+	// The owning-adapter path resolves to the second adapter.
+	adapter, err := client.Adapter(ctx, props.Adapter)
+	require.NoError(t, err)
+	name, err := adapter.Name(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "phy1", name)
 }
 
 // -----------------------------------------------------------------------------

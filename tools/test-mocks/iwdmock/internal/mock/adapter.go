@@ -8,12 +8,22 @@ import (
 	"github.com/chrispypip/spiderw/internal/iwdbus"
 )
 
+// adapterPath is the path of the primary mock adapter. It owns the device that
+// the mock networks/BSSes/known networks hang under, and the firehose emitters
+// target it.
 const adapterPath = dbus.ObjectPath("/net/connman/iwd/phy0")
 
-var exportedAdapter *Adapter
+// adapter1Path is the path of a second mock adapter, exercising multi-adapter
+// enumeration.
+const adapter1Path = dbus.ObjectPath("/net/connman/iwd/phy1")
+
+var exportedAdapters []*Adapter
 
 // Adapter represents the mock iwd Adapter interface exported on D-Bus.
 type Adapter struct {
+	// Path is the D-Bus object path this adapter is exported at.
+	Path dbus.ObjectPath
+
 	// Powered is the mock Powered property.
 	Powered bool
 
@@ -30,26 +40,45 @@ type Adapter struct {
 	SupportedModes []string
 }
 
-// ExportAdapter exports the mock adapter object on the D-Bus connection.
+// ExportAdapter exports the mock adapter objects on the D-Bus connection. Real
+// systems can have several radios (built-in plus USB, multi-radio hardware), so
+// the mock exports two adapters. model and vendor are the optional Model/Vendor
+// of every exported adapter (nil under --omit-optionals).
 func ExportAdapter(conn *dbus.Conn, model, vendor *string) error {
-	a := &Adapter{
-		Powered:        true,
-		Name:           "phy0",
-		Model:          model,
-		Vendor:         vendor,
-		SupportedModes: []string{"station", "ap"},
+	adapters := []*Adapter{
+		{
+			Path:           adapterPath,
+			Powered:        true,
+			Name:           "phy0",
+			Model:          model,
+			Vendor:         vendor,
+			SupportedModes: []string{"station", "ap"},
+		},
+		{
+			Path:           adapter1Path,
+			Powered:        true,
+			Name:           "phy1",
+			Model:          model,
+			Vendor:         vendor,
+			SupportedModes: []string{"station"},
+		},
 	}
 
-	exportedAdapter = a
+	exportedAdapters = nil
+	for _, a := range adapters {
+		if err := conn.Export(a, a.Path, iwdbus.IwdAdapterIface); err != nil {
+			return err
+		}
+		if err := conn.Export(a, a.Path, "org.freedesktop.DBus.Properties"); err != nil {
+			return err
+		}
+		if err := exportAdapterIntrospection(conn, a.Path); err != nil {
+			return err
+		}
+		exportedAdapters = append(exportedAdapters, a)
+	}
 
-	// Export methods.
-	if err := conn.Export(a, adapterPath, iwdbus.IwdAdapterIface); err != nil {
-		return err
-	}
-	if err := conn.Export(a, adapterPath, "org.freedesktop.DBus.Properties"); err != nil {
-		return err
-	}
-	return exportAdapterIntrospection(conn)
+	return nil
 }
 
 func badModesPayload() interface{} {
@@ -118,7 +147,7 @@ func (a *Adapter) Set(iface, p string, v dbus.Variant) *dbus.Error {
 			return dbus.MakeFailedError(fmt.Errorf("property Powered must be a bool, got %T", v))
 		}
 		a.Powered = b
-		emitPropertiesChanged(adapterPath, iwdbus.IwdAdapterIface, map[string]dbus.Variant{"Powered": dbus.MakeVariant(b)}, []string{})
+		emitPropertiesChanged(a.Path, iwdbus.IwdAdapterIface, map[string]dbus.Variant{"Powered": dbus.MakeVariant(b)}, []string{})
 		return nil
 	default:
 		return dbus.MakeFailedError(fmt.Errorf("cannot set property %q", p))

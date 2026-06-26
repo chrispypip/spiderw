@@ -289,6 +289,25 @@ func TestAdapterMock_Firehose(t *testing.T) {
 	require.Equal(t, []string{}, ss)
 }
 
+// TestAdapterMock_SecondAdapter exercises multi-adapter enumeration: the mock
+// exports a second adapter (phy1) with a distinct supported-modes set, so it is
+// distinguishable from the primary phy0 (which also supports AP).
+func TestAdapterMock_SecondAdapter(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	ctx := context.Background()
+	phy1 := newPublicMockAdapter(t, ctx, newMockClient(t, ctx), "phy1")
+
+	supportsStation, err := phy1.SupportsStation(ctx)
+	require.NoError(t, err)
+	require.True(t, supportsStation)
+
+	supportsAP, err := phy1.SupportsAP(ctx)
+	require.NoError(t, err)
+	require.False(t, supportsAP)
+}
+
 // -----------------------------------------------------------------------------
 // CLI (`spiderw adapter …`) against the mock — thin, CLI-specific coverage only
 // -----------------------------------------------------------------------------
