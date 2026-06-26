@@ -219,115 +219,101 @@ func parseDaemonMap(get func(k string) (interface{}, bool)) (*DaemonInfo, error)
 	}, nil
 }
 
-// GetAdapters asks iwd's ObjectManager for managed objects and returns every
-// object that implements net.connman.iwd.Adapter, along with its Name property.
+// getRefs asks iwd's ObjectManager for managed objects and returns a reference
+// for every object that implements iface, built by makeRef and sorted by object
+// path. It is the shared enumeration skeleton behind GetAdapters, GetDevices,
+// and the other Get* methods.
+func getRefs[T any](
+	ctx context.Context,
+	conn *dbus.Conn,
+	op, iface string,
+	makeRef func(path dbus.ObjectPath, props map[string]dbus.Variant) (T, error),
+) ([]T, error) {
+	if conn == nil {
+		return nil, WrapConnection(op, ErrDaemonUninitialized)
+	}
+
+	objects, err := getManagedObjects(ctx, conn, IwdService)
+	if err != nil {
+		return nil, WrapIntrospection(DBusObjectManagerGetManagedObjects, err)
+	}
+
+	type entry struct {
+		path dbus.ObjectPath
+		ref  T
+	}
+	entries := make([]entry, 0, len(objects))
+	for path, ifaces := range objects {
+		props, ok := ifaces[iface]
+		if !ok {
+			continue
+		}
+		ref, err := makeRef(path, props)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry{path: path, ref: ref})
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return string(entries[i].path) < string(entries[j].path)
+	})
+
+	refs := make([]T, len(entries))
+	for i, e := range entries {
+		refs[i] = e.ref
+	}
+	return refs, nil
+}
+
+// GetAdapters returns every object that implements net.connman.iwd.Adapter,
+// along with its Name property.
 func (d *Daemon) GetAdapters(ctx context.Context) ([]AdapterRef, error) {
-	const op = "Daemon.GetAdapters"
-
-	if d == nil || d.conn == nil {
-		return nil, WrapConnection(op, ErrDaemonUninitialized)
+	if d == nil {
+		return nil, WrapConnection("Daemon.GetAdapters", ErrDaemonUninitialized)
 	}
-
-	objects, err := getManagedObjects(ctx, d.conn, IwdService)
-	if err != nil {
-		return nil, WrapIntrospection(DBusObjectManagerGetManagedObjects, err)
-	}
-	refs := make([]AdapterRef, 0, len(objects))
-	for path, ifaces := range objects {
-		props, ok := ifaces[IwdAdapterIface]
-		if !ok {
-			continue
-		}
-
-		name, err := adapterNameFromManagedObject(path, props)
-		if err != nil {
-			return nil, err
-		}
-
-		refs = append(refs, AdapterRef{Path: path, Name: name})
-	}
-
-	sort.Slice(refs, func(i, j int) bool {
-		return string(refs[i].Path) < string(refs[j].Path)
-	})
-
-	return refs, nil
+	return getRefs(ctx, d.conn, "Daemon.GetAdapters", IwdAdapterIface,
+		func(path dbus.ObjectPath, props map[string]dbus.Variant) (AdapterRef, error) {
+			name, err := objectNameFromManagedObject("adapter", path, props)
+			if err != nil {
+				return AdapterRef{}, err
+			}
+			return AdapterRef{Path: path, Name: name}, nil
+		})
 }
 
-func adapterNameFromManagedObject(path dbus.ObjectPath, props map[string]dbus.Variant) (string, error) {
-	return objectNameFromManagedObject("adapter", path, props)
-}
-
-// GetDevices asks iwd's ObjectManager for managed objects and returns every
-// object that implements net.connman.iwd.Device, along with its Name property.
+// GetDevices returns every object that implements net.connman.iwd.Device, along
+// with its Name property.
 func (d *Daemon) GetDevices(ctx context.Context) ([]DeviceRef, error) {
-	const op = "Daemon.GetDevices"
-
-	if d == nil || d.conn == nil {
-		return nil, WrapConnection(op, ErrDaemonUninitialized)
+	if d == nil {
+		return nil, WrapConnection("Daemon.GetDevices", ErrDaemonUninitialized)
 	}
-
-	objects, err := getManagedObjects(ctx, d.conn, IwdService)
-	if err != nil {
-		return nil, WrapIntrospection(DBusObjectManagerGetManagedObjects, err)
-	}
-	refs := make([]DeviceRef, 0, len(objects))
-	for path, ifaces := range objects {
-		props, ok := ifaces[IwdDeviceIface]
-		if !ok {
-			continue
-		}
-
-		name, err := objectNameFromManagedObject("device", path, props)
-		if err != nil {
-			return nil, err
-		}
-
-		refs = append(refs, DeviceRef{Path: path, Name: name})
-	}
-
-	sort.Slice(refs, func(i, j int) bool {
-		return string(refs[i].Path) < string(refs[j].Path)
-	})
-
-	return refs, nil
+	return getRefs(ctx, d.conn, "Daemon.GetDevices", IwdDeviceIface,
+		func(path dbus.ObjectPath, props map[string]dbus.Variant) (DeviceRef, error) {
+			name, err := objectNameFromManagedObject("device", path, props)
+			if err != nil {
+				return DeviceRef{}, err
+			}
+			return DeviceRef{Path: path, Name: name}, nil
+		})
 }
 
-// GetBasicServiceSets asks iwd's ObjectManager for managed objects and returns
-// every object that implements net.connman.iwd.BasicServiceSet, along with its
-// Address property. Unlike adapters and devices, a BSS has no Name property, so
-// it is identified by its Address (BSSID).
+// GetBasicServiceSets returns every object that implements
+// net.connman.iwd.BasicServiceSet, along with its Address property. Unlike
+// adapters and devices, a BSS has no Name property, so it is identified by its
+// Address (BSSID).
 func (d *Daemon) GetBasicServiceSets(ctx context.Context) ([]BasicServiceSetRef, error) {
-	const op = "Daemon.GetBasicServiceSets"
-
-	if d == nil || d.conn == nil {
-		return nil, WrapConnection(op, ErrDaemonUninitialized)
+	if d == nil {
+		return nil, WrapConnection("Daemon.GetBasicServiceSets", ErrDaemonUninitialized)
 	}
-
-	objects, err := getManagedObjects(ctx, d.conn, IwdService)
-	if err != nil {
-		return nil, WrapIntrospection(DBusObjectManagerGetManagedObjects, err)
-	}
-	refs := make([]BasicServiceSetRef, 0, len(objects))
-	for path, ifaces := range objects {
-		props, ok := ifaces[IwdBasicServiceSetIface]
-		if !ok {
-			continue
-		}
-
-		address, err := bssAddressFromManagedObject(path, props)
-		if err != nil {
-			return nil, err
-		}
-
-		refs = append(refs, BasicServiceSetRef{Path: path, Address: address})
-	}
-
-	sort.Slice(refs, func(i, j int) bool {
-		return string(refs[i].Path) < string(refs[j].Path)
-	})
-
-	return refs, nil
+	return getRefs(ctx, d.conn, "Daemon.GetBasicServiceSets", IwdBasicServiceSetIface,
+		func(path dbus.ObjectPath, props map[string]dbus.Variant) (BasicServiceSetRef, error) {
+			address, err := bssAddressFromManagedObject(path, props)
+			if err != nil {
+				return BasicServiceSetRef{}, err
+			}
+			return BasicServiceSetRef{Path: path, Address: address}, nil
+		})
 }
 
 // bssAddressFromManagedObject validates a BSS object path and extracts its
@@ -353,76 +339,36 @@ func bssAddressFromManagedObject(path dbus.ObjectPath, props map[string]dbus.Var
 	return s, nil
 }
 
-// GetNetworks asks iwd's ObjectManager for managed objects and returns every
-// object that implements net.connman.iwd.Network, along with its Name (SSID)
-// property.
+// GetNetworks returns every object that implements net.connman.iwd.Network,
+// along with its Name (SSID) property.
 func (d *Daemon) GetNetworks(ctx context.Context) ([]NetworkRef, error) {
-	const op = "Daemon.GetNetworks"
-
-	if d == nil || d.conn == nil {
-		return nil, WrapConnection(op, ErrDaemonUninitialized)
+	if d == nil {
+		return nil, WrapConnection("Daemon.GetNetworks", ErrDaemonUninitialized)
 	}
-
-	objects, err := getManagedObjects(ctx, d.conn, IwdService)
-	if err != nil {
-		return nil, WrapIntrospection(DBusObjectManagerGetManagedObjects, err)
-	}
-	refs := make([]NetworkRef, 0, len(objects))
-	for path, ifaces := range objects {
-		props, ok := ifaces[IwdNetworkIface]
-		if !ok {
-			continue
-		}
-
-		name, err := objectNameFromManagedObject("network", path, props)
-		if err != nil {
-			return nil, err
-		}
-
-		refs = append(refs, NetworkRef{Path: path, Name: name})
-	}
-
-	sort.Slice(refs, func(i, j int) bool {
-		return string(refs[i].Path) < string(refs[j].Path)
-	})
-
-	return refs, nil
+	return getRefs(ctx, d.conn, "Daemon.GetNetworks", IwdNetworkIface,
+		func(path dbus.ObjectPath, props map[string]dbus.Variant) (NetworkRef, error) {
+			name, err := objectNameFromManagedObject("network", path, props)
+			if err != nil {
+				return NetworkRef{}, err
+			}
+			return NetworkRef{Path: path, Name: name}, nil
+		})
 }
 
-// GetKnownNetworks asks iwd's ObjectManager for managed objects and returns every
-// object that implements net.connman.iwd.KnownNetwork, along with its Name
-// property.
+// GetKnownNetworks returns every object that implements
+// net.connman.iwd.KnownNetwork, along with its Name property.
 func (d *Daemon) GetKnownNetworks(ctx context.Context) ([]KnownNetworkRef, error) {
-	const op = "Daemon.GetKnownNetworks"
-
-	if d == nil || d.conn == nil {
-		return nil, WrapConnection(op, ErrDaemonUninitialized)
+	if d == nil {
+		return nil, WrapConnection("Daemon.GetKnownNetworks", ErrDaemonUninitialized)
 	}
-
-	objects, err := getManagedObjects(ctx, d.conn, IwdService)
-	if err != nil {
-		return nil, WrapIntrospection(DBusObjectManagerGetManagedObjects, err)
-	}
-	refs := make([]KnownNetworkRef, 0, len(objects))
-	for path, ifaces := range objects {
-		props, ok := ifaces[IwdKnownNetworkIface]
-		if !ok {
-			continue
-		}
-
-		name, err := objectNameFromManagedObject("known network", path, props)
-		if err != nil {
-			return nil, err
-		}
-
-		refs = append(refs, KnownNetworkRef{Path: path, Name: name})
-	}
-
-	sort.Slice(refs, func(i, j int) bool {
-		return string(refs[i].Path) < string(refs[j].Path)
-	})
-
-	return refs, nil
+	return getRefs(ctx, d.conn, "Daemon.GetKnownNetworks", IwdKnownNetworkIface,
+		func(path dbus.ObjectPath, props map[string]dbus.Variant) (KnownNetworkRef, error) {
+			name, err := objectNameFromManagedObject("known network", path, props)
+			if err != nil {
+				return KnownNetworkRef{}, err
+			}
+			return KnownNetworkRef{Path: path, Name: name}, nil
+		})
 }
 
 // objectNameFromManagedObject validates an object path and extracts its required
