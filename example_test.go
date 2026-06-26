@@ -298,6 +298,67 @@ func ExampleNetwork_ExtendedServiceSet() {
 	}
 }
 
+// ExampleClient_KnownNetwork discovers a saved (known) network and reads its
+// properties.
+func ExampleClient_KnownNetwork() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	refs, err := client.Daemon().KnownNetworks(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no known networks found")
+	}
+
+	known, err := client.KnownNetwork(ctx, refs[0].Path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	props, err := known.Properties(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s type=%s autoConnect=%t\n", props.Name, props.Type, props.AutoConnect)
+}
+
+// ExampleKnownNetwork_SetAutoConnect disables automatic connection for a saved
+// network without forgetting it.
+func ExampleKnownNetwork_SetAutoConnect() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	refs, err := client.Daemon().KnownNetworks(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no known networks found")
+	}
+
+	known, err := client.KnownNetwork(ctx, refs[0].Path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := known.SetAutoConnect(ctx, false); err != nil {
+		log.Fatal(err)
+	}
+	// Use known.Forget(ctx) to remove the saved network entirely.
+}
+
 // ExampleClient_AllAdapters constructs a handle for every adapter iwd exposes
 // and reports each one's powered state.
 func ExampleClient_AllAdapters() {

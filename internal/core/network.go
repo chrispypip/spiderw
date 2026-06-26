@@ -13,26 +13,29 @@ import (
 	"github.com/chrispypip/spiderw/internal/iwdvalue"
 )
 
-// SecurityType identifies a network security type.
-type SecurityType = iwdvalue.SecurityType
+// NetworkType identifies an iwd network type.
+type NetworkType = iwdvalue.NetworkType
 
-// SecurityType constants identify canonical iwd network security types.
-// SecurityTypeUnknown is reserved for invalid or unrecognized values.
+// NetworkType constants identify canonical iwd network types.
+// NetworkTypeUnknown is reserved for invalid or unrecognized values.
 const (
-	// SecurityTypeUnknown represents an invalid or unrecognized security type.
-	SecurityTypeUnknown = iwdvalue.SecurityTypeUnknown
+	// NetworkTypeUnknown represents an invalid or unrecognized network type.
+	NetworkTypeUnknown = iwdvalue.NetworkTypeUnknown
 
-	// SecurityTypeOpen is an open (unsecured) network.
-	SecurityTypeOpen = iwdvalue.SecurityTypeOpen
+	// NetworkTypeOpen is an open (unsecured) network.
+	NetworkTypeOpen = iwdvalue.NetworkTypeOpen
 
-	// SecurityTypeWEP is a WEP network.
-	SecurityTypeWEP = iwdvalue.SecurityTypeWEP
+	// NetworkTypeWEP is a WEP network.
+	NetworkTypeWEP = iwdvalue.NetworkTypeWEP
 
-	// SecurityTypePSK is a pre-shared-key (WPA-Personal) network.
-	SecurityTypePSK = iwdvalue.SecurityTypePSK
+	// NetworkTypePSK is a pre-shared-key (WPA-Personal) network.
+	NetworkTypePSK = iwdvalue.NetworkTypePSK
 
-	// SecurityType8021x is an 802.1x (EAP) network.
-	SecurityType8021x = iwdvalue.SecurityType8021x
+	// NetworkType8021x is an 802.1x (EAP) network.
+	NetworkType8021x = iwdvalue.NetworkType8021x
+
+	// NetworkTypeHotspot is a hotspot network (reported only for a KnownNetwork).
+	NetworkTypeHotspot = iwdvalue.NetworkTypeHotspot
 )
 
 // NetworkPropertiesChanged describes normalized network property-change data.
@@ -48,7 +51,7 @@ type networkRaw interface {
 	GetName(ctx context.Context) (string, error)
 	GetConnected(ctx context.Context) (bool, error)
 	GetDevice(ctx context.Context) (dbus.ObjectPath, error)
-	GetType(ctx context.Context) (iwdbus.SecurityType, error)
+	GetType(ctx context.Context) (iwdbus.NetworkType, error)
 	GetKnownNetwork(ctx context.Context) (*string, error)
 	GetExtendedServiceSet(ctx context.Context) ([]string, error)
 	GetProperties(ctx context.Context) (*iwdbus.NetworkProperties, error)
@@ -62,7 +65,7 @@ type NetworkIface interface {
 	Name(ctx context.Context) (string, error)
 	Connected(ctx context.Context) (bool, error)
 	Device(ctx context.Context) (string, error)
-	Type(ctx context.Context) (SecurityType, error)
+	Type(ctx context.Context) (NetworkType, error)
 	KnownNetwork(ctx context.Context) (*string, error)
 	ExtendedServiceSet(ctx context.Context) ([]string, error)
 	Properties(ctx context.Context) (*NetworkProperties, error)
@@ -78,7 +81,7 @@ type NetworkProperties struct {
 	Name               string
 	Connected          bool
 	Device             string
-	Type               SecurityType
+	Type               NetworkType
 	KnownNetwork       *string
 	ExtendedServiceSet []string
 }
@@ -164,21 +167,21 @@ func (n *Network) Device(ctx context.Context) (string, error) {
 	return path, nil
 }
 
-// Type returns the normalized network security type.
-func (n *Network) Type(ctx context.Context) (SecurityType, error) {
+// Type returns the normalized network type.
+func (n *Network) Type(ctx context.Context) (NetworkType, error) {
 	const op = "Network.Type"
 
 	rawNetwork, err := n.rawNetwork(op)
 	if err != nil {
-		return SecurityTypeUnknown, err
+		return NetworkTypeUnknown, err
 	}
 
 	raw, err := rawNetwork.GetType(ctx)
 	if err != nil {
-		return SecurityTypeUnknown, WrapNetworkUnavailable(op, "failed querying iwd Network type", err)
+		return NetworkTypeUnknown, WrapNetworkUnavailable(op, "failed querying iwd Network type", err)
 	}
 
-	return validateSecurityType(op, raw)
+	return validateNetworkType(ResourceNetwork, op, raw)
 }
 
 // KnownNetwork returns the object path of the network's known-network record, or
@@ -196,7 +199,7 @@ func (n *Network) KnownNetwork(ctx context.Context) (*string, error) {
 		return nil, WrapNetworkUnavailable(op, "failed querying iwd Network known-network", err)
 	}
 
-	return normalizeOptionalPath(raw), nil
+	return normalizeOptionalString(raw), nil
 }
 
 // ExtendedServiceSet returns the object paths of the basic service sets (BSSes)
@@ -262,7 +265,7 @@ func (n *Network) Properties(ctx context.Context) (*NetworkProperties, error) {
 		return nil, WrapInvalidState(ResourceNetwork, op, "network returned empty Device", fmt.Errorf("missing or invalid Device field"))
 	}
 
-	secType, err := validateSecurityType(op, raw.Type)
+	secType, err := validateNetworkType(ResourceNetwork, op, raw.Type)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +280,7 @@ func (n *Network) Properties(ctx context.Context) (*NetworkProperties, error) {
 		Connected:          raw.Connected,
 		Device:             device,
 		Type:               secType,
-		KnownNetwork:       normalizeOptionalPath(raw.KnownNetwork),
+		KnownNetwork:       normalizeOptionalString(raw.KnownNetwork),
 		ExtendedServiceSet: ess,
 	}, nil
 }
@@ -335,19 +338,19 @@ func (n *Network) SubscribeConnectedChanged(ctx context.Context, fn func(bool)) 
 	return UnsubscribeFunc(unsub), nil
 }
 
-// validateSecurityType ensures the backend reported a recognized iwd security
+// validateNetworkType ensures the backend reported a recognized iwd network
 // type, treating an unknown value as invalid state.
-func validateSecurityType(op string, t iwdbus.SecurityType) (SecurityType, error) {
-	if !iwdvalue.ValidSecurityType(t) {
-		details := fmt.Sprintf("network reported unknown security type %q", t)
-		return SecurityTypeUnknown, WrapInvalidState(ResourceNetwork, op, details, fmt.Errorf("missing or invalid Type field"))
+func validateNetworkType(resource Resource, op string, t iwdbus.NetworkType) (NetworkType, error) {
+	if !iwdvalue.ValidNetworkType(t) {
+		details := fmt.Sprintf("network reported unknown type %q", t)
+		return NetworkTypeUnknown, WrapInvalidState(resource, op, details, fmt.Errorf("missing or invalid Type field"))
 	}
 	return t, nil
 }
 
-// normalizeOptionalPath trims an optional object path, returning nil when the
+// normalizeOptionalString trims an optional string, returning nil when the
 // value is absent or blank after trimming.
-func normalizeOptionalPath(p *string) *string {
+func normalizeOptionalString(p *string) *string {
 	if p == nil {
 		return nil
 	}

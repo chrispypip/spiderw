@@ -1,0 +1,83 @@
+//go:build stress
+
+package spiderw
+
+import (
+	"context"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestStress_Public_KnownNetwork_MixedMethods(t *testing.T) {
+	known := newTestKnownNetwork(t)
+
+	const N = 6000
+	var wg sync.WaitGroup
+
+	for i := range N {
+		wg.Go(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			switch i % 8 {
+			case 0:
+				_, _ = known.Name(ctx)
+			case 1:
+				_, _ = known.Type(ctx)
+			case 2:
+				_, _ = known.Hidden(ctx)
+			case 3:
+				_, _ = known.LastConnectedTime(ctx)
+			case 4:
+				_, _ = known.AutoConnect(ctx)
+			case 5:
+				_ = known.SetAutoConnect(ctx, i%2 == 0)
+			case 6:
+				_, _ = known.Properties(ctx)
+			case 7:
+				_ = known.Forget(ctx)
+			}
+		})
+	}
+
+	wg.Wait()
+}
+
+func TestStress_Public_KnownNetwork_SubscribeAutoConnectChanged_Fanout(t *testing.T) {
+	known := newTestKnownNetwork(t)
+
+	fn := known.core.(*fakeCoreKnownNetwork)
+	fn.setAutoConnectEvent(true)
+
+	const N = 4000
+	var wg sync.WaitGroup
+
+	for range N {
+		wg.Go(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			_, err := known.SubscribeAutoConnectChanged(ctx, func(bool) {})
+			require.NoError(t, err)
+		})
+	}
+
+	wg.Wait()
+}
+
+func TestStress_Public_KnownNetwork_Nil(t *testing.T) {
+	var k *KnownNetwork
+
+	const N = 1000
+	var wg sync.WaitGroup
+
+	for range N {
+		wg.Go(func() {
+			_, _ = k.AutoConnect(context.Background())
+		})
+	}
+
+	wg.Wait()
+}

@@ -531,3 +531,93 @@ func (c *Client) AllNetworks(ctx context.Context) ([]*Network, error) {
 
 	return networks, nil
 }
+
+// KnownNetwork creates a KnownNetwork wrapper for a specific iwd known-network
+// object path.
+//
+// Use Daemon.KnownNetworks to discover valid known-network paths.
+func (c *Client) KnownNetwork(ctx context.Context, path string) (*KnownNetwork, error) {
+	const op = "Client.KnownNetwork"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op, "path", path)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	coreKnownNetwork, err := c.wire.NewKnownNetwork(ctx, path)
+	if err != nil {
+		log.Error(ctx, "known network wiring failed", "op", op, "path", path, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	pub := newKnownNetwork(coreKnownNetwork, path)
+	if pub == nil {
+		log.Error(ctx, "known network wrapper unexpectedly nil", "op", op, "path", path)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+	return pub, nil
+}
+
+// AllKnownNetworks mints live KnownNetwork handles for every known network iwd
+// currently exposes.
+//
+// It enumerates known networks via the daemon, then constructs a handle for each,
+// preserving the daemon's enumeration order. Use KnownNetwork to obtain a single
+// known network by path, or Daemon.KnownNetworks for lightweight references
+// without constructing handles.
+func (c *Client) AllKnownNetworks(ctx context.Context) ([]*KnownNetwork, error) {
+	const op = "Client.AllKnownNetworks"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil || c.daemon == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	// Enumeration is the daemon's job; construction is the client's.
+	refs, err := c.daemon.KnownNetworks(ctx)
+	if err != nil {
+		log.Error(ctx, "known network enumeration failed", "op", op, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	known := make([]*KnownNetwork, 0, len(refs))
+	for _, ref := range refs {
+		coreKnownNetwork, err := c.wire.NewKnownNetwork(ctx, ref.Path)
+		if err != nil {
+			log.Error(ctx, "known network wiring failed", "op", op, "path", ref.Path, "err", err)
+			return nil, wrapPublicError(op, err)
+		}
+		pub := newKnownNetwork(coreKnownNetwork, ref.Path)
+		if pub == nil {
+			log.Error(ctx, "known network wrapper unexpectedly nil", "op", op, "path", ref.Path)
+			return nil, wrapPublicError(op, ErrInternal)
+		}
+		known = append(known, pub)
+	}
+
+	return known, nil
+}

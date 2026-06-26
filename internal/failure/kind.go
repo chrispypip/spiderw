@@ -68,6 +68,10 @@ const (
 
 	// ResourceNetwork identifies failures involving an iwd network object.
 	ResourceNetwork Resource = "network"
+
+	// ResourceKnownNetwork identifies failures involving an iwd known-network
+	// object.
+	ResourceKnownNetwork Resource = "known network"
 )
 
 // String returns the stable resource label.

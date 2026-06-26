@@ -12,26 +12,29 @@ import (
 // IwdNetworkIface is the fully qualified D-Bus interface name for iwd networks.
 const IwdNetworkIface = IwdService + ".Network"
 
-// SecurityType identifies a raw iwd network security type.
-type SecurityType = iwdvalue.SecurityType
+// NetworkType identifies a raw iwd network type.
+type NetworkType = iwdvalue.NetworkType
 
-// SecurityType constants identify raw iwd network security types.
-// SecurityTypeUnknown is reserved for invalid or unrecognized values.
+// NetworkType constants identify raw iwd network types.
+// NetworkTypeUnknown is reserved for invalid or unrecognized values.
 const (
-	// SecurityTypeUnknown represents an invalid or unrecognized security type.
-	SecurityTypeUnknown = iwdvalue.SecurityTypeUnknown
+	// NetworkTypeUnknown represents an invalid or unrecognized network type.
+	NetworkTypeUnknown = iwdvalue.NetworkTypeUnknown
 
-	// SecurityTypeOpen is an open (unsecured) network.
-	SecurityTypeOpen = iwdvalue.SecurityTypeOpen
+	// NetworkTypeOpen is an open (unsecured) network.
+	NetworkTypeOpen = iwdvalue.NetworkTypeOpen
 
-	// SecurityTypeWEP is a WEP network.
-	SecurityTypeWEP = iwdvalue.SecurityTypeWEP
+	// NetworkTypeWEP is a WEP network.
+	NetworkTypeWEP = iwdvalue.NetworkTypeWEP
 
-	// SecurityTypePSK is a pre-shared-key (WPA-Personal) network.
-	SecurityTypePSK = iwdvalue.SecurityTypePSK
+	// NetworkTypePSK is a pre-shared-key (WPA-Personal) network.
+	NetworkTypePSK = iwdvalue.NetworkTypePSK
 
-	// SecurityType8021x is an 802.1x (EAP) network.
-	SecurityType8021x = iwdvalue.SecurityType8021x
+	// NetworkType8021x is an 802.1x (EAP) network.
+	NetworkType8021x = iwdvalue.NetworkType8021x
+
+	// NetworkTypeHotspot is a hotspot network (reported only for a KnownNetwork).
+	NetworkTypeHotspot = iwdvalue.NetworkTypeHotspot
 )
 
 // NetworkPropertiesChanged describes raw D-Bus network property-change data.
@@ -117,17 +120,17 @@ func (n *Network) GetDevice(ctx context.Context) (dbus.ObjectPath, error) {
 	return parseNetworkObjectPath("Device", value)
 }
 
-// GetType reads and parses the Type (security) property.
-func (n *Network) GetType(ctx context.Context) (SecurityType, error) {
+// GetType reads and parses the Type (network type) property.
+func (n *Network) GetType(ctx context.Context) (NetworkType, error) {
 	if err := n.ensureInitialized(); err != nil {
-		return SecurityTypeUnknown, WrapConnection("Network.ensureInitialized", err)
+		return NetworkTypeUnknown, WrapConnection("Network.ensureInitialized", err)
 	}
 
 	value, err := n.call.GetProperty(ctx, IwdNetworkIface, "Type")
 	if err != nil {
-		return SecurityTypeUnknown, WrapProperty(IwdNetworkIface, "Type", err)
+		return NetworkTypeUnknown, WrapProperty(IwdNetworkIface, "Type", err)
 	}
-	return parseSecurityType(value)
+	return parseNetworkType(value)
 }
 
 // GetKnownNetwork reads the optional KnownNetwork property, the object path of
@@ -186,7 +189,7 @@ type NetworkProperties struct {
 	Name               string
 	Connected          bool
 	Device             dbus.ObjectPath
-	Type               SecurityType
+	Type               NetworkType
 	KnownNetwork       *string
 	ExtendedServiceSet []string
 }
@@ -242,7 +245,7 @@ func (n *Network) GetProperties(ctx context.Context) (*NetworkProperties, error)
 	if !ok {
 		return nil, WrapProperty(IwdNetworkIface, "Type", fmt.Errorf("missing required property"))
 	}
-	secType, err := parseSecurityType(typeV.Value())
+	secType, err := parseNetworkType(typeV.Value())
 	if err != nil {
 		return nil, err
 	}
@@ -352,15 +355,15 @@ func (n *Network) ensureInitialized() error {
 	return nil
 }
 
-// parseSecurityType normalizes the D-Bus Type value into a SecurityType.
-func parseSecurityType(v interface{}) (SecurityType, error) {
+// parseNetworkType normalizes the D-Bus Type value into a NetworkType.
+func parseNetworkType(v interface{}) (NetworkType, error) {
 	s, ok := v.(string)
 	if !ok {
-		return SecurityTypeUnknown, WrapVariant("Type", fmt.Errorf("expected string, got %T", v))
+		return NetworkTypeUnknown, WrapVariant("Type", fmt.Errorf("expected string, got %T", v))
 	}
-	secType, ok := iwdvalue.ParseSecurityType(s)
+	secType, ok := iwdvalue.ParseNetworkType(s)
 	if !ok {
-		return SecurityTypeUnknown, WrapVariant("Type", fmt.Errorf("invalid security type %q", s))
+		return NetworkTypeUnknown, WrapVariant("Type", fmt.Errorf("invalid network type %q", s))
 	}
 	return secType, nil
 }

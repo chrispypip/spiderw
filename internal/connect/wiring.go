@@ -13,19 +13,23 @@ import (
 )
 
 var (
-	connectSystemBusFn  = dbus.ConnectSystemBus
-	connectSessionBusFn = dbus.ConnectSessionBus
-	newIwdDaemonFn      = iwdbus.NewDaemon
-	newIwdAdapterFn     = iwdbus.NewAdapter
-	newIwdDeviceFn      = iwdbus.NewDevice
-	newIwdBSSFn         = iwdbus.NewBasicServiceSet
-	newIwdNetworkFn     = iwdbus.NewNetwork
-	newCoreDaemonFn     = func(raw *iwdbus.Daemon) *core.Daemon { return core.NewDaemon(raw) }
-	newCoreAdapterFn    = func(raw *iwdbus.Adapter) *core.Adapter { return core.NewAdapter(raw) }
-	newCoreDeviceFn     = func(raw *iwdbus.Device) *core.Device { return core.NewDevice(raw) }
-	newCoreBSSFn        = func(raw *iwdbus.BasicServiceSet) *core.BasicServiceSet { return core.NewBasicServiceSet(raw) }
-	newCoreNetworkFn    = func(raw *iwdbus.Network) *core.Network { return core.NewNetwork(raw) }
-	closeConnFn         = func(c *dbus.Conn) error { return c.Close() }
+	connectSystemBusFn    = dbus.ConnectSystemBus
+	connectSessionBusFn   = dbus.ConnectSessionBus
+	newIwdDaemonFn        = iwdbus.NewDaemon
+	newIwdAdapterFn       = iwdbus.NewAdapter
+	newIwdDeviceFn        = iwdbus.NewDevice
+	newIwdBSSFn           = iwdbus.NewBasicServiceSet
+	newIwdNetworkFn       = iwdbus.NewNetwork
+	newIwdKnownNetworkFn  = iwdbus.NewKnownNetwork
+	newCoreDaemonFn       = func(raw *iwdbus.Daemon) *core.Daemon { return core.NewDaemon(raw) }
+	newCoreAdapterFn      = func(raw *iwdbus.Adapter) *core.Adapter { return core.NewAdapter(raw) }
+	newCoreDeviceFn       = func(raw *iwdbus.Device) *core.Device { return core.NewDevice(raw) }
+	newCoreBSSFn          = func(raw *iwdbus.BasicServiceSet) *core.BasicServiceSet { return core.NewBasicServiceSet(raw) }
+	newCoreNetworkFn      = func(raw *iwdbus.Network) *core.Network { return core.NewNetwork(raw) }
+	newCoreKnownNetworkFn = func(raw *iwdbus.KnownNetwork) *core.KnownNetwork {
+		return core.NewKnownNetwork(raw)
+	}
+	closeConnFn = func(c *dbus.Conn) error { return c.Close() }
 )
 
 func newConn(ctx context.Context, system bool) (*Wiring, error) {
@@ -102,6 +106,10 @@ type Wiring struct {
 
 	// NetworkFactory optionally overrides network construction for tests.
 	NetworkFactory func(ctx context.Context, path string) (core.NetworkIface, error)
+
+	// KnownNetworkFactory optionally overrides known-network construction for
+	// tests.
+	KnownNetworkFactory func(ctx context.Context, path string) (core.KnownNetworkIface, error)
 }
 
 // NewAdapter constructs a core adapter wrapper for the given iwd object path.
@@ -242,4 +250,40 @@ func (w *Wiring) NewNetwork(ctx context.Context, path string) (core.NetworkIface
 		return nil, core.WrapNetworkUnavailable(op, "network unavailable", fmt.Errorf("core network interface not available"))
 	}
 	return coreNetwork, nil
+}
+
+// NewKnownNetwork constructs a core known-network wrapper for the given iwd
+// object path.
+func (w *Wiring) NewKnownNetwork(ctx context.Context, path string) (core.KnownNetworkIface, error) {
+	const op = "NewKnownNetwork"
+
+	if w == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "wiring cannot be nil", core.ErrCore)
+	}
+	if path == "" {
+		return nil, core.WrapInvalidArgument(core.ResourceKnownNetwork, op, "known network path cannot be empty", core.ErrCore)
+	}
+	if path[0] != '/' {
+		return nil, core.WrapInvalidArgument(core.ResourceKnownNetwork, op, "known network path must be absolute", core.ErrCore)
+	}
+	if w.KnownNetworkFactory != nil {
+		return w.KnownNetworkFactory(ctx, path)
+	}
+	if w.Conn == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "D-Bus conn cannot be nil", core.ErrCore)
+	}
+
+	iwdKnownNetwork, err := newIwdKnownNetworkFn(ctx, w.Conn, dbus.ObjectPath(path))
+	if err != nil {
+		return nil, core.WrapKnownNetworkUnavailable(op, "known network unavailable", err)
+	}
+	if iwdKnownNetwork == nil {
+		return nil, core.WrapKnownNetworkUnavailable(op, "known network unavailable", iwdbus.WrapIntrospection(path, fmt.Errorf("iwd known network interface not available")))
+	}
+
+	coreKnownNetwork := newCoreKnownNetworkFn(iwdKnownNetwork)
+	if coreKnownNetwork == nil {
+		return nil, core.WrapKnownNetworkUnavailable(op, "known network unavailable", fmt.Errorf("core known network interface not available"))
+	}
+	return coreKnownNetwork, nil
 }

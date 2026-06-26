@@ -24,7 +24,7 @@ func TestNetwork(t *testing.T) {
 		n := newNetwork((&fakeCoreNetwork{}).setProps(core.NetworkProperties{
 			Name:               "OpenNet",
 			Device:             "/net/connman/iwd/phy0/wlan0",
-			Type:               core.SecurityTypeOpen,
+			Type:               core.NetworkTypeOpen,
 			ExtendedServiceSet: []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"},
 		}), "/net/connman/iwd/phy0/wlan0/open")
 		require.NotNil(t, n)
@@ -32,12 +32,12 @@ func TestNetwork(t *testing.T) {
 
 		secType, err := n.Type(ctx)
 		require.NoError(t, err)
-		require.Equal(t, SecurityTypeOpen, secType)
+		require.Equal(t, NetworkTypeOpen, secType)
 
 		props, err := n.Properties(ctx)
 		require.NoError(t, err)
 		require.Equal(t, "OpenNet", props.Name)
-		require.Equal(t, SecurityTypeOpen, props.Type)
+		require.Equal(t, NetworkTypeOpen, props.Type)
 		require.Equal(t, []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"}, props.ExtendedServiceSet)
 	})
 

@@ -23,6 +23,7 @@ func TestHelp_ListsCommands(t *testing.T) {
 		{"device", []string{"Usage:", "spiderw device", "Commands:", "list", "status", "<device> status", "powered", "mode", "address", "adapter", "monitor"}},
 		{"bss", []string{"Usage:", "spiderw bss", "Commands:", "list", "status", "<bss> status", "<bss> address"}},
 		{"network", []string{"Usage:", "spiderw network", "Commands:", "list", "status", "<network> connect", "connected", "type", "bsses", "monitor"}},
+		{"known-network", []string{"Usage:", "spiderw known-network", "Commands:", "list", "status", "autoconnect", "forget", "last-connected", "monitor"}},
 	}
 
 	for _, tc := range cases {

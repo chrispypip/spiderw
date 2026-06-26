@@ -40,6 +40,10 @@ var (
 	// initialization.
 	ErrNetworkUninitialized = errors.New("network is not initialized")
 
+	// ErrKnownNetworkUninitialized indicates that a KnownNetwork was used before
+	// initialization.
+	ErrKnownNetworkUninitialized = errors.New("known network is not initialized")
+
 	// ErrNoAgent indicates that iwd rejected an operation because no credentials
 	// agent is registered. Connecting to a secured network that is not already
 	// known requires a registered agent to supply credentials.

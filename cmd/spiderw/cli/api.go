@@ -19,10 +19,12 @@ type clientAPI interface {
 	Device(ctx context.Context, path string) (deviceAPI, error)
 	BasicServiceSet(ctx context.Context, path string) (bssAPI, error)
 	Network(ctx context.Context, path string) (networkAPI, error)
+	KnownNetwork(ctx context.Context, path string) (knownNetworkAPI, error)
 	AllAdapters(ctx context.Context) ([]adapterAPI, error)
 	AllDevices(ctx context.Context) ([]deviceAPI, error)
 	AllBasicServiceSets(ctx context.Context) ([]bssAPI, error)
 	AllNetworks(ctx context.Context) ([]networkAPI, error)
+	AllKnownNetworks(ctx context.Context) ([]knownNetworkAPI, error)
 	Close() error
 }
 
@@ -35,6 +37,7 @@ type daemonAPI interface {
 	Devices(ctx context.Context) ([]spiderw.DeviceRef, error)
 	BasicServiceSets(ctx context.Context) ([]spiderw.BasicServiceSetRef, error)
 	Networks(ctx context.Context) ([]spiderw.NetworkRef, error)
+	KnownNetworks(ctx context.Context) ([]spiderw.KnownNetworkRef, error)
 }
 
 type adapterAPI interface {
@@ -78,12 +81,25 @@ type networkAPI interface {
 	Name(ctx context.Context) (string, error)
 	Connected(ctx context.Context) (bool, error)
 	Device(ctx context.Context) (string, error)
-	Type(ctx context.Context) (spiderw.SecurityType, error)
+	Type(ctx context.Context) (spiderw.NetworkType, error)
 	KnownNetwork(ctx context.Context) (*string, error)
 	ExtendedServiceSet(ctx context.Context) ([]string, error)
 	Connect(ctx context.Context) error
 	Properties(ctx context.Context) (*spiderw.NetworkProperties, error)
 	SubscribeConnectedChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
+}
+
+type knownNetworkAPI interface {
+	Path() string
+	Name(ctx context.Context) (string, error)
+	Type(ctx context.Context) (spiderw.NetworkType, error)
+	Hidden(ctx context.Context) (bool, error)
+	LastConnectedTime(ctx context.Context) (*string, error)
+	AutoConnect(ctx context.Context) (bool, error)
+	SetAutoConnect(ctx context.Context, autoConnect bool) error
+	Forget(ctx context.Context) error
+	Properties(ctx context.Context) (*spiderw.KnownNetworkProperties, error)
+	SubscribeAutoConnectChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
 }
 
 // realClient adapts a concrete *spiderw.Client to clientAPI, converting the
@@ -132,6 +148,14 @@ func (r realClient) Network(ctx context.Context, path string) (networkAPI, error
 	return n, err
 }
 
+func (r realClient) KnownNetwork(ctx context.Context, path string) (knownNetworkAPI, error) {
+	k, err := r.c.KnownNetwork(ctx, path)
+	if k == nil {
+		return nil, err
+	}
+	return k, err
+}
+
 func (r realClient) AllAdapters(ctx context.Context) ([]adapterAPI, error) {
 	as, err := r.c.AllAdapters(ctx)
 	if err != nil {
@@ -176,6 +200,18 @@ func (r realClient) AllNetworks(ctx context.Context) ([]networkAPI, error) {
 	out := make([]networkAPI, 0, len(ns))
 	for _, n := range ns {
 		out = append(out, n)
+	}
+	return out, nil
+}
+
+func (r realClient) AllKnownNetworks(ctx context.Context) ([]knownNetworkAPI, error) {
+	ks, err := r.c.AllKnownNetworks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]knownNetworkAPI, 0, len(ks))
+	for _, k := range ks {
+		out = append(out, k)
 	}
 	return out, nil
 }

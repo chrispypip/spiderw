@@ -10,13 +10,14 @@ import (
 	"github.com/chrispypip/spiderw/internal/iwdbus"
 )
 
-// StartSignalFirehose starts background mock daemon, adapter, device, and
-// network signal emitters.
+// StartSignalFirehose starts background mock daemon, adapter, device, network,
+// and known-network signal emitters.
 func StartSignalFirehose() {
 	go firehoseDaemonSignals()
 	go firehoseAdapterSignals()
 	go firehoseDeviceSignals()
 	go firehoseNetworkSignals()
+	go firehoseKnownNetworkSignals()
 }
 
 func firehoseDaemonSignals() {
@@ -74,6 +75,22 @@ func firehoseNetworkSignals() {
 			iwdbus.IwdNetworkIface,
 			map[string]dbus.Variant{
 				"Connected": dbus.MakeVariant(rand.Intn(2) == 0),
+			},
+			[]string{},
+		)
+		time.Sleep(3 * time.Millisecond)
+	}
+}
+
+func firehoseKnownNetworkSignals() {
+	// Emit AutoConnect toggles on the first known network so subscribers see churn.
+	knownNetworkPath := dbus.ObjectPath("/net/connman/iwd/known_networks/1")
+	for {
+		emitPropertiesChanged(
+			knownNetworkPath,
+			iwdbus.IwdKnownNetworkIface,
+			map[string]dbus.Variant{
+				"AutoConnect": dbus.MakeVariant(rand.Intn(2) == 0),
 			},
 			[]string{},
 		)

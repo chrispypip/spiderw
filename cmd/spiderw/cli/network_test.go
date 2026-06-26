@@ -24,7 +24,7 @@ func fakeWithNetwork() *fakeClient {
 		props: &spiderw.NetworkProperties{
 			Name:               "OpenNet",
 			Device:             "/net/connman/iwd/phy0/wlan0",
-			Type:               spiderw.SecurityTypeOpen,
+			Type:               spiderw.NetworkTypeOpen,
 			ExtendedServiceSet: []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff", "/net/connman/iwd/phy0/wlan0/bbccddeeff00"},
 		},
 	}
@@ -33,7 +33,7 @@ func fakeWithNetwork() *fakeClient {
 		props: &spiderw.NetworkProperties{
 			Name:         "KnownNet",
 			Device:       "/net/connman/iwd/phy0/wlan0",
-			Type:         spiderw.SecurityTypePSK,
+			Type:         spiderw.NetworkTypePSK,
 			KnownNetwork: &known,
 		},
 	}
@@ -42,7 +42,7 @@ func fakeWithNetwork() *fakeClient {
 		props: &spiderw.NetworkProperties{
 			Name:   "SecuredNet",
 			Device: "/net/connman/iwd/phy0/wlan0",
-			Type:   spiderw.SecurityTypePSK,
+			Type:   spiderw.NetworkTypePSK,
 		},
 		connectErr: errors.New("no credentials agent registered"),
 	}

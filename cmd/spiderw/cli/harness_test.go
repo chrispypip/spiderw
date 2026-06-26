@@ -15,24 +15,28 @@ import (
 // a D-Bus connection or the iwd mock.
 
 type fakeClient struct {
-	daemon       daemonAPI
-	adapters     map[string]adapterAPI // keyed by Path
-	devices      map[string]deviceAPI  // keyed by Path
-	bsses        map[string]bssAPI     // keyed by Path
-	networks     map[string]networkAPI // keyed by Path
-	adapterErr   error                 // returned by Adapter(...)
-	deviceErr    error                 // returned by Device(...)
-	bssErr       error                 // returned by BasicServiceSet(...)
-	networkErr   error                 // returned by Network(...)
-	allAdapters  []adapterAPI
-	allDevices   []deviceAPI
-	allBSSes     []bssAPI
-	allNetworks  []networkAPI
-	allAdaptErr  error
-	allDeviceErr error
-	allBSSErr    error
-	allNetErr    error
-	closed       bool
+	daemon        daemonAPI
+	adapters      map[string]adapterAPI      // keyed by Path
+	devices       map[string]deviceAPI       // keyed by Path
+	bsses         map[string]bssAPI          // keyed by Path
+	networks      map[string]networkAPI      // keyed by Path
+	knownNetworks map[string]knownNetworkAPI // keyed by Path
+	adapterErr    error                      // returned by Adapter(...)
+	deviceErr     error                      // returned by Device(...)
+	bssErr        error                      // returned by BasicServiceSet(...)
+	networkErr    error                      // returned by Network(...)
+	knownNetErr   error                      // returned by KnownNetwork(...)
+	allAdapters   []adapterAPI
+	allDevices    []deviceAPI
+	allBSSes      []bssAPI
+	allNetworks   []networkAPI
+	allKnownNets  []knownNetworkAPI
+	allAdaptErr   error
+	allDeviceErr  error
+	allBSSErr     error
+	allNetErr     error
+	allKnownErr   error
+	closed        bool
 }
 
 func (f *fakeClient) Daemon() daemonAPI { return f.daemon }
@@ -65,6 +69,13 @@ func (f *fakeClient) Network(_ context.Context, path string) (networkAPI, error)
 	return f.networks[path], nil
 }
 
+func (f *fakeClient) KnownNetwork(_ context.Context, path string) (knownNetworkAPI, error) {
+	if f.knownNetErr != nil {
+		return nil, f.knownNetErr
+	}
+	return f.knownNetworks[path], nil
+}
+
 func (f *fakeClient) AllAdapters(context.Context) ([]adapterAPI, error) {
 	return f.allAdapters, f.allAdaptErr
 }
@@ -81,18 +92,23 @@ func (f *fakeClient) AllNetworks(context.Context) ([]networkAPI, error) {
 	return f.allNetworks, f.allNetErr
 }
 
+func (f *fakeClient) AllKnownNetworks(context.Context) ([]knownNetworkAPI, error) {
+	return f.allKnownNets, f.allKnownErr
+}
+
 func (f *fakeClient) Close() error {
 	f.closed = true
 	return nil
 }
 
 type fakeDaemon struct {
-	info     *spiderw.DaemonInfo
-	adapters []spiderw.AdapterRef
-	devices  []spiderw.DeviceRef
-	bsses    []spiderw.BasicServiceSetRef
-	networks []spiderw.NetworkRef
-	err      error
+	info          *spiderw.DaemonInfo
+	adapters      []spiderw.AdapterRef
+	devices       []spiderw.DeviceRef
+	bsses         []spiderw.BasicServiceSetRef
+	networks      []spiderw.NetworkRef
+	knownNetworks []spiderw.KnownNetworkRef
+	err           error
 }
 
 func (f *fakeDaemon) Info(context.Context) (*spiderw.DaemonInfo, error) {
@@ -134,6 +150,10 @@ func (f *fakeDaemon) BasicServiceSets(context.Context) ([]spiderw.BasicServiceSe
 
 func (f *fakeDaemon) Networks(context.Context) ([]spiderw.NetworkRef, error) {
 	return f.networks, f.err
+}
+
+func (f *fakeDaemon) KnownNetworks(context.Context) ([]spiderw.KnownNetworkRef, error) {
+	return f.knownNetworks, f.err
 }
 
 type fakeAdapter struct {
@@ -336,9 +356,9 @@ func (f *fakeNetwork) Device(context.Context) (string, error) {
 	return f.props.Device, nil
 }
 
-func (f *fakeNetwork) Type(context.Context) (spiderw.SecurityType, error) {
+func (f *fakeNetwork) Type(context.Context) (spiderw.NetworkType, error) {
 	if f.err != nil {
-		return spiderw.SecurityTypeUnknown, f.err
+		return spiderw.NetworkTypeUnknown, f.err
 	}
 	return f.props.Type, nil
 }
@@ -370,6 +390,70 @@ func (f *fakeNetwork) Properties(context.Context) (*spiderw.NetworkProperties, e
 }
 
 func (f *fakeNetwork) SubscribeConnectedChanged(context.Context, func(bool)) (spiderw.UnsubscribeFunc, error) {
+	return func() error { return nil }, f.err
+}
+
+type fakeKnownNetwork struct {
+	path      string
+	props     *spiderw.KnownNetworkProperties
+	forgetErr error
+	err       error
+}
+
+func (f *fakeKnownNetwork) Path() string { return f.path }
+
+func (f *fakeKnownNetwork) Name(context.Context) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.props.Name, nil
+}
+
+func (f *fakeKnownNetwork) Type(context.Context) (spiderw.NetworkType, error) {
+	if f.err != nil {
+		return spiderw.NetworkTypeUnknown, f.err
+	}
+	return f.props.Type, nil
+}
+
+func (f *fakeKnownNetwork) Hidden(context.Context) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.props.Hidden, nil
+}
+
+func (f *fakeKnownNetwork) LastConnectedTime(context.Context) (*string, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.props.LastConnectedTime, nil
+}
+
+func (f *fakeKnownNetwork) AutoConnect(context.Context) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.props.AutoConnect, nil
+}
+
+func (f *fakeKnownNetwork) SetAutoConnect(_ context.Context, autoConnect bool) error {
+	if f.err != nil {
+		return f.err
+	}
+	f.props.AutoConnect = autoConnect
+	return nil
+}
+
+func (f *fakeKnownNetwork) Forget(context.Context) error {
+	return f.forgetErr
+}
+
+func (f *fakeKnownNetwork) Properties(context.Context) (*spiderw.KnownNetworkProperties, error) {
+	return f.props, f.err
+}
+
+func (f *fakeKnownNetwork) SubscribeAutoConnectChanged(context.Context, func(bool)) (spiderw.UnsubscribeFunc, error) {
 	return func() error { return nil }, f.err
 }
 

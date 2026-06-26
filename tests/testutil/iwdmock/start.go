@@ -324,3 +324,9 @@ func StartMockWithoutBSS(t *testing.T, dir string) {
 func StartMockWithoutNetwork(t *testing.T, dir string) {
 	startMockWithT(t, dir, []string{"--omit-network"})
 }
+
+// StartMockWithoutKnownNetwork starts an iwd mock that does not export any
+// known-network objects, which exercises empty known-network enumeration.
+func StartMockWithoutKnownNetwork(t *testing.T, dir string) {
+	startMockWithT(t, dir, []string{"--omit-knownnetwork"})
+}

@@ -96,7 +96,7 @@ func testNetwork_GetType(t *testing.T) {
 	}}}
 	secType, err := n.GetType(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, SecurityTypePSK, secType)
+	require.Equal(t, NetworkTypePSK, secType)
 }
 
 func testNetwork_GetType_Invalid(t *testing.T) {
@@ -106,7 +106,7 @@ func testNetwork_GetType_Invalid(t *testing.T) {
 	}}}
 	_, err := n.GetType(context.Background())
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid security type")
+	require.Contains(t, err.Error(), "invalid network type")
 }
 
 func testNetwork_GetKnownNetwork(t *testing.T) {
@@ -225,7 +225,7 @@ func testNetwork_GetProperties(t *testing.T) {
 	require.Equal(t, "OpenNet", props.Name)
 	require.False(t, props.Connected)
 	require.Equal(t, dbus.ObjectPath("/net/connman/iwd/phy0/wlan0"), props.Device)
-	require.Equal(t, SecurityTypeOpen, props.Type)
+	require.Equal(t, NetworkTypeOpen, props.Type)
 	require.NotNil(t, props.KnownNetwork)
 	require.Equal(t, "/net/connman/iwd/known_networks/1", *props.KnownNetwork)
 	require.Equal(t, []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"}, props.ExtendedServiceSet)
@@ -267,7 +267,7 @@ func testNetwork_GetProperties_Errors(t *testing.T) {
 		{name: "missing Device", props: without("Device"), wantContains: "property=Device"},
 		{name: "missing Type", props: without("Type"), wantContains: "property=Type"},
 		{name: "missing ExtendedServiceSet", props: without("ExtendedServiceSet"), wantContains: "property=ExtendedServiceSet"},
-		{name: "Type invalid", props: with("Type", dbus.MakeVariant("wpa3")), wantContains: "invalid security type"},
+		{name: "Type invalid", props: with("Type", dbus.MakeVariant("wpa3")), wantContains: "invalid network type"},
 		{name: "Connected wrong type", props: with("Connected", dbus.MakeVariant("nope")), wantContains: "expected bool"},
 	}
 

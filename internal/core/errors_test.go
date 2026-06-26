@@ -125,12 +125,12 @@ func TestErrors_Core(t *testing.T) {
 					wantRes:  ResourceAdapter,
 				},
 				{
-					name:     "network unavailable excludes property",
+					name:     "network unavailable maps dbus property",
 					fn:       WrapNetworkUnavailable,
 					op:       "Scan",
 					details:  "network check",
 					inputErr: iwdbus.ErrDBusProperty,
-					wantKind: KindOperationFailed,
+					wantKind: KindUnavailable,
 					wantRes:  ResourceNetwork,
 				},
 				{

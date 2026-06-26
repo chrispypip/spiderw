@@ -90,7 +90,7 @@ func TestNetworkMock_Properties(t *testing.T) {
 	props, err := open.Properties(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "OpenNet", props.Name)
-	require.Equal(t, spiderw.SecurityTypeOpen, props.Type)
+	require.Equal(t, spiderw.NetworkTypeOpen, props.Type)
 	require.Equal(t, "/net/connman/iwd/phy0/wlan0", props.Device)
 	require.Nil(t, props.KnownNetwork)
 	require.Len(t, props.ExtendedServiceSet, 2)
@@ -98,7 +98,7 @@ func TestNetworkMock_Properties(t *testing.T) {
 	known := newPublicMockNetwork(t, ctx, client, "KnownNet")
 	kp, err := known.Properties(ctx)
 	require.NoError(t, err)
-	require.Equal(t, spiderw.SecurityTypePSK, kp.Type)
+	require.Equal(t, spiderw.NetworkTypePSK, kp.Type)
 	require.NotNil(t, kp.KnownNetwork)
 }
 

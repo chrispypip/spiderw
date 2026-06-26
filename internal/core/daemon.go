@@ -46,6 +46,16 @@ type NetworkRef struct {
 	Name string
 }
 
+// KnownNetworkRef is a lightweight reference to a known network discovered by the
+// iwd daemon.
+type KnownNetworkRef struct {
+	// Path is the canonical D-Bus object path for the known network.
+	Path string
+
+	// Name is the known network's Name property.
+	Name string
+}
+
 // DaemonIface defines the core daemon operations used by the public layer.
 type DaemonIface interface {
 	Info(ctx context.Context) (*DaemonInfo, error)
@@ -56,6 +66,7 @@ type DaemonIface interface {
 	Devices(ctx context.Context) ([]DeviceRef, error)
 	BasicServiceSets(ctx context.Context) ([]BasicServiceSetRef, error)
 	Networks(ctx context.Context) ([]NetworkRef, error)
+	KnownNetworks(ctx context.Context) ([]KnownNetworkRef, error)
 }
 
 // DaemonInfo is the normalized core-layer view of daemon metadata.
@@ -76,6 +87,7 @@ type daemonRaw interface {
 	GetDevices(ctx context.Context) ([]iwdbus.DeviceRef, error)
 	GetBasicServiceSets(ctx context.Context) ([]iwdbus.BasicServiceSetRef, error)
 	GetNetworks(ctx context.Context) ([]iwdbus.NetworkRef, error)
+	GetKnownNetworks(ctx context.Context) ([]iwdbus.KnownNetworkRef, error)
 }
 
 // Daemon is the core-layer facade over a raw iwd daemon backend.
@@ -280,6 +292,36 @@ func (d *Daemon) Networks(ctx context.Context) ([]NetworkRef, error) {
 		}
 
 		refs = append(refs, NetworkRef{Path: p, Name: n})
+	}
+	return refs, nil
+}
+
+// KnownNetworks returns the known networks currently exposed by the iwd daemon.
+func (d *Daemon) KnownNetworks(ctx context.Context) ([]KnownNetworkRef, error) {
+	const op = "Daemon.KnownNetworks"
+
+	rawDaemon, err := d.rawDaemon(op)
+	if err != nil {
+		return nil, err
+	}
+
+	rawRefs, err := rawDaemon.GetKnownNetworks(ctx)
+	if err != nil {
+		return nil, WrapDaemonUnavailable(op, "failed getting known networks", err)
+	}
+	refs := make([]KnownNetworkRef, 0, len(rawRefs))
+	for _, r := range rawRefs {
+		p := strings.TrimSpace(string(r.Path))
+		if p == "" || !strings.HasPrefix(p, "/") {
+			return nil, WrapInvalidState(ResourceKnownNetwork, op, "known network returned invalid path", fmt.Errorf("invalid known network path %q", p))
+		}
+
+		n := strings.TrimSpace(r.Name)
+		if n == "" {
+			return nil, WrapInvalidState(ResourceKnownNetwork, op, "known network returned empty Name", fmt.Errorf("missing or invalid Name field"))
+		}
+
+		refs = append(refs, KnownNetworkRef{Path: p, Name: n})
 	}
 	return refs, nil
 }

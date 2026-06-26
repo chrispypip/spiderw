@@ -476,7 +476,7 @@ const networkHelpText = `Commands:
   <network> status                 Show a snapshot of one network
   <network> connect                Connect to the network (open/known only without an agent)
   <network> connected              Show whether the network is connected
-  <network> type                   Show the network security type
+  <network> type                   Show the network type
   <network> device                 Show the owning device object path
   <network> name                   Show the network SSID
   <network> known-network          Show the known-network object path, if any

@@ -53,6 +53,16 @@ type NetworkRef struct {
 	Name string
 }
 
+// KnownNetworkRef is a lightweight reference to a known network discovered by
+// ObjectManager.
+type KnownNetworkRef struct {
+	// Path is the canonical D-Bus object path for the known network.
+	Path dbus.ObjectPath
+
+	// Name is the KnownNetwork.Name property.
+	Name string
+}
+
 // Daemon provides typed access to the iwd daemon D-Bus interface.
 type Daemon struct {
 	conn  *dbus.Conn
@@ -370,6 +380,42 @@ func (d *Daemon) GetNetworks(ctx context.Context) ([]NetworkRef, error) {
 		}
 
 		refs = append(refs, NetworkRef{Path: path, Name: name})
+	}
+
+	sort.Slice(refs, func(i, j int) bool {
+		return string(refs[i].Path) < string(refs[j].Path)
+	})
+
+	return refs, nil
+}
+
+// GetKnownNetworks asks iwd's ObjectManager for managed objects and returns every
+// object that implements net.connman.iwd.KnownNetwork, along with its Name
+// property.
+func (d *Daemon) GetKnownNetworks(ctx context.Context) ([]KnownNetworkRef, error) {
+	const op = "Daemon.GetKnownNetworks"
+
+	if d == nil || d.conn == nil {
+		return nil, WrapConnection(op, ErrDaemonUninitialized)
+	}
+
+	objects, err := getManagedObjects(ctx, d.conn, IwdService)
+	if err != nil {
+		return nil, WrapIntrospection(DBusObjectManagerGetManagedObjects, err)
+	}
+	refs := make([]KnownNetworkRef, 0, len(objects))
+	for path, ifaces := range objects {
+		props, ok := ifaces[IwdKnownNetworkIface]
+		if !ok {
+			continue
+		}
+
+		name, err := objectNameFromManagedObject("known network", path, props)
+		if err != nil {
+			return nil, err
+		}
+
+		refs = append(refs, KnownNetworkRef{Path: path, Name: name})
 	}
 
 	sort.Slice(refs, func(i, j int) bool {

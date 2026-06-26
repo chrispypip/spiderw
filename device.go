@@ -37,7 +37,8 @@ type DeviceProperties struct {
 	// Mode is the device's current operating mode.
 	Mode Mode
 
-	// Adapter is the object path of the adapter that owns this device.
+	// Adapter is the object path of the adapter that owns this device. Resolve it
+	// to a handle with Client.Adapter.
 	Adapter string
 }
 
@@ -125,6 +126,8 @@ func (d *Device) SetMode(ctx context.Context, mode Mode) error {
 }
 
 // Adapter returns the object path of the adapter that owns this device.
+//
+// Resolve it to a handle with Client.Adapter.
 func (d *Device) Adapter(ctx context.Context) (string, error) {
 	return delegate(ctx, "Device.Adapter", d.coreDevice, func(ctx context.Context, c core.DeviceIface) (string, error) {
 		return c.Adapter(ctx)

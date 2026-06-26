@@ -66,6 +66,10 @@ const (
 
 	// ResourceNetwork identifies failures involving an iwd network object.
 	ResourceNetwork Resource = Resource(failure.ResourceNetwork)
+
+	// ResourceKnownNetwork identifies failures involving an iwd known-network
+	// object.
+	ResourceKnownNetwork Resource = Resource(failure.ResourceKnownNetwork)
 )
 
 // -----------------------------------------------------------------------------

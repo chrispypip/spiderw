@@ -481,6 +481,65 @@ func TestDaemon_Core(t *testing.T) {
 		})
 	})
 
+	t.Run("KnownNetworks", func(t *testing.T) {
+		t.Run("DBusErrorMapping", func(t *testing.T) {
+			f := &fakeIwdbusDaemon{}
+			f.setErr(iwdbus.ErrDBusIntrospection)
+			d := NewDaemon(f)
+
+			_, err := d.KnownNetworks(context.Background())
+			require.Error(t, err)
+
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindUnavailable, ce.Kind)
+			require.Equal(t, ResourceDaemon, ce.Resource)
+		})
+
+		t.Run("InvalidFields", func(t *testing.T) {
+			tests := []struct {
+				name    string
+				known   []iwdbus.KnownNetworkRef
+				wantSub string
+			}{
+				{name: "empty path", known: []iwdbus.KnownNetworkRef{{Path: "", Name: "HomeNet"}}, wantSub: "invalid path"},
+				{name: "empty name", known: []iwdbus.KnownNetworkRef{{Path: "/net/connman/iwd/abc", Name: ""}}, wantSub: "empty Name"},
+			}
+
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					f := &fakeIwdbusDaemon{}
+					f.setKnownNetworks(tc.known)
+					d := NewDaemon(f)
+					_, err := d.KnownNetworks(context.Background())
+					require.Error(t, err)
+
+					var ce *Error
+					require.ErrorAs(t, err, &ce)
+					require.Equal(t, KindInvalidState, ce.Kind)
+					require.Equal(t, ResourceKnownNetwork, ce.Resource)
+					require.Contains(t, err.Error(), tc.wantSub)
+				})
+			}
+		})
+
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeIwdbusDaemon{}
+			f.setKnownNetworks([]iwdbus.KnownNetworkRef{
+				{Path: "/net/connman/iwd/abc", Name: "HomeNet"},
+				{Path: "  /net/connman/iwd/def  ", Name: "  CafeNet  "},
+			})
+			d := NewDaemon(f)
+
+			out, err := d.KnownNetworks(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, []KnownNetworkRef{
+				{Path: "/net/connman/iwd/abc", Name: "HomeNet"},
+				{Path: "/net/connman/iwd/def", Name: "CafeNet"},
+			}, out)
+		})
+	})
+
 	t.Run("ConvenienceMethods", func(t *testing.T) {
 		tests := []struct {
 			name string

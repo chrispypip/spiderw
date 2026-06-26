@@ -25,7 +25,7 @@ func TestNetwork_Core(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "OpenNet", props.Name)
 		require.Equal(t, "/net/connman/iwd/phy0/wlan0", props.Device)
-		require.Equal(t, SecurityTypeOpen, props.Type)
+		require.Equal(t, NetworkTypeOpen, props.Type)
 		require.NotNil(t, props.KnownNetwork)
 		require.Equal(t, []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"}, props.ExtendedServiceSet)
 	})
@@ -43,11 +43,11 @@ func TestNetwork_Core(t *testing.T) {
 	t.Run("InvalidTypeIsInvalidState", func(t *testing.T) {
 		t.Parallel()
 		p := validNetworkProps()
-		p.Type = iwdbus.SecurityType("wpa3")
+		p.Type = iwdbus.NetworkType("wpa3")
 		n := NewNetwork((&fakeIwdbusNetwork{}).setProps(p))
 		_, err := n.Type(ctx)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "unknown security type")
+		require.Contains(t, err.Error(), "unknown type")
 	})
 
 	t.Run("KnownNetworkNilPassthrough", func(t *testing.T) {

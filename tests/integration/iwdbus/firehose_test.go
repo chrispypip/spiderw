@@ -105,6 +105,41 @@ func TestSignalFirehose_NetworkSurvives(t *testing.T) {
 	}
 }
 
+func TestSignalFirehose_KnownNetworkSurvives(t *testing.T) {
+	iwdmock.StartMockFirehose(t)
+
+	for range 20 {
+		out, err := runSpiderKnownNetwork(t, "list")
+		require.NoError(t, err, "known-network list failed under firehose load: %s", out)
+		require.Contains(t, out, "KnownNet")
+
+		out, err = runSpiderKnownNetwork(t, "KnownNet", "autoconnect")
+		require.NoError(t, err, "known-network autoconnect failed under firehose load: %s", out)
+		require.Contains(t, []string{"true\n", "false\n"}, out)
+	}
+}
+
+func TestSignalFirehose_PublicKnownNetworkSubscribeReceivesSignals(t *testing.T) {
+	iwdmock.StartMockFirehose(t)
+
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+	known := newPublicMockKnownNetwork(t, ctx, client, "KnownNet")
+
+	fired := make(chan struct{}, 10)
+
+	unsubscribe, err := known.SubscribeAutoConnectChanged(ctx, func(bool) {
+		select {
+		case fired <- struct{}{}:
+		default:
+		}
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, unsubscribe.Unsubscribe()) })
+
+	requireFired(t, fired, "known-network auto-connect subscription did not receive firehose signal")
+}
+
 func TestSignalFirehose_PublicNetworkSubscribeReceivesSignals(t *testing.T) {
 	iwdmock.StartMockFirehose(t)
 

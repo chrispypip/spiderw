@@ -70,6 +70,10 @@ func main() {
 		log.Fatalf("[mock-iwd] ERROR: exportNetwork: %s", err)
 	}
 
+	if err := mock.ExportKnownNetwork(conn); err != nil {
+		log.Fatalf("[mock-iwd] ERROR: exportKnownNetwork: %s", err)
+	}
+
 	if err := mock.ExportObjectManager(conn); err != nil {
 		log.Fatalf("[mock-iwd] ERROR: exportObjectManager: %s", err)
 	}

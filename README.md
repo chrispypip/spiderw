@@ -17,9 +17,10 @@ Wi-Fi interfaces, iwd, and mockable runtime behavior. It provides:
 > **Project status: early development (pre-v1).** The public API is **unstable**
 > and may change without notice until the first tagged release. The implemented
 > surface today covers `Client`, `Daemon`, `Adapter`, `Device`,
-> `BasicServiceSet`, and `Network` (identity, powered/mode state, supported
-> modes, property subscriptions, and connecting to open or already-known
-> networks) — with much more of the iwd API planned. It is developed and tested
+> `BasicServiceSet`, `Network`, and `KnownNetwork` (identity, powered/mode state,
+> supported modes, property subscriptions, connecting to open or already-known
+> networks, and managing saved networks) — with much more of the iwd API planned.
+> It is developed and tested
 > against **iwd 3.12** (see [Compatibility & Requirements](#compatibility--requirements)).
 > Issues are welcome; pull requests for new features are not being accepted yet
 > (see [CONTRIBUTING](CONTRIBUTING.md)).
@@ -49,11 +50,12 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
   version the project targets and validates against; the bundled mock's
   introspection XML is modeled on it.
 - **Supported iwd interfaces:** `Daemon`, `Adapter`, `Device`,
-  `BasicServiceSet`, and `Network`. Network `Connect()` works for open and
-  already-known networks; connecting to a not-yet-known secured network requires
-  a credentials agent (`net.connman.iwd.Agent`), which is **not yet implemented**
-  and surfaces as an error matching `spiderw.ErrNoAgent`. More of the iwd API is
-  planned — see the [Roadmap](ROADMAP.md).
+  `BasicServiceSet`, `Network`, and `KnownNetwork`. Network `Connect()` works for
+  open and already-known networks; connecting to a not-yet-known secured network
+  requires a credentials agent (`net.connman.iwd.Agent`), which is **not yet
+  implemented** and surfaces as an error matching `spiderw.ErrNoAgent`.
+  `KnownNetwork` supports inspecting saved networks, toggling auto-connect, and
+  forgetting them. More of the iwd API is planned — see the [Roadmap](ROADMAP.md).
 - **Operating system:** **Linux only.** iwd is a Linux wireless daemon; spiderw
   has no support for other platforms.
 - **D-Bus:** Requires access to a D-Bus bus. Real iwd runs on the **system bus**
@@ -186,7 +188,8 @@ if err != nil {
 The public error categories are `KindUnavailable`, `KindInvalidState`,
 `KindInvalidArgument`, and `KindInternal`. Resource values include
 `ResourceClient`, `ResourceDaemon`, `ResourceAdapter`, `ResourceDevice`,
-`ResourceBasicServiceSet`, `ResourceStation`, and `ResourceNetwork`.
+`ResourceBasicServiceSet`, `ResourceNetwork`, `ResourceKnownNetwork`, and
+`ResourceStation`.
 
 Some operations also map specific iwd D-Bus errors to matchable sentinels, so you
 can react to a precise outcome without parsing text. For example,
@@ -321,7 +324,8 @@ D-Bus decoding is handled internally; public methods return standard Go types
 ## CLI Quick Start
 
 The `spiderw` command can query the daemon, adapters, devices, basic service
-sets, and networks through the same public API used by library callers. It uses the system bus
+sets, networks, and known networks through the same public API used by library
+callers. It uses the system bus
 by default, which is where real iwd runs, so the examples below need no bus flag.
 The Go mock registers on the session bus, so pass `--session` when testing
 against `iwdmock`.
@@ -422,6 +426,26 @@ spiderw network OpenNet device
 spiderw network OpenNet known-network
 spiderw network OpenNet bsses
 spiderw network OpenNet monitor connected
+```
+
+List known (saved) networks, or print a full snapshot for every one:
+
+```bash
+spiderw known-network list
+spiderw known-network status
+```
+
+Use the name or path from `known-network list` as the reference:
+
+```bash
+spiderw known-network KnownNet status
+spiderw known-network KnownNet type
+spiderw known-network KnownNet hidden
+spiderw known-network KnownNet last-connected
+spiderw known-network KnownNet autoconnect
+spiderw known-network KnownNet autoconnect false
+spiderw known-network KnownNet forget
+spiderw known-network KnownNet monitor autoconnect
 ```
 
 To target the Go mock instead of a real daemon, add `--session`:

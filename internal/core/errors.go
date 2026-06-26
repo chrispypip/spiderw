@@ -73,6 +73,10 @@ const (
 
 	// ResourceNetwork identifies failures involving an iwd network object.
 	ResourceNetwork = failure.ResourceNetwork
+
+	// ResourceKnownNetwork identifies failures involving an iwd known-network
+	// object.
+	ResourceKnownNetwork = failure.ResourceKnownNetwork
 )
 
 // Error sentinels support errors.Is checks in core-layer errors.
@@ -99,6 +103,10 @@ var (
 	// ErrNetworkNotInitialized indicates that a Network wrapper has no raw
 	// backend.
 	ErrNetworkNotInitialized = errors.New("network not initialized")
+
+	// ErrKnownNetworkNotInitialized indicates that a KnownNetwork wrapper has no
+	// raw backend.
+	ErrKnownNetworkNotInitialized = errors.New("known network not initialized")
 
 	// ErrNoAgent indicates that iwd rejected an operation because no credentials
 	// agent is registered. It is re-exported from the iwdbus layer so callers can
@@ -175,11 +183,12 @@ type unavailablePolicy struct {
 }
 
 var (
-	daemonUnavailablePolicy  = unavailablePolicy{resource: ResourceDaemon}
-	adapterUnavailablePolicy = unavailablePolicy{resource: ResourceAdapter, includeDBusProperty: true}
-	deviceUnavailablePolicy  = unavailablePolicy{resource: ResourceDevice, includeDBusProperty: true}
-	bssUnavailablePolicy     = unavailablePolicy{resource: ResourceBasicServiceSet, includeDBusProperty: true}
-	networkUnavailablePolicy = unavailablePolicy{resource: ResourceNetwork}
+	daemonUnavailablePolicy       = unavailablePolicy{resource: ResourceDaemon}
+	adapterUnavailablePolicy      = unavailablePolicy{resource: ResourceAdapter, includeDBusProperty: true}
+	deviceUnavailablePolicy       = unavailablePolicy{resource: ResourceDevice, includeDBusProperty: true}
+	bssUnavailablePolicy          = unavailablePolicy{resource: ResourceBasicServiceSet, includeDBusProperty: true}
+	networkUnavailablePolicy      = unavailablePolicy{resource: ResourceNetwork, includeDBusProperty: true}
+	knownNetworkUnavailablePolicy = unavailablePolicy{resource: ResourceKnownNetwork, includeDBusProperty: true}
 )
 
 func wrapUnavailable(op, details string, err error, policy unavailablePolicy) error {
@@ -226,6 +235,12 @@ func WrapBasicServiceSetUnavailable(op, details string, err error) error {
 // WrapNetworkUnavailable classifies D-Bus network failures by kind and resource.
 func WrapNetworkUnavailable(op, details string, err error) error {
 	return wrapUnavailable(op, details, err, networkUnavailablePolicy)
+}
+
+// WrapKnownNetworkUnavailable classifies D-Bus known-network failures by kind and
+// resource.
+func WrapKnownNetworkUnavailable(op, details string, err error) error {
+	return wrapUnavailable(op, details, err, knownNetworkUnavailablePolicy)
 }
 
 // WrapInvalidState wraps invalid state issues for resource.

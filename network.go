@@ -11,31 +11,34 @@ import (
 	"github.com/chrispypip/spiderw/internal/logging"
 )
 
-// SecurityType identifies the security type of an iwd network.
-type SecurityType string
+// NetworkType identifies the network type of an iwd network.
+type NetworkType string
 
-// SecurityType constants identify the supported iwd network security types.
-// SecurityTypeUnknown is reserved for invalid or unrecognized values.
+// NetworkType constants identify the supported iwd network types.
+// NetworkTypeUnknown is reserved for invalid or unrecognized values.
 const (
-	// SecurityTypeUnknown represents an invalid or unrecognized security type.
-	SecurityTypeUnknown SecurityType = SecurityType(iwdvalue.SecurityTypeUnknown)
+	// NetworkTypeUnknown represents an invalid or unrecognized network type.
+	NetworkTypeUnknown NetworkType = NetworkType(iwdvalue.NetworkTypeUnknown)
 
-	// SecurityTypeOpen is an open (unsecured) network.
-	SecurityTypeOpen SecurityType = SecurityType(iwdvalue.SecurityTypeOpen)
+	// NetworkTypeOpen is an open (unsecured) network.
+	NetworkTypeOpen NetworkType = NetworkType(iwdvalue.NetworkTypeOpen)
 
-	// SecurityTypeWEP is a WEP network.
-	SecurityTypeWEP SecurityType = SecurityType(iwdvalue.SecurityTypeWEP)
+	// NetworkTypeWEP is a WEP network.
+	NetworkTypeWEP NetworkType = NetworkType(iwdvalue.NetworkTypeWEP)
 
-	// SecurityTypePSK is a pre-shared-key (WPA-Personal) network.
-	SecurityTypePSK SecurityType = SecurityType(iwdvalue.SecurityTypePSK)
+	// NetworkTypePSK is a pre-shared-key (WPA-Personal) network.
+	NetworkTypePSK NetworkType = NetworkType(iwdvalue.NetworkTypePSK)
 
-	// SecurityType8021x is an 802.1x (EAP / WPA-Enterprise) network.
-	SecurityType8021x SecurityType = SecurityType(iwdvalue.SecurityType8021x)
+	// NetworkType8021x is an 802.1x (EAP / WPA-Enterprise) network.
+	NetworkType8021x NetworkType = NetworkType(iwdvalue.NetworkType8021x)
+
+	// NetworkTypeHotspot is a hotspot network (reported only for a KnownNetwork).
+	NetworkTypeHotspot NetworkType = NetworkType(iwdvalue.NetworkTypeHotspot)
 )
 
-// String returns the canonical iwd string for the security type.
-func (s SecurityType) String() string {
-	return iwdvalue.SecurityType(s).String()
+// String returns the canonical iwd string for the network type.
+func (s NetworkType) String() string {
+	return iwdvalue.NetworkType(s).String()
 }
 
 // NetworkPropertiesChanged describes network properties reported by a D-Bus
@@ -59,13 +62,15 @@ type NetworkProperties struct {
 	Connected bool
 
 	// Device is the object path of the device/station the network belongs to.
+	// Resolve it to a handle with Client.Device.
 	Device string
 
-	// Type is the network's security type.
-	Type SecurityType
+	// Type is the network's network type.
+	Type NetworkType
 
 	// KnownNetwork is the object path of the network's known-network record, or
-	// nil when the network is not known/provisioned.
+	// nil when the network is not known/provisioned. Resolve it to a handle with
+	// Client.KnownNetwork.
 	KnownNetwork *string
 
 	// ExtendedServiceSet is the object paths of the basic service sets (BSSes)
@@ -123,25 +128,29 @@ func (n *Network) Connected(ctx context.Context) (bool, error) {
 }
 
 // Device returns the object path of the device/station the network belongs to.
+//
+// Resolve it to a handle with Client.Device.
 func (n *Network) Device(ctx context.Context) (string, error) {
 	return delegate(ctx, "Network.Device", n.coreNetwork, func(ctx context.Context, c core.NetworkIface) (string, error) {
 		return c.Device(ctx)
 	})
 }
 
-// Type returns the network's security type.
-func (n *Network) Type(ctx context.Context) (SecurityType, error) {
-	return delegate(ctx, "Network.Type", n.coreNetwork, func(ctx context.Context, c core.NetworkIface) (SecurityType, error) {
+// Type returns the network's network type.
+func (n *Network) Type(ctx context.Context) (NetworkType, error) {
+	return delegate(ctx, "Network.Type", n.coreNetwork, func(ctx context.Context, c core.NetworkIface) (NetworkType, error) {
 		ct, err := c.Type(ctx)
 		if err != nil {
-			return SecurityTypeUnknown, err
+			return NetworkTypeUnknown, err
 		}
-		return convertSecurityType(ct)
+		return convertNetworkType(ct)
 	})
 }
 
 // KnownNetwork returns the object path of the network's known-network record, or
 // nil when the network is not known/provisioned.
+//
+// Resolve it to a handle with Client.KnownNetwork.
 func (n *Network) KnownNetwork(ctx context.Context) (*string, error) {
 	return delegate(ctx, "Network.KnownNetwork", n.coreNetwork, func(ctx context.Context, c core.NetworkIface) (*string, error) {
 		return c.KnownNetwork(ctx)
@@ -176,7 +185,7 @@ func (n *Network) Properties(ctx context.Context) (*NetworkProperties, error) {
 			return nil, err
 		}
 
-		secType, err := convertSecurityType(cp.Type)
+		secType, err := convertNetworkType(cp.Type)
 		if err != nil {
 			return nil, err
 		}
@@ -246,10 +255,10 @@ func (n *Network) SubscribeConnectedChanged(ctx context.Context, fn func(bool)) 
 	return UnsubscribeFunc(unsubscribe), nil
 }
 
-func convertSecurityType(t core.SecurityType) (SecurityType, error) {
-	if !iwdvalue.ValidSecurityType(t) {
-		details := fmt.Sprintf("invalid security type %q", t)
-		return SecurityTypeUnknown, &Error{Kind: KindInvalidArgument, Resource: ResourceNetwork, Op: "Network.convertType", Details: details, Err: ErrInvalidArgument}
+func convertNetworkType(t core.NetworkType) (NetworkType, error) {
+	if !iwdvalue.ValidNetworkType(t) {
+		details := fmt.Sprintf("invalid network type %q", t)
+		return NetworkTypeUnknown, &Error{Kind: KindInvalidArgument, Resource: ResourceNetwork, Op: "Network.convertType", Details: details, Err: ErrInvalidArgument}
 	}
-	return SecurityType(t), nil
+	return NetworkType(t), nil
 }

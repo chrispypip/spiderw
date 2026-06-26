@@ -32,6 +32,9 @@ var (
 
 	//go:embed xml/network.xml
 	networkIntrospectionXML []byte
+
+	//go:embed xml/knownnetwork.xml
+	knownNetworkIntrospectionXML []byte
 )
 
 func exportDaemonIntrospection(conn *dbus.Conn) error {
@@ -52,4 +55,8 @@ func exportBSSIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {
 
 func exportNetworkIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {
 	return conn.Export(introspectStub(networkIntrospectionXML), path, iwdbus.DBusIntrospectableIface)
+}
+
+func exportKnownNetworkIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {
+	return conn.Export(introspectStub(knownNetworkIntrospectionXML), path, iwdbus.DBusIntrospectableIface)
 }

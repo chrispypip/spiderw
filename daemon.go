@@ -47,6 +47,16 @@ type NetworkRef struct {
 	Name string
 }
 
+// KnownNetworkRef is a lightweight reference to a known network discovered by the
+// iwd daemon.
+type KnownNetworkRef struct {
+	// Path is the canonical D-Bus object path for the known network.
+	Path string
+
+	// Name is the known network's name (usually the SSID).
+	Name string
+}
+
 // DaemonInfo is the public API view of the iwd daemon metadata.
 //
 // This intentionally mirrors core.DaemonInfo but is separate to avoid leaking
@@ -190,6 +200,22 @@ func (d *Daemon) Networks(ctx context.Context) ([]NetworkRef, error) {
 		out := make([]NetworkRef, 0, len(refs))
 		for _, r := range refs {
 			out = append(out, NetworkRef{Path: r.Path, Name: r.Name})
+		}
+		return out, nil
+	})
+}
+
+// KnownNetworks returns lightweight references to the known networks currently
+// exposed by iwd.
+func (d *Daemon) KnownNetworks(ctx context.Context) ([]KnownNetworkRef, error) {
+	return delegate(ctx, "Daemon.KnownNetworks", d.coreDaemon, func(ctx context.Context, c core.DaemonIface) ([]KnownNetworkRef, error) {
+		refs, err := c.KnownNetworks(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]KnownNetworkRef, 0, len(refs))
+		for _, r := range refs {
+			out = append(out, KnownNetworkRef{Path: r.Path, Name: r.Name})
 		}
 		return out, nil
 	})

@@ -70,7 +70,7 @@ func (f *fakeCoreNetwork) Connected(context.Context) (bool, error) {
 func (f *fakeCoreNetwork) Device(context.Context) (string, error) {
 	return f.loadProps().Device, f.loadErr()
 }
-func (f *fakeCoreNetwork) Type(context.Context) (core.SecurityType, error) {
+func (f *fakeCoreNetwork) Type(context.Context) (core.NetworkType, error) {
 	return f.loadProps().Type, f.loadErr()
 }
 func (f *fakeCoreNetwork) KnownNetwork(context.Context) (*string, error) {
@@ -122,7 +122,7 @@ func validCoreNetworkProps() core.NetworkProperties {
 	return core.NetworkProperties{
 		Name:               "OpenNet",
 		Device:             "/net/connman/iwd/phy0/wlan0",
-		Type:               core.SecurityTypeOpen,
+		Type:               core.NetworkTypeOpen,
 		ExtendedServiceSet: []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"},
 	}
 }

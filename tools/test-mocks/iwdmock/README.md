@@ -28,7 +28,7 @@ API, which is the iwd version spiderw is developed and tested against.
   ```
 
 * Exposes a small set of objects (currently: ObjectManager, daemon, adapter,
-  device, basic service sets, and networks)
+  device, basic service sets, networks, and known networks)
 * Can emit signals, including a "firehose" mode to stress the dispatcher
 * Supports session bus only (it connects via `dbus.ConnectSessionBus()`)
 ---
@@ -63,6 +63,7 @@ tools/test-mocks/iwdmock/
 |   |-- device.go
 |   |-- export.go
 |   |-- firehose.go
+|   |-- knownnetwork.go
 |   |-- network.go
 |   |-- objectmanager.go
 |   |-- utils.go
@@ -71,6 +72,7 @@ tools/test-mocks/iwdmock/
 |       |-- bss.xml
 |       |-- daemon.xml
 |       |-- device.xml
+|       |-- knownnetwork.xml
 |       `-- network.xml
 `-- README.md        # This file
 ```
@@ -198,7 +200,7 @@ defined across:
 * `--daemon-fail-calls`
   Make daemon calls return a D-Bus error
 
-### Device, basic service set, and network scenario flags
+### Device, basic service set, network, and known-network scenario flags
 
 * `--omit-device`
   Don't export the device object, exercising empty device enumeration.
@@ -206,6 +208,9 @@ defined across:
   Don't export the basic service set objects, exercising empty BSS enumeration.
 * `--omit-network`
   Don't export the network objects, exercising empty network enumeration.
+* `--omit-knownnetwork`
+  Don't export the known-network objects, exercising empty known-network
+  enumeration.
 
 The mock exports multiple basic service sets by default, mirroring iwd reporting
 one BSS per access point/radio a device can hear during a scan. It also exports
@@ -213,6 +218,11 @@ three networks — an open network, a known (provisioned) secured network, and a
 unknown secured network — so `Network.Connect` exercises both the no-agent
 success paths and the `net.connman.iwd.NoAgent` rejection. The open network's
 `ExtendedServiceSet` lists both mock BSSes, demonstrating multi-BSS membership.
+
+Two known networks are exported: one (`psk`, with a last-connected time and
+auto-connect on) at the path the mock network references via its `KnownNetwork`
+property — so that linkage resolves end to end — and one `hotspot` that has never
+been connected to (no `LastConnectedTime`) with auto-connect off.
 
 ---
 

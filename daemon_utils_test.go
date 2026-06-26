@@ -17,15 +17,16 @@ type fakeCoreDaemonError struct {
 type fakeCoreDaemon struct {
 	testutil.UnimplementedCoreDaemon
 
-	info     atomic.Pointer[core.DaemonInfo]
-	version  atomic.Pointer[string]
-	stateDir atomic.Pointer[string]
-	ncfg     atomic.Bool
-	adapters atomic.Pointer[[]core.AdapterRef]
-	devices  atomic.Pointer[[]core.DeviceRef]
-	bsses    atomic.Pointer[[]core.BasicServiceSetRef]
-	networks atomic.Pointer[[]core.NetworkRef]
-	err      atomic.Pointer[fakeCoreDaemonError]
+	info          atomic.Pointer[core.DaemonInfo]
+	version       atomic.Pointer[string]
+	stateDir      atomic.Pointer[string]
+	ncfg          atomic.Bool
+	adapters      atomic.Pointer[[]core.AdapterRef]
+	devices       atomic.Pointer[[]core.DeviceRef]
+	bsses         atomic.Pointer[[]core.BasicServiceSetRef]
+	networks      atomic.Pointer[[]core.NetworkRef]
+	knownNetworks atomic.Pointer[[]core.KnownNetworkRef]
+	err           atomic.Pointer[fakeCoreDaemonError]
 }
 
 func (f *fakeCoreDaemon) setInfo(info *core.DaemonInfo) {
@@ -90,6 +91,16 @@ func (f *fakeCoreDaemon) setNetworks(networks []core.NetworkRef) {
 
 	networksCopy := append([]core.NetworkRef(nil), networks...)
 	f.networks.Store(&networksCopy)
+}
+
+func (f *fakeCoreDaemon) setKnownNetworks(known []core.KnownNetworkRef) {
+	if known == nil {
+		f.knownNetworks.Store(nil)
+		return
+	}
+
+	knownCopy := append([]core.KnownNetworkRef(nil), known...)
+	f.knownNetworks.Store(&knownCopy)
 }
 
 func (f *fakeCoreDaemon) setErr(err error) {
@@ -200,4 +211,16 @@ func (f *fakeCoreDaemon) Networks(ctx context.Context) ([]core.NetworkRef, error
 		return nil, nil
 	}
 	return append([]core.NetworkRef(nil), (*networks)...), nil
+}
+
+func (f *fakeCoreDaemon) KnownNetworks(ctx context.Context) ([]core.KnownNetworkRef, error) {
+	if err := f.loadErr(); err != nil {
+		return nil, err
+	}
+
+	known := f.knownNetworks.Load()
+	if known == nil {
+		return nil, nil
+	}
+	return append([]core.KnownNetworkRef(nil), (*known)...), nil
 }

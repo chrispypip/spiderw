@@ -69,7 +69,7 @@ func (f *fakeIwdbusNetwork) GetConnected(context.Context) (bool, error) {
 func (f *fakeIwdbusNetwork) GetDevice(context.Context) (dbus.ObjectPath, error) {
 	return f.loadProps().Device, f.loadErr()
 }
-func (f *fakeIwdbusNetwork) GetType(context.Context) (iwdbus.SecurityType, error) {
+func (f *fakeIwdbusNetwork) GetType(context.Context) (iwdbus.NetworkType, error) {
 	return f.loadProps().Type, f.loadErr()
 }
 func (f *fakeIwdbusNetwork) GetKnownNetwork(context.Context) (*string, error) {
@@ -124,7 +124,7 @@ func validNetworkProps() iwdbus.NetworkProperties {
 		Name:               "OpenNet",
 		Connected:          false,
 		Device:             "/net/connman/iwd/phy0/wlan0",
-		Type:               iwdbus.SecurityTypeOpen,
+		Type:               iwdbus.NetworkTypeOpen,
 		KnownNetwork:       &known,
 		ExtendedServiceSet: []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"},
 	}

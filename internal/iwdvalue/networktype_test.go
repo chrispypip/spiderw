@@ -8,24 +8,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSecurityType(t *testing.T) {
+func TestNetworkType(t *testing.T) {
 	t.Run("ParseValid", func(t *testing.T) {
 		tests := []struct {
 			input string
-			want  SecurityType
+			want  NetworkType
 		}{
-			{input: "open", want: SecurityTypeOpen},
-			{input: "wep", want: SecurityTypeWEP},
-			{input: "psk", want: SecurityTypePSK},
-			{input: "8021x", want: SecurityType8021x},
+			{input: "open", want: NetworkTypeOpen},
+			{input: "wep", want: NetworkTypeWEP},
+			{input: "psk", want: NetworkTypePSK},
+			{input: "8021x", want: NetworkType8021x},
+			{input: "hotspot", want: NetworkTypeHotspot},
 		}
 
 		for _, tt := range tests {
 			t.Run(tt.input, func(t *testing.T) {
-				got, ok := ParseSecurityType(tt.input)
+				got, ok := ParseNetworkType(tt.input)
 				require.True(t, ok)
 				require.Equal(t, tt.want, got)
-				require.True(t, ValidSecurityType(got))
+				require.True(t, ValidNetworkType(got))
 				require.Equal(t, tt.input, got.String())
 			})
 		}
@@ -36,16 +37,16 @@ func TestSecurityType(t *testing.T) {
 
 		for _, input := range tests {
 			t.Run(input, func(t *testing.T) {
-				got, ok := ParseSecurityType(input)
+				got, ok := ParseNetworkType(input)
 				require.False(t, ok)
-				require.Equal(t, SecurityTypeUnknown, got)
-				require.False(t, ValidSecurityType(got))
+				require.Equal(t, NetworkTypeUnknown, got)
+				require.False(t, ValidNetworkType(got))
 			})
 		}
 	})
 
 	t.Run("UnknownString", func(t *testing.T) {
-		require.Equal(t, "unknown", SecurityTypeUnknown.String())
-		require.Equal(t, "unknown", SecurityType("bad-type").String())
+		require.Equal(t, "unknown", NetworkTypeUnknown.String())
+		require.Equal(t, "unknown", NetworkType("bad-type").String())
 	})
 }

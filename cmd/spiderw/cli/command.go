@@ -138,11 +138,12 @@ func rootCommand(app *App) *Command {
 		Name:        "",
 		Description: "spiderw - a safe Go interface to iwd",
 		Subcommands: map[string]*Command{
-			"daemon":  daemonCommand(app),
-			"adapter": adapterCommand(app),
-			"device":  deviceCommand(app),
-			"bss":     bssCommand(app),
-			"network": networkCommand(app),
+			"daemon":        daemonCommand(app),
+			"adapter":       adapterCommand(app),
+			"device":        deviceCommand(app),
+			"bss":           bssCommand(app),
+			"network":       networkCommand(app),
+			"known-network": knownNetworkCommand(app),
 		},
 	}
 }

@@ -23,12 +23,13 @@ type fakeIwdbusDaemonError struct {
 type fakeIwdbusDaemon struct {
 	testutil.UnimplementedIwdbusDaemon
 
-	info     atomic.Pointer[iwdbus.DaemonInfo]
-	adapters atomic.Pointer[[]iwdbus.AdapterRef]
-	devices  atomic.Pointer[[]iwdbus.DeviceRef]
-	bsses    atomic.Pointer[[]iwdbus.BasicServiceSetRef]
-	networks atomic.Pointer[[]iwdbus.NetworkRef]
-	err      atomic.Pointer[fakeIwdbusDaemonError]
+	info          atomic.Pointer[iwdbus.DaemonInfo]
+	adapters      atomic.Pointer[[]iwdbus.AdapterRef]
+	devices       atomic.Pointer[[]iwdbus.DeviceRef]
+	bsses         atomic.Pointer[[]iwdbus.BasicServiceSetRef]
+	networks      atomic.Pointer[[]iwdbus.NetworkRef]
+	knownNetworks atomic.Pointer[[]iwdbus.KnownNetworkRef]
+	err           atomic.Pointer[fakeIwdbusDaemonError]
 }
 
 func fakeIwdbusDaemonWithInfo(info *iwdbus.DaemonInfo) *fakeIwdbusDaemon {
@@ -63,6 +64,12 @@ func (f *fakeIwdbusDaemon) setBasicServiceSets(bsses []iwdbus.BasicServiceSetRef
 func (f *fakeIwdbusDaemon) setNetworks(networks []iwdbus.NetworkRef) *fakeIwdbusDaemon {
 	cloned := cloneIwdbusNetworkRefs(networks)
 	f.networks.Store(&cloned)
+	return f
+}
+
+func (f *fakeIwdbusDaemon) setKnownNetworks(known []iwdbus.KnownNetworkRef) *fakeIwdbusDaemon {
+	cloned := cloneIwdbusKnownNetworkRefs(known)
+	f.knownNetworks.Store(&cloned)
 	return f
 }
 
@@ -117,6 +124,14 @@ func (f *fakeIwdbusDaemon) GetNetworks(ctx context.Context) ([]iwdbus.NetworkRef
 		return nil, f.loadErr()
 	}
 	return cloneIwdbusNetworkRefs(*ptr), f.loadErr()
+}
+
+func (f *fakeIwdbusDaemon) GetKnownNetworks(ctx context.Context) ([]iwdbus.KnownNetworkRef, error) {
+	ptr := f.knownNetworks.Load()
+	if ptr == nil {
+		return nil, f.loadErr()
+	}
+	return cloneIwdbusKnownNetworkRefs(*ptr), f.loadErr()
 }
 
 // newTestDaemon mirrors helpers used by internal/iwdbus tests.
@@ -178,6 +193,15 @@ func cloneIwdbusNetworkRefs(refs []iwdbus.NetworkRef) []iwdbus.NetworkRef {
 		return nil
 	}
 	out := make([]iwdbus.NetworkRef, len(refs))
+	copy(out, refs)
+	return out
+}
+
+func cloneIwdbusKnownNetworkRefs(refs []iwdbus.KnownNetworkRef) []iwdbus.KnownNetworkRef {
+	if refs == nil {
+		return nil
+	}
+	out := make([]iwdbus.KnownNetworkRef, len(refs))
 	copy(out, refs)
 	return out
 }

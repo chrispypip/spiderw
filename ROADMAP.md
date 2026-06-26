@@ -32,16 +32,18 @@ The following areas are currently implemented and tested end to end:
   mode, owning adapter), powered/mode changes, and property subscriptions.
 - Basic service set (BSS) discovery, construction, and address lookup.
 - Network discovery, construction, and properties (SSID, connected state,
-  security type, owning device, optional known-network record, and basic service
+  network type, owning device, optional known-network record, and basic service
   set membership via `ExtendedServiceSet`).
 - Connecting to open and already-known networks via `Network.Connect`, with
   connected-state subscriptions. Connecting to a not-yet-known secured network
   reports a mapped `ErrNoAgent` until agent support lands.
-- CLI coverage for daemon, adapter, device, basic service set, and network
-  operations.
+- Known-network discovery, construction, and properties (name, type, hidden,
+  last-connected time, auto-connect), plus toggling auto-connect, forgetting, and
+  auto-connect subscriptions.
+- CLI coverage for daemon, adapter, device, basic service set, network, and
+  known-network operations.
 - Mock iwd integration tests, including signal firehose coverage.
-- Shared adapter mode and network security-type parsing and formatting across
-  layers.
+- Shared adapter mode and network type parsing and formatting across layers.
 - Structured error handling using generic error kinds plus resource metadata,
   including matchable sentinels for named iwd errors (for example `ErrNoAgent`,
   `ErrBusy`, `ErrFailed`), across the core and public API.
@@ -56,7 +58,6 @@ The following areas are currently implemented and tested end to end:
 Likely future vertical slices include:
 
 - Stations, including station-driven network scanning.
-- Known networks.
 - Agent support (`net.connman.iwd.Agent`), required to connect to secured
   networks that are not already known.
 - Additional signal subscriptions for objects beyond adapters and networks.
