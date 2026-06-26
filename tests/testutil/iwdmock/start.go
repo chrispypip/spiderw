@@ -27,9 +27,38 @@ const mockImportPath = "github.com/chrispypip/spiderw/tools/test-mocks/iwdmock"
 type runningMock struct {
 	cmd  *exec.Cmd
 	done <-chan error
-	// tmpDir is non-empty when startMock created its own temporary directory
-	// for the built binary and is responsible for removing it on stop.
-	tmpDir string
+}
+
+// The iwd mock binary is built once per test process and shared by every test;
+// only the mock *process* is spawned fresh per test, preserving isolation.
+// Building once avoids re-invoking `go build` on every StartMock* call, which
+// otherwise dominated the integration suite's runtime.
+var (
+	mockBinOnce sync.Once
+	mockBinPath string
+	mockBinErr  error
+)
+
+// ensureMockBinary builds the iwd mock binary once and returns its path.
+//
+// The build output lives in a temporary directory that is intentionally not
+// removed: it is reused for the lifetime of the test process and reclaimed by
+// the OS afterward.
+func ensureMockBinary() (string, error) {
+	mockBinOnce.Do(func() {
+		dir, err := os.MkdirTemp("", "iwdmock-bin-")
+		if err != nil {
+			mockBinErr = err
+			return
+		}
+		path := filepath.Join(dir, "iwdmock-bin")
+		if out, err := exec.Command("go", "build", "-o", path, mockImportPath).CombinedOutput(); err != nil {
+			mockBinErr = fmt.Errorf("building iwd mock: %w: %s", err, out)
+			return
+		}
+		mockBinPath = path
+	})
+	return mockBinPath, mockBinErr
 }
 
 func waitForBusName(conn *dbus.Conn, name string, timeout time.Duration) error {
@@ -79,56 +108,33 @@ func waitForBusNameNoT(name string, timeout time.Duration) error {
 	return err
 }
 
-func startMock(dir string, args []string) (*runningMock, error) {
-	// When no directory is supplied, build into a temporary directory owned by
-	// this mock and removed in stopMock.
-	ownTmp := ""
-	if dir == "" {
-		var err error
-		dir, err = os.MkdirTemp("", "iwdmock-")
-		if err != nil {
-			return nil, err
-		}
-		ownTmp = dir
-	}
-	binPath := filepath.Join(dir, "iwdmock-bin")
-
-	cleanupOwnTmp := func() {
-		if ownTmp != "" {
-			_ = os.RemoveAll(ownTmp)
-		}
-	}
-
-	buildCmd := exec.Command("go", "build", "-o", binPath, mockImportPath)
-	if out, err := buildCmd.CombinedOutput(); err != nil {
-		cleanupOwnTmp()
-		return nil, fmt.Errorf("building iwd mock: %w: %s", err, out)
+// startMock spawns a fresh mock process from the shared, pre-built binary. The
+// dir parameter is retained for API compatibility but no longer used: the binary
+// is built once by ensureMockBinary rather than per call.
+func startMock(_ string, args []string) (*runningMock, error) {
+	binPath, err := ensureMockBinary()
+	if err != nil {
+		return nil, err
 	}
 
 	addr := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
 	if addr == "" {
-		cleanupOwnTmp()
 		return nil, errors.New("DBUS_SESSION_BUS_ADDRESS not set in test environment")
 	}
-	cmd := exec.Command(binPath, args...)
 
-	env := append(os.Environ(), "DBUS_SESSION_BUS_ADDRESS="+addr)
-	cmd.Env = env
+	cmd := exec.Command(binPath, args...)
+	cmd.Env = append(os.Environ(), "DBUS_SESSION_BUS_ADDRESS="+addr)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		cleanupOwnTmp()
 		return nil, err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		cleanupOwnTmp()
 		return nil, err
 	}
 
-	err = cmd.Start()
-	if err != nil {
-		cleanupOwnTmp()
+	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
 
@@ -144,22 +150,13 @@ func startMock(dir string, args []string) (*runningMock, error) {
 			close(ready)
 		})
 	}
-	var scanErr error
 	scan := func(r io.Reader) {
 		sc := bufio.NewScanner(r)
 		for sc.Scan() {
-			line := sc.Text()
-			if strings.Contains(line, "READY") {
+			if strings.Contains(sc.Text(), "READY") {
 				signalReady()
 			}
 		}
-		if err := sc.Err(); err != nil {
-			scanErr = err
-			return
-		}
-	}
-	if scanErr != nil {
-		return nil, scanErr
 	}
 
 	go scan(stdout)
@@ -167,12 +164,11 @@ func startMock(dir string, args []string) (*runningMock, error) {
 
 	select {
 	case <-ready:
-		return &runningMock{cmd: cmd, done: done, tmpDir: ownTmp}, nil
+		return &runningMock{cmd: cmd, done: done}, nil
 	case err := <-done:
-		cleanupOwnTmp()
 		return nil, fmt.Errorf("mock exited before signaling READY: %w", err)
 	case <-time.After(2 * time.Second):
-		stopMock(&runningMock{cmd: cmd, done: done, tmpDir: ownTmp})
+		stopMock(&runningMock{cmd: cmd, done: done})
 		return nil, errors.New("mock did not signal READY")
 	}
 }
@@ -180,9 +176,6 @@ func startMock(dir string, args []string) (*runningMock, error) {
 func stopMock(mock *runningMock) {
 	if mock == nil {
 		return
-	}
-	if mock.tmpDir != "" {
-		defer func() { _ = os.RemoveAll(mock.tmpDir) }()
 	}
 	if mock.cmd == nil || mock.cmd.Process == nil {
 		return
