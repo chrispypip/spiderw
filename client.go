@@ -180,37 +180,7 @@ func (c *Client) Daemon() *Daemon {
 //
 // Use Daemon.Adapters to discover valid adapter paths.
 func (c *Client) Adapter(ctx context.Context, path string) (*Adapter, error) {
-	const op = "Client.Adapter"
-	log := logging.FromContext(ctx)
-
-	if c == nil {
-		log.Error(ctx, "client uninitialized", "op", op)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-
-	c.closeMu.RLock()
-	defer c.closeMu.RUnlock()
-	if c.closed {
-		log.Error(ctx, "client already closed", "op", op, "path", path)
-		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
-	}
-	if c.wire == nil {
-		log.Error(ctx, "client wiring uninitialized", "op", op)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-
-	coreAdapter, err := c.wire.NewAdapter(ctx, path)
-	if err != nil {
-		log.Error(ctx, "adapter wiring failed", "op", op, "path", path, "err", err)
-		return nil, wrapPublicError(op, err)
-	}
-
-	pub := newAdapter(coreAdapter, path)
-	if pub == nil {
-		log.Error(ctx, "adapter wrapper unexpectedly nil", "op", op, "path", path)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-	return pub, nil
+	return clientObject(c, ctx, "Client.Adapter", path, (*connect.Wiring).NewAdapter, newAdapter)
 }
 
 // AllAdapters mints live Adapter handles for every adapter iwd currently
@@ -269,37 +239,7 @@ func (c *Client) AllAdapters(ctx context.Context) ([]*Adapter, error) {
 //
 // Use Daemon.Devices to discover valid device paths.
 func (c *Client) Device(ctx context.Context, path string) (*Device, error) {
-	const op = "Client.Device"
-	log := logging.FromContext(ctx)
-
-	if c == nil {
-		log.Error(ctx, "client uninitialized", "op", op)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-
-	c.closeMu.RLock()
-	defer c.closeMu.RUnlock()
-	if c.closed {
-		log.Error(ctx, "client already closed", "op", op, "path", path)
-		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
-	}
-	if c.wire == nil {
-		log.Error(ctx, "client wiring uninitialized", "op", op)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-
-	coreDevice, err := c.wire.NewDevice(ctx, path)
-	if err != nil {
-		log.Error(ctx, "device wiring failed", "op", op, "path", path, "err", err)
-		return nil, wrapPublicError(op, err)
-	}
-
-	pub := newDevice(coreDevice, path)
-	if pub == nil {
-		log.Error(ctx, "device wrapper unexpectedly nil", "op", op, "path", path)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-	return pub, nil
+	return clientObject(c, ctx, "Client.Device", path, (*connect.Wiring).NewDevice, newDevice)
 }
 
 // AllDevices mints live Device handles for every device iwd currently exposes.
@@ -358,37 +298,7 @@ func (c *Client) AllDevices(ctx context.Context) ([]*Device, error) {
 //
 // Use Daemon.BasicServiceSets to discover valid BSS paths.
 func (c *Client) BasicServiceSet(ctx context.Context, path string) (*BasicServiceSet, error) {
-	const op = "Client.BasicServiceSet"
-	log := logging.FromContext(ctx)
-
-	if c == nil {
-		log.Error(ctx, "client uninitialized", "op", op)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-
-	c.closeMu.RLock()
-	defer c.closeMu.RUnlock()
-	if c.closed {
-		log.Error(ctx, "client already closed", "op", op, "path", path)
-		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
-	}
-	if c.wire == nil {
-		log.Error(ctx, "client wiring uninitialized", "op", op)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-
-	coreBSS, err := c.wire.NewBasicServiceSet(ctx, path)
-	if err != nil {
-		log.Error(ctx, "basic service set wiring failed", "op", op, "path", path, "err", err)
-		return nil, wrapPublicError(op, err)
-	}
-
-	pub := newBasicServiceSet(coreBSS, path)
-	if pub == nil {
-		log.Error(ctx, "basic service set wrapper unexpectedly nil", "op", op, "path", path)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-	return pub, nil
+	return clientObject(c, ctx, "Client.BasicServiceSet", path, (*connect.Wiring).NewBasicServiceSet, newBasicServiceSet)
 }
 
 // AllBasicServiceSets mints live BasicServiceSet handles for every BSS iwd
@@ -447,37 +357,7 @@ func (c *Client) AllBasicServiceSets(ctx context.Context) ([]*BasicServiceSet, e
 //
 // Use Daemon.Networks to discover valid network paths.
 func (c *Client) Network(ctx context.Context, path string) (*Network, error) {
-	const op = "Client.Network"
-	log := logging.FromContext(ctx)
-
-	if c == nil {
-		log.Error(ctx, "client uninitialized", "op", op)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-
-	c.closeMu.RLock()
-	defer c.closeMu.RUnlock()
-	if c.closed {
-		log.Error(ctx, "client already closed", "op", op, "path", path)
-		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
-	}
-	if c.wire == nil {
-		log.Error(ctx, "client wiring uninitialized", "op", op)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-
-	coreNetwork, err := c.wire.NewNetwork(ctx, path)
-	if err != nil {
-		log.Error(ctx, "network wiring failed", "op", op, "path", path, "err", err)
-		return nil, wrapPublicError(op, err)
-	}
-
-	pub := newNetwork(coreNetwork, path)
-	if pub == nil {
-		log.Error(ctx, "network wrapper unexpectedly nil", "op", op, "path", path)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-	return pub, nil
+	return clientObject(c, ctx, "Client.Network", path, (*connect.Wiring).NewNetwork, newNetwork)
 }
 
 // AllNetworks mints live Network handles for every network iwd currently
@@ -537,37 +417,7 @@ func (c *Client) AllNetworks(ctx context.Context) ([]*Network, error) {
 //
 // Use Daemon.KnownNetworks to discover valid known-network paths.
 func (c *Client) KnownNetwork(ctx context.Context, path string) (*KnownNetwork, error) {
-	const op = "Client.KnownNetwork"
-	log := logging.FromContext(ctx)
-
-	if c == nil {
-		log.Error(ctx, "client uninitialized", "op", op)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-
-	c.closeMu.RLock()
-	defer c.closeMu.RUnlock()
-	if c.closed {
-		log.Error(ctx, "client already closed", "op", op, "path", path)
-		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
-	}
-	if c.wire == nil {
-		log.Error(ctx, "client wiring uninitialized", "op", op)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-
-	coreKnownNetwork, err := c.wire.NewKnownNetwork(ctx, path)
-	if err != nil {
-		log.Error(ctx, "known network wiring failed", "op", op, "path", path, "err", err)
-		return nil, wrapPublicError(op, err)
-	}
-
-	pub := newKnownNetwork(coreKnownNetwork, path)
-	if pub == nil {
-		log.Error(ctx, "known network wrapper unexpectedly nil", "op", op, "path", path)
-		return nil, wrapPublicError(op, ErrInternal)
-	}
-	return pub, nil
+	return clientObject(c, ctx, "Client.KnownNetwork", path, (*connect.Wiring).NewKnownNetwork, newKnownNetwork)
 }
 
 // AllKnownNetworks mints live KnownNetwork handles for every known network iwd
