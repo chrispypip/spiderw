@@ -446,7 +446,15 @@ func ExampleAdapter_Properties() {
 	}
 	defer client.Close()
 
-	adapter, err := client.Adapter(ctx, "/net/connman/iwd/0")
+	refs, err := client.Daemon().Adapters(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no adapters found")
+	}
+
+	adapter, err := client.Adapter(ctx, refs[0].Path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -476,7 +484,15 @@ func ExampleAdapter_SupportsMode() {
 	}
 	defer client.Close()
 
-	adapter, err := client.Adapter(ctx, "/net/connman/iwd/0")
+	refs, err := client.Daemon().Adapters(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no adapters found")
+	}
+
+	adapter, err := client.Adapter(ctx, refs[0].Path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -499,7 +515,15 @@ func ExampleAdapter_SubscribePoweredChanged() {
 	}
 	defer client.Close()
 
-	adapter, err := client.Adapter(ctx, "/net/connman/iwd/0")
+	refs, err := client.Daemon().Adapters(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no adapters found")
+	}
+
+	adapter, err := client.Adapter(ctx, refs[0].Path)
 	if err != nil {
 		log.Fatal(err)
 	}
