@@ -21,6 +21,8 @@ var (
 	newIwdBSSFn           = iwdbus.NewBasicServiceSet
 	newIwdNetworkFn       = iwdbus.NewNetwork
 	newIwdKnownNetworkFn  = iwdbus.NewKnownNetwork
+	newIwdAgentManagerFn  = iwdbus.NewAgentManager
+	exportAgentFn         = iwdbus.ExportAgent
 	newCoreDaemonFn       = func(raw *iwdbus.Daemon) *core.Daemon { return core.NewDaemon(raw) }
 	newCoreAdapterFn      = func(raw *iwdbus.Adapter) *core.Adapter { return core.NewAdapter(raw) }
 	newCoreDeviceFn       = func(raw *iwdbus.Device) *core.Device { return core.NewDevice(raw) }
@@ -110,7 +112,15 @@ type Wiring struct {
 	// KnownNetworkFactory optionally overrides known-network construction for
 	// tests.
 	KnownNetworkFactory func(ctx context.Context, path string) (core.KnownNetworkIface, error)
+
+	// AgentFactory optionally overrides agent registration for tests.
+	AgentFactory func(ctx context.Context, cc core.CredentialCallbacks) (core.AgentIface, error)
 }
+
+// agentObjectPath is the D-Bus object path the credentials agent is exported at.
+// It lives in spiderw's own path namespace (the connection owns a unique bus
+// name), not under iwd's tree.
+const agentObjectPath = dbus.ObjectPath("/spiderw/agent")
 
 // NewAdapter constructs a core adapter wrapper for the given iwd object path.
 func (w *Wiring) NewAdapter(ctx context.Context, path string) (core.AdapterIface, error) {
@@ -286,4 +296,46 @@ func (w *Wiring) NewKnownNetwork(ctx context.Context, path string) (core.KnownNe
 		return nil, core.WrapKnownNetworkUnavailable(op, "known network unavailable", fmt.Errorf("core known network interface not available"))
 	}
 	return coreKnownNetwork, nil
+}
+
+// NewAgent exports a credentials agent built from cc and registers it with iwd,
+// returning a handle whose Unregister tears it back down.
+//
+// Unlike the single-object constructors above, an agent is an object spiderw
+// exports and iwd calls into: NewAgent exports the agent at agentObjectPath, then
+// calls AgentManager.RegisterAgent. On any failure after export, the object is
+// unexported before returning.
+func (w *Wiring) NewAgent(ctx context.Context, cc core.CredentialCallbacks) (core.AgentIface, error) {
+	const op = "NewAgent"
+
+	if w == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "wiring cannot be nil", core.ErrCore)
+	}
+	if w.AgentFactory != nil {
+		return w.AgentFactory(ctx, cc)
+	}
+	if w.Conn == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "D-Bus conn cannot be nil", core.ErrCore)
+	}
+
+	agent, handler := core.NewAgent(cc)
+
+	unexport, err := exportAgentFn(w.Conn, agentObjectPath, handler)
+	if err != nil {
+		return nil, core.WrapAgentUnavailable(op, "failed exporting agent object", err)
+	}
+
+	manager, err := newIwdAgentManagerFn(ctx, w.Conn)
+	if err != nil {
+		_ = unexport()
+		return nil, core.WrapAgentUnavailable(op, "agent manager unavailable", err)
+	}
+
+	if err := manager.RegisterAgent(ctx, agentObjectPath); err != nil {
+		_ = unexport()
+		return nil, core.WrapAgentUnavailable(op, "failed registering agent", err)
+	}
+
+	agent.Bind(manager, agentObjectPath, unexport)
+	return agent, nil
 }

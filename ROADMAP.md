@@ -35,12 +35,19 @@ The following areas are currently implemented and tested end to end:
   network type, owning device, optional known-network record, and basic service
   set membership via `ExtendedServiceSet`).
 - Connecting to open and already-known networks via `Network.Connect`, with
-  connected-state subscriptions. Connecting to a not-yet-known secured network
-  reports a mapped `ErrNoAgent` until agent support lands.
+  connected-state subscriptions.
+- Credentials agent support (`net.connman.iwd.Agent` / `AgentManager`) via
+  `Client.RegisterAgent`, enabling connection to not-yet-known secured (PSK)
+  networks. The PSK passphrase path is tested end to end; the 802.1x credential
+  callbacks (username/password and private-key passphrase) are wired through every
+  layer but are not yet tested against the mock or validated on hardware
+  (experimental). A not-yet-known secured network without a registered agent still
+  reports a mapped `ErrNoAgent`.
 - Known-network discovery, construction, and properties (name, type, hidden,
   last-connected time, auto-connect), plus toggling auto-connect, forgetting, and
   auto-connect subscriptions.
-- CLI coverage for daemon, adapter, device, basic service set, network, and
+- CLI coverage for daemon, adapter, device, basic service set, network (including
+  interactive secured connect with `--passphrase` / `--passphrase-stdin`), and
   known-network operations.
 - Mock iwd integration tests, including signal firehose coverage.
 - Shared adapter mode and network type parsing and formatting across layers.
@@ -58,8 +65,12 @@ The following areas are currently implemented and tested end to end:
 Likely future vertical slices include:
 
 - Stations, including station-driven network scanning.
-- Agent support (`net.connman.iwd.Agent`), required to connect to secured
-  networks that are not already known.
+- End-to-end test coverage for the 802.1x credential agent callbacks (a mock
+  fixture that drives `RequestUserNameAndPassword` / `RequestUserPassword` /
+  `RequestPrivateKeyPassphrase`), promoting them from experimental to tested.
+- Provisioning new networks, including the `NetworkConfigurationAgent` and full
+  802.1x/enterprise configuration (the credentials `Agent` is implemented, but
+  *configuring* a brand-new enterprise network is not).
 - Additional signal subscriptions for objects beyond adapters and networks.
 
 Each new slice should follow the established pattern:

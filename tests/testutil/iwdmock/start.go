@@ -323,3 +323,9 @@ func StartMockWithoutNetwork(t *testing.T, dir string) {
 func StartMockWithoutKnownNetwork(t *testing.T, dir string) {
 	startMockWithT(t, dir, []string{"--omit-knownnetwork"})
 }
+
+// StartMockWithoutAgent starts an iwd mock that does not export the AgentManager
+// interface, which exercises the client's "agent manager unavailable" path.
+func StartMockWithoutAgent(t *testing.T, dir string) {
+	startMockWithT(t, dir, []string{"--omit-agent"})
+}

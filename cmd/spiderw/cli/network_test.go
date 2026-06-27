@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -15,7 +16,7 @@ import (
 
 // fakeWithNetwork builds a client exposing the three networks the mock models:
 // an open network, a known (provisioned) network, and an unknown secured network
-// whose Connect fails.
+// that needs a credentials agent to connect.
 func fakeWithNetwork() *fakeClient {
 	known := "/net/connman/iwd/known_networks/1"
 
@@ -44,7 +45,6 @@ func fakeWithNetwork() *fakeClient {
 			Device: "/net/connman/iwd/phy0/wlan0",
 			Type:   spiderw.NetworkTypePSK,
 		},
-		connectErr: errors.New("no credentials agent registered"),
 	}
 
 	return &fakeClient{
@@ -87,17 +87,91 @@ func TestNetworkCmd_List(t *testing.T) {
 func TestNetworkCmd_Connect_Open(t *testing.T) {
 	t.Parallel()
 
-	out, code := driveCLI(fakeWithNetwork(), nil, false, "network", "OpenNet", "connect")
+	fc := fakeWithNetwork()
+	out, code := driveCLI(fc, nil, false, "network", "OpenNet", "connect")
 	require.Equal(t, 0, code, out)
 	require.Equal(t, "true", strings.TrimSpace(out))
+	// An open network needs no agent.
+	require.Nil(t, fc.registeredCfg)
 }
 
-func TestNetworkCmd_Connect_SecuredFails(t *testing.T) {
+func TestNetworkCmd_Connect_Secured_PassphraseFlag(t *testing.T) {
 	t.Parallel()
 
-	out, code := driveCLI(fakeWithNetwork(), nil, false, "network", "SecuredNet", "connect")
+	fc := fakeWithNetwork()
+	out, code := driveConnect(fc, "", nil, "network", "SecuredNet", "connect", "--passphrase=hunter2")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "true", strings.TrimSpace(out))
+
+	// The CLI registered an agent whose passphrase callback returns the flag
+	// value, then unregistered it.
+	require.NotNil(t, fc.registeredCfg)
+	require.NotNil(t, fc.registeredCfg.Passphrase)
+	secret, err := fc.registeredCfg.Passphrase(context.Background(), "/net/connman/iwd/phy0/wlan0/secured_psk")
+	require.NoError(t, err)
+	require.Equal(t, "hunter2", secret)
+	require.NotNil(t, fc.agent)
+	require.True(t, fc.agent.unregistered)
+}
+
+func TestNetworkCmd_Connect_Secured_PassphraseStdin(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithNetwork()
+	out, code := driveConnect(fc, "topsecret\n", nil, "network", "SecuredNet", "connect", "--passphrase-stdin")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "true", strings.TrimSpace(out))
+
+	require.NotNil(t, fc.registeredCfg)
+	secret, err := fc.registeredCfg.Passphrase(context.Background(), "p")
+	require.NoError(t, err)
+	require.Equal(t, "topsecret", secret)
+}
+
+func TestNetworkCmd_Connect_Secured_Prompt(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithNetwork()
+	prompt := func(string) (string, error) { return "prompted-secret", nil }
+	out, code := driveConnect(fc, "", prompt, "network", "SecuredNet", "connect")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "true", strings.TrimSpace(out))
+
+	require.NotNil(t, fc.registeredCfg)
+	secret, err := fc.registeredCfg.Passphrase(context.Background(), "p")
+	require.NoError(t, err)
+	require.Equal(t, "prompted-secret", secret)
+}
+
+func TestNetworkCmd_Connect_Secured_BothSourcesRejected(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithNetwork()
+	out, code := driveConnect(fc, "x\n", nil, "network", "SecuredNet", "connect", "--passphrase=y", "--passphrase-stdin")
 	require.Equal(t, 1, code)
-	require.Contains(t, out, "no credentials agent registered")
+	require.Contains(t, out, "only one of --passphrase")
+	require.Nil(t, fc.registeredCfg)
+}
+
+func TestNetworkCmd_Connect_Secured_RegisterFails(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithNetwork()
+	fc.registerErr = errors.New("agent slot taken")
+	out, code := driveConnect(fc, "", func(string) (string, error) { return "s", nil }, "network", "SecuredNet", "connect")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "agent slot taken")
+}
+
+func TestNetworkCmd_Connect_Known_NoAgent(t *testing.T) {
+	t.Parallel()
+
+	// A known (provisioned) secured network connects without an agent.
+	fc := fakeWithNetwork()
+	out, code := driveCLI(fc, nil, false, "network", "KnownNet", "connect")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "true", strings.TrimSpace(out))
+	require.Nil(t, fc.registeredCfg)
 }
 
 func TestNetworkCmd_Type(t *testing.T) {

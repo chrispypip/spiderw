@@ -44,6 +44,15 @@ var (
 	// initialization.
 	ErrKnownNetworkUninitialized = errors.New("known network is not initialized")
 
+	// ErrAgentManagerUninitialized indicates that an AgentManager was used before
+	// initialization.
+	ErrAgentManagerUninitialized = errors.New("agent manager is not initialized")
+
+	// ErrAgentCanceled is the value an AgentHandler callback returns to decline a
+	// credentials request. The exported agent maps it (and, defensively, any
+	// non-nil error) to the IwdAgentErrorCanceled D-Bus error returned to iwd.
+	ErrAgentCanceled = errors.New("credentials request canceled")
+
 	// ErrNoAgent indicates that iwd rejected an operation because no credentials
 	// agent is registered. Connecting to a secured network that is not already
 	// known requires a registered agent to supply credentials.

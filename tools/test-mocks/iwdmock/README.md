@@ -27,8 +27,9 @@ API, which is the iwd version spiderw is developed and tested against.
   net.connman.iwd
   ```
 
-* Exposes a small set of objects (currently: ObjectManager, daemon, adapter,
-  device, basic service sets, networks, and known networks)
+* Exposes a small set of objects (currently: ObjectManager, daemon (which also
+  hosts the AgentManager interface), adapter, device, basic service sets,
+  networks, and known networks)
 * Can emit signals, including a "firehose" mode to stress the dispatcher
 * Supports session bus only (it connects via `dbus.ConnectSessionBus()`)
 ---
@@ -211,6 +212,10 @@ defined across:
 * `--omit-knownnetwork`
   Don't export the known-network objects, exercising empty known-network
   enumeration.
+* `--omit-agent`
+  Don't export the `net.connman.iwd.AgentManager` interface, so agent
+  registration is unavailable. Exercises the client's "agent manager
+  unavailable" path.
 
 The mock exports multiple basic service sets by default, mirroring iwd reporting
 one BSS per access point/radio a device can hear during a scan. It also exports
@@ -218,6 +223,19 @@ three networks — an open network, a known (provisioned) secured network, and a
 unknown secured network — so `Network.Connect` exercises both the no-agent
 success paths and the `net.connman.iwd.NoAgent` rejection. The open network's
 `ExtendedServiceSet` lists both mock BSSes, demonstrating multi-BSS membership.
+
+### Credentials agent (AgentManager)
+
+The mock daemon also hosts the `net.connman.iwd.AgentManager` interface
+(`RegisterAgent`/`UnregisterAgent`) on the daemon object, recording the single
+registered agent the way iwd does — a second `RegisterAgent` is rejected with
+`net.connman.iwd.AlreadyExists`, and unregistering an unknown path with
+`net.connman.iwd.NotFound`. Connecting the unknown secured network drives the
+full callback loop: the mock calls the registered agent's `RequestPassphrase`
+back over D-Bus and connects only when it returns the expected passphrase
+(`mock-secret-passphrase`); a wrong or declined passphrase yields
+`net.connman.iwd.Failed`, and no registered agent yields
+`net.connman.iwd.NoAgent`. Use `--omit-agent` to drop the interface entirely.
 
 Two known networks are exported: one (`psk`, with a last-connected time and
 auto-connect on) at the path the mock network references via its `KnownNetwork`
@@ -243,3 +261,30 @@ Guidelines:
 * Avoid adding timing/state complexity
 * Match real iwd introspection XML as closely as possible
 * Add/adjust integration tests alongside new mock behavior
+
+### Fidelity principle
+
+Be faithful to what spiderw *observes at the boundary*; do not reimplement iwd's
+*internal state machine*.
+
+Model with high fidelity:
+
+* Property **shape** — types, and especially presence/absence (e.g. omit
+  `KnownNetwork` when a network is not known; omit `LastConnectedTime` when a
+  known network has never connected).
+* Realistic **fixture values** so normalization and both branches get exercised
+  (e.g. one known network with `AutoConnect` true and one false).
+* **Method contracts and error names** for a given input (`Connect` →
+  `NoAgent`/`Failed`, `RegisterAgent` → `AlreadyExists`, etc.).
+
+Do **not** simulate iwd's stateful side effects — provisioning a `KnownNetwork`
+on first connect, computing the `AutoConnect` default, object
+creation/destruction, calling `Agent.Release` on a client-initiated
+`UnregisterAgent` — unless a specific spiderw code path observes that transition
+in the same flow.
+
+Litmus test: *does spiderw read back the result of the side effect in the same
+flow?* If yes, simulate it minimally (this is why the mock validates the secured
+passphrase against a constant — spiderw's agent + `Connect` flow has both success
+and failure branches to exercise). If no, simulating it tests a reimplementation
+of iwd rather than spiderw, so leave it to real-hardware testing.

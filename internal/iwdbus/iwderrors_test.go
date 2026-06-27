@@ -28,6 +28,16 @@ func TestIwdErrorMapping(t *testing.T) {
 		{name: IwdErrorTimeout, sentinel: ErrTimeout},
 		{name: IwdErrorInProgress, sentinel: ErrInProgress},
 		{name: IwdErrorNotConfigured, sentinel: ErrNotConfigured},
+		{name: IwdErrorNotFound, sentinel: ErrNotFound},
+		{name: IwdErrorAlreadyExists, sentinel: ErrAlreadyExists},
+		{name: IwdErrorInvalidArguments, sentinel: ErrInvalidArguments},
+		{name: IwdErrorInvalidFormat, sentinel: ErrInvalidFormat},
+		{name: IwdErrorNotConnected, sentinel: ErrNotConnected},
+		{name: IwdErrorNotImplemented, sentinel: ErrNotImplemented},
+		{name: IwdErrorServiceSetOverlap, sentinel: ErrServiceSetOverlap},
+		{name: IwdErrorAlreadyProvisioned, sentinel: ErrAlreadyProvisioned},
+		{name: IwdErrorNotHidden, sentinel: ErrNotHidden},
+		{name: IwdErrorNotAvailable, sentinel: ErrNotAvailable},
 	}
 
 	for _, tc := range cases {

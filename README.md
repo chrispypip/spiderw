@@ -17,9 +17,11 @@ Wi-Fi interfaces, iwd, and mockable runtime behavior. It provides:
 > **Project status: early development (pre-v1).** The public API is **unstable**
 > and may change without notice until the first tagged release. The implemented
 > surface today covers `Client`, `Daemon`, `Adapter`, `Device`,
-> `BasicServiceSet`, `Network`, and `KnownNetwork` (identity, powered/mode state,
-> supported modes, property subscriptions, connecting to open or already-known
-> networks, and managing saved networks) — with much more of the iwd API planned.
+> `BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
+> (identity, powered/mode state, supported modes, property subscriptions,
+> connecting to open, already-known, **and secured (PSK)** networks via a
+> registered agent, and managing saved networks) — with much more of the iwd API
+> planned.
 > It is developed and tested
 > against **iwd 3.12** (see [Compatibility & Requirements](#compatibility--requirements)).
 > Issues are welcome; pull requests for new features are not being accepted yet
@@ -50,12 +52,19 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
   version the project targets and validates against; the bundled mock's
   introspection XML is modeled on it.
 - **Supported iwd interfaces:** `Daemon`, `Adapter`, `Device`,
-  `BasicServiceSet`, `Network`, and `KnownNetwork`. Network `Connect()` works for
-  open and already-known networks; connecting to a not-yet-known secured network
-  requires a credentials agent (`net.connman.iwd.Agent`), which is **not yet
-  implemented** and surfaces as an error matching `spiderw.ErrNoAgent`.
-  `KnownNetwork` supports inspecting saved networks, toggling auto-connect, and
-  forgetting them. More of the iwd API is planned — see the [Roadmap](ROADMAP.md).
+  `BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
+  (`net.connman.iwd.Agent` / `AgentManager`). Network `Connect()` works for open
+  and already-known networks with no agent; connecting to a not-yet-known secured
+  network requires a registered agent (`Client.RegisterAgent`) to supply
+  credentials — without one, `Connect()` surfaces an error matching
+  `spiderw.ErrNoAgent`. The agent's **PSK passphrase** path is implemented and
+  tested end to end. The 802.1x credential callbacks (username/password and
+  private-key passphrase) are wired through every layer but are **not yet tested
+  against the mock or validated on hardware** — treat them as experimental.
+  *Provisioning* a brand-new 802.1x network (`NetworkConfigurationAgent`) is not
+  implemented. `KnownNetwork` supports inspecting saved networks, toggling
+  auto-connect, and forgetting them. More of the iwd API is planned — see the
+  [Roadmap](ROADMAP.md).
 - **Operating system:** **Linux only.** iwd is a Linux wireless daemon; spiderw
   has no support for other platforms.
 - **D-Bus:** Requires access to a D-Bus bus. Real iwd runs on the **system bus**
@@ -188,15 +197,18 @@ if err != nil {
 The public error categories are `KindUnavailable`, `KindInvalidState`,
 `KindInvalidArgument`, and `KindInternal`. Resource values include
 `ResourceClient`, `ResourceDaemon`, `ResourceAdapter`, `ResourceDevice`,
-`ResourceBasicServiceSet`, `ResourceNetwork`, `ResourceKnownNetwork`, and
-`ResourceStation`.
+`ResourceBasicServiceSet`, `ResourceNetwork`, `ResourceKnownNetwork`,
+`ResourceStation`, and `ResourceAgent`.
 
 Some operations also map specific iwd D-Bus errors to matchable sentinels, so you
 can react to a precise outcome without parsing text. For example,
 `Network.Connect` surfaces `spiderw.ErrNoAgent` (no credentials agent
 registered), `spiderw.ErrBusy`, `spiderw.ErrInProgress`, `spiderw.ErrFailed`,
 `spiderw.ErrTimeout`, `spiderw.ErrAborted`, `spiderw.ErrNotSupported`, and
-`spiderw.ErrNotConfigured` — all usable with `errors.Is`.
+`spiderw.ErrNotConfigured`; registering an agent can surface
+`spiderw.ErrAlreadyExists` (another agent already owns the connection). These
+join the rest of iwd's named errors (`spiderw.ErrNotFound`,
+`spiderw.ErrInvalidArguments`, …) — all usable with `errors.Is`.
 
 ---
 
@@ -413,9 +425,7 @@ spiderw network list
 spiderw network status
 ```
 
-Use the SSID or path from `network list` as the network reference. `connect`
-works for open and already-known networks; other secured networks need a
-credentials agent (not yet implemented):
+Use the SSID or path from `network list` as the network reference:
 
 ```bash
 spiderw network OpenNet status
@@ -426,6 +436,17 @@ spiderw network OpenNet device
 spiderw network OpenNet known-network
 spiderw network OpenNet bsses
 spiderw network OpenNet monitor connected
+```
+
+`connect` joins open and already-known networks directly. For a not-yet-known
+secured (PSK) network it registers a temporary credentials agent and supplies the
+passphrase from `--passphrase`, `--passphrase-stdin`, or an interactive no-echo
+prompt:
+
+```bash
+spiderw network MyWifi connect                       # prompts: Passphrase: ******
+spiderw network MyWifi connect --passphrase=hunter2  # non-interactive
+echo hunter2 | spiderw network MyWifi connect --passphrase-stdin
 ```
 
 List known (saved) networks, or print a full snapshot for every one:

@@ -254,6 +254,49 @@ func ExampleNetwork_Connect() {
 	}
 }
 
+// ExampleClient_RegisterAgent connects to a secured (PSK) network by registering
+// a credentials agent that supplies the passphrase when iwd asks for it.
+func ExampleClient_RegisterAgent() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	// iwd calls Passphrase only when it actually needs credentials (a secured
+	// network that is not already known). networkPath identifies the network;
+	// resolve it with client.Network if you need its details.
+	agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
+		Passphrase: func(_ context.Context, networkPath string) (string, error) {
+			return lookupPassphraseFor(networkPath), nil
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = agent.Unregister(ctx) }()
+
+	refs, err := client.Daemon().Networks(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no networks found")
+	}
+
+	network, err := client.Network(ctx, refs[0].Path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := network.Connect(ctx); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("connected")
+}
+
 // ExampleNetwork_ExtendedServiceSet lists the basic service sets (access points)
 // that make up a network and resolves each path to a live BasicServiceSet handle.
 func ExampleNetwork_ExtendedServiceSet() {
@@ -496,4 +539,11 @@ func Example_errorHandling() {
 		}
 
 	}
+}
+
+// lookupPassphraseFor stands in for however an application supplies credentials
+// (a keyring, a config file, an interactive prompt, ...). It is used by
+// ExampleClient_RegisterAgent.
+func lookupPassphraseFor(networkPath string) string {
+	return networkPath + ": correct horse battery staple"
 }

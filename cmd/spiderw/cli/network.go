@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -272,12 +274,58 @@ func (r networkBSSesResult) String() string {
 	return strings.Join(r.ExtendedServiceSet, "\n")
 }
 
+const networkConnectUsage = "usage: spiderw network <network> connect [--passphrase=<secret> | --passphrase-stdin]"
+
 func runNetworkConnect(app *App, ctx context.Context, networkRef string, args []string) error {
-	if len(args) != 0 {
-		return fmt.Errorf("usage: spiderw network <network> connect")
+	fs := flag.NewFlagSet("connect", flag.ContinueOnError)
+	fs.SetOutput(app.stderr())
+	passphrase := fs.String("passphrase", "", "passphrase for a secured (PSK) network")
+	passStdin := fs.Bool("passphrase-stdin", false, "read the passphrase from the first line of stdin")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("%s", networkConnectUsage)
 	}
 
-	return withNetwork(app, ctx, networkRef, func(ctx context.Context, n networkAPI) error {
+	passphraseSet := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "passphrase" {
+			passphraseSet = true
+		}
+	})
+	if passphraseSet && *passStdin {
+		return fmt.Errorf("specify only one of --passphrase or --passphrase-stdin")
+	}
+
+	return app.withClient(ctx, func(client clientAPI) error {
+		n, err := networkByRef(ctx, client, networkRef)
+		if err != nil {
+			return err
+		}
+
+		needsAgent, err := networkNeedsAgent(ctx, n)
+		if err != nil {
+			return err
+		}
+
+		if needsAgent {
+			secret, err := resolveConnectPassphrase(app, networkRef, passphraseSet, *passphrase, *passStdin)
+			if err != nil {
+				return err
+			}
+
+			agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
+				Passphrase: func(context.Context, string) (string, error) {
+					return secret, nil
+				},
+			})
+			if err != nil {
+				return err
+			}
+			defer func() { _ = agent.Unregister(context.Background()) }()
+		}
+
 		if err := n.Connect(ctx); err != nil {
 			return err
 		}
@@ -288,6 +336,49 @@ func runNetworkConnect(app *App, ctx context.Context, networkRef string, args []
 		}
 		return app.printOutput(networkConnectedResult{Network: networkRef, Connected: connected})
 	})
+}
+
+// networkNeedsAgent reports whether connecting to n requires a credentials
+// agent: true only for a secured network iwd does not already know. Open and
+// known networks connect without one.
+//
+// It reads Type and KnownNetwork in a single Properties (GetAll) call, which also
+// avoids a single-property Get of the optional KnownNetwork (absent for a network
+// iwd does not know).
+func networkNeedsAgent(ctx context.Context, n networkAPI) (bool, error) {
+	props, err := n.Properties(ctx)
+	if err != nil {
+		return false, err
+	}
+	if props.Type == spiderw.NetworkTypeOpen {
+		return false, nil
+	}
+	return props.KnownNetwork == nil, nil
+}
+
+// resolveConnectPassphrase obtains the passphrase for a secured connect, in
+// precedence order: --passphrase, then --passphrase-stdin, then an interactive
+// no-echo terminal prompt.
+func resolveConnectPassphrase(app *App, networkRef string, passphraseSet bool, passphrase string, passStdin bool) (string, error) {
+	switch {
+	case passphraseSet:
+		return passphrase, nil
+	case passStdin:
+		return readPassphraseStdin(app)
+	default:
+		return app.promptPassphrase(fmt.Sprintf("Passphrase for %s: ", networkRef))
+	}
+}
+
+func readPassphraseStdin(app *App) (string, error) {
+	scanner := bufio.NewScanner(app.stdin())
+	if !scanner.Scan() {
+		if err := scanner.Err(); err != nil {
+			return "", fmt.Errorf("reading passphrase from stdin: %w", err)
+		}
+		return "", fmt.Errorf("no passphrase provided on stdin")
+	}
+	return scanner.Text(), nil
 }
 
 func runNetworkConnected(app *App, ctx context.Context, networkRef string, args []string) error {
@@ -474,7 +565,9 @@ const networkHelpText = `Commands:
   list                             List networks (name and path)
   status                           Show a snapshot of every network
   <network> status                 Show a snapshot of one network
-  <network> connect                Connect to the network (open/known only without an agent)
+  <network> connect                Connect to the network; for a secured network
+                                   supply --passphrase=<secret>, --passphrase-stdin,
+                                   or answer the interactive prompt
   <network> connected              Show whether the network is connected
   <network> type                   Show the network type
   <network> device                 Show the owning device object path

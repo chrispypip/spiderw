@@ -25,7 +25,12 @@ type clientAPI interface {
 	AllBasicServiceSets(ctx context.Context) ([]bssAPI, error)
 	AllNetworks(ctx context.Context) ([]networkAPI, error)
 	AllKnownNetworks(ctx context.Context) ([]knownNetworkAPI, error)
+	RegisterAgent(ctx context.Context, cfg spiderw.AgentConfig) (agentAPI, error)
 	Close() error
+}
+
+type agentAPI interface {
+	Unregister(ctx context.Context) error
 }
 
 type daemonAPI interface {
@@ -214,6 +219,14 @@ func (r realClient) AllKnownNetworks(ctx context.Context) ([]knownNetworkAPI, er
 		out = append(out, k)
 	}
 	return out, nil
+}
+
+func (r realClient) RegisterAgent(ctx context.Context, cfg spiderw.AgentConfig) (agentAPI, error) {
+	a, err := r.c.RegisterAgent(ctx, cfg)
+	if a == nil {
+		return nil, err
+	}
+	return a, err
 }
 
 func (r realClient) Close() error {

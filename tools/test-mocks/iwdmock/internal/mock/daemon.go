@@ -10,25 +10,38 @@ import (
 
 const daemonPath = dbus.ObjectPath("/net/connman/iwd")
 
-// Daemon represents the iwd Daemon interface mock.
+// Daemon represents the iwd Daemon interface mock. It also hosts the
+// AgentManager interface, which lives on the same object in real iwd.
 type Daemon struct{}
 
 // ExportDaemon registers the mock Daemon on the session bus.
 func ExportDaemon(conn *dbus.Conn) error {
-	if !*omitDaemonFlag {
-		d := &Daemon{}
-		// Export Daemon interface
-		if err := conn.Export(d, daemonPath, iwdbus.IwdDaemonIface); err != nil {
-			return err
-		}
-		// Export Properties interface
-		if err := conn.Export(d, daemonPath, "org.freedesktop.DBus.Properties"); err != nil {
-			return err
-		}
-		// Export Introspectable interface
-		return exportDaemonIntrospection(conn)
+	if *omitDaemonFlag {
+		return nil
 	}
-	return nil
+
+	d := &Daemon{}
+	// Export Daemon interface
+	if err := conn.Export(d, daemonPath, iwdbus.IwdDaemonIface); err != nil {
+		return err
+	}
+	// Export Properties interface
+	if err := conn.Export(d, daemonPath, "org.freedesktop.DBus.Properties"); err != nil {
+		return err
+	}
+
+	// Export the AgentManager interface on the same object, and record the
+	// connection so a registered agent can be called back. --omit-agent leaves
+	// the interface off entirely, so agent registration is unavailable.
+	if agentManagerExported() {
+		if err := conn.Export(d, daemonPath, iwdbus.IwdAgentManagerIface); err != nil {
+			return err
+		}
+		agents.bindConn(conn)
+	}
+
+	// Export Introspectable interface
+	return exportDaemonIntrospection(conn)
 }
 
 // GetInfo implements net.connman.iwd.Daemon.GetInfo.

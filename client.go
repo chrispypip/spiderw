@@ -22,6 +22,7 @@ type Client struct {
 	daemon    *Daemon
 	wire      *connect.Wiring
 	cleanup   func() error
+	agent     *Agent
 	closeMu   sync.RWMutex
 	closeOnce sync.Once
 	closed    bool
@@ -139,14 +140,26 @@ func (c *Client) Close() error {
 
 	c.closeOnce.Do(func() {
 		c.closeMu.Lock()
-		defer c.closeMu.Unlock()
 		c.closed = true
 		c.daemon = nil
-		if c.cleanup == nil {
+		agent := c.agent
+		c.agent = nil
+		cleanup := c.cleanup
+		// Release the lock before calling out to Unregister: the agent's clear
+		// callback re-acquires closeMu, and cleanup may block on D-Bus I/O.
+		c.closeMu.Unlock()
+
+		// Best-effort: unregister a live agent so iwd drops its reference before
+		// the connection closes. Unregister is idempotent.
+		if agent != nil {
+			_ = agent.Unregister(context.Background())
+		}
+
+		if cleanup == nil {
 			return
 		}
 
-		err := c.cleanup()
+		err := cleanup()
 		if err == nil {
 			return
 		}
@@ -174,6 +187,68 @@ func (c *Client) Daemon() *Daemon {
 		return nil
 	}
 	return c.daemon
+}
+
+// RegisterAgent registers a credentials agent so iwd can request credentials
+// when connecting to a secured network that is not already known. Without a
+// registered agent, Network.Connect on such a network fails (ErrUnavailable, with
+// iwd's ErrNoAgent in the chain).
+//
+// At least one request callback in cfg must be set, or RegisterAgent returns an
+// invalid-argument error. A Client owns a single agent: RegisterAgent returns an
+// invalid-state error if one is already registered, so Unregister the previous
+// agent first. The returned Agent is also unregistered automatically on Close.
+func (c *Client) RegisterAgent(ctx context.Context, cfg AgentConfig) (*Agent, error) {
+	const op = "Client.RegisterAgent"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	cc := cfg.toCore()
+	if err := cc.Validate(op); err != nil {
+		log.Error(ctx, "invalid agent config", "op", op, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	c.closeMu.Lock()
+	defer c.closeMu.Unlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+	if c.agent != nil {
+		log.Error(ctx, "agent already registered", "op", op)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceAgent, Op: op, Err: ErrInvalidState}
+	}
+
+	coreAgent, err := c.wire.NewAgent(ctx, cc)
+	if err != nil {
+		log.Error(ctx, "agent registration failed", "op", op, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	pub := newAgent(coreAgent, func() {
+		c.closeMu.Lock()
+		defer c.closeMu.Unlock()
+		if c.agent != nil && c.agent.core == coreAgent {
+			c.agent = nil
+		}
+	})
+	if pub == nil {
+		log.Error(ctx, "agent wrapper unexpectedly nil", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+	c.agent = pub
+
+	log.Debug(ctx, "agent registered", "op", op)
+	return pub, nil
 }
 
 // Adapter creates an Adapter wrapper for a specific iwd adapter object path.

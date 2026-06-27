@@ -77,6 +77,10 @@ const (
 	// ResourceKnownNetwork identifies failures involving an iwd known-network
 	// object.
 	ResourceKnownNetwork = failure.ResourceKnownNetwork
+
+	// ResourceAgent identifies failures involving the iwd credentials agent or
+	// agent manager.
+	ResourceAgent = failure.ResourceAgent
 )
 
 // Error sentinels support errors.Is checks in core-layer errors.
@@ -108,6 +112,9 @@ var (
 	// raw backend.
 	ErrKnownNetworkNotInitialized = errors.New("known network not initialized")
 
+	// ErrAgentNotInitialized indicates that an Agent wrapper has no backend.
+	ErrAgentNotInitialized = errors.New("agent not initialized")
+
 	// ErrNoAgent indicates that iwd rejected an operation because no credentials
 	// agent is registered. It is re-exported from the iwdbus layer so callers can
 	// match it with errors.Is through the core and public error chains.
@@ -122,6 +129,17 @@ var (
 	ErrTimeout       = iwdbus.ErrTimeout
 	ErrInProgress    = iwdbus.ErrInProgress
 	ErrNotConfigured = iwdbus.ErrNotConfigured
+
+	ErrNotFound           = iwdbus.ErrNotFound
+	ErrAlreadyExists      = iwdbus.ErrAlreadyExists
+	ErrInvalidArguments   = iwdbus.ErrInvalidArguments
+	ErrInvalidFormat      = iwdbus.ErrInvalidFormat
+	ErrNotConnected       = iwdbus.ErrNotConnected
+	ErrNotImplemented     = iwdbus.ErrNotImplemented
+	ErrServiceSetOverlap  = iwdbus.ErrServiceSetOverlap
+	ErrAlreadyProvisioned = iwdbus.ErrAlreadyProvisioned
+	ErrNotHidden          = iwdbus.ErrNotHidden
+	ErrNotAvailable       = iwdbus.ErrNotAvailable
 )
 
 func newError(kind Kind, resource Resource, op, details string, err error) error {
@@ -189,6 +207,9 @@ var (
 	bssUnavailablePolicy          = unavailablePolicy{resource: ResourceBasicServiceSet, includeDBusProperty: true}
 	networkUnavailablePolicy      = unavailablePolicy{resource: ResourceNetwork, includeDBusProperty: true}
 	knownNetworkUnavailablePolicy = unavailablePolicy{resource: ResourceKnownNetwork, includeDBusProperty: true}
+	// Agent operations are method calls (Register/Unregister) and object
+	// export/unexport, never property reads, so includeDBusProperty stays false.
+	agentUnavailablePolicy = unavailablePolicy{resource: ResourceAgent}
 )
 
 func wrapUnavailable(op, details string, err error, policy unavailablePolicy) error {
@@ -241,6 +262,12 @@ func WrapNetworkUnavailable(op, details string, err error) error {
 // resource.
 func WrapKnownNetworkUnavailable(op, details string, err error) error {
 	return wrapUnavailable(op, details, err, knownNetworkUnavailablePolicy)
+}
+
+// WrapAgentUnavailable classifies D-Bus agent/agent-manager failures by kind and
+// resource.
+func WrapAgentUnavailable(op, details string, err error) error {
+	return wrapUnavailable(op, details, err, agentUnavailablePolicy)
 }
 
 // WrapInvalidState wraps invalid state issues for resource.

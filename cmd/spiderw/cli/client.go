@@ -27,16 +27,39 @@ type App struct {
 	// Stderr receives diagnostic command output.
 	Stderr io.Writer
 
+	// Stdin is the input source for --passphrase-stdin.
+	Stdin io.Reader
+
 	// NewClient constructs the spiderw client used by commands.
 	NewClient clientFactory
+
+	// PromptPassphrase reads a passphrase interactively. Overridable in tests so
+	// the connect flow can be driven without a terminal.
+	PromptPassphrase func(prompt string) (string, error)
 }
 
 func newApp() *App {
 	return &App{
-		Stdout:    os.Stdout,
-		Stderr:    os.Stderr,
-		NewClient: defaultClientFactory,
+		Stdout:           os.Stdout,
+		Stderr:           os.Stderr,
+		Stdin:            os.Stdin,
+		NewClient:        defaultClientFactory,
+		PromptPassphrase: defaultPromptPassphrase,
 	}
+}
+
+func (a *App) stdin() io.Reader {
+	if a == nil || a.Stdin == nil {
+		return os.Stdin
+	}
+	return a.Stdin
+}
+
+func (a *App) promptPassphrase(prompt string) (string, error) {
+	if a == nil || a.PromptPassphrase == nil {
+		return defaultPromptPassphrase(prompt)
+	}
+	return a.PromptPassphrase(prompt)
 }
 
 func (a *App) newClient(ctx context.Context) (clientAPI, error) {

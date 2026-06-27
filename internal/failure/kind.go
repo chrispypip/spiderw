@@ -72,6 +72,10 @@ const (
 	// ResourceKnownNetwork identifies failures involving an iwd known-network
 	// object.
 	ResourceKnownNetwork Resource = "known network"
+
+	// ResourceAgent identifies failures involving the iwd credentials agent or
+	// agent manager.
+	ResourceAgent Resource = "agent"
 )
 
 // String returns the stable resource label.

@@ -2,6 +2,7 @@ package mock
 
 import (
 	_ "embed"
+	"strings"
 
 	"github.com/godbus/dbus/v5"
 
@@ -35,10 +36,19 @@ var (
 
 	//go:embed xml/knownnetwork.xml
 	knownNetworkIntrospectionXML []byte
+
+	//go:embed xml/agentmanager.xml
+	agentManagerIntrospectionXML []byte
 )
 
 func exportDaemonIntrospection(conn *dbus.Conn) error {
-	return conn.Export(introspectStub(daemonIntrospectionXML), iwdbus.IwdDaemonPath, iwdbus.DBusIntrospectableIface)
+	xml := daemonIntrospectionXML
+	if agentManagerExported() {
+		// Splice the AgentManager interface block in before the closing </node>
+		// so client introspection sees it alongside the Daemon interface.
+		xml = []byte(strings.Replace(string(daemonIntrospectionXML), "</node>", string(agentManagerIntrospectionXML)+"</node>", 1))
+	}
+	return conn.Export(introspectStub(xml), iwdbus.IwdDaemonPath, iwdbus.DBusIntrospectableIface)
 }
 
 func exportAdapterIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {

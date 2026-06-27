@@ -143,12 +143,26 @@ func (n *Network) extendedServiceSet() []dbus.ObjectPath {
 
 // Connect implements the mock Network.Connect method.
 //
-// It succeeds for open networks and for known (provisioned) networks, mirroring
-// iwd's behavior where neither needs a credentials agent. An unknown secured
-// network is rejected with net.connman.iwd.NoAgent.
+// Open and known (provisioned) networks connect with no agent, mirroring iwd. An
+// unknown secured network needs a credentials agent: the mock calls the
+// registered agent's RequestPassphrase and connects only if it returns the
+// expected passphrase. With no agent registered it is rejected with
+// net.connman.iwd.NoAgent; a wrong or declined passphrase yields
+// net.connman.iwd.Failed.
 func (n *Network) Connect() *dbus.Error {
 	if n.Type != "open" && n.KnownNetwork == "" {
-		return dbus.NewError(iwdbus.IwdErrorNoAgent, []interface{}{"No agent registered"})
+		passphrase, ok, err := agents.requestPassphrase(n.Path)
+		if !ok {
+			return dbus.NewError(iwdbus.IwdErrorNoAgent, []interface{}{"No agent registered"})
+		}
+		if err != nil {
+			// The agent declined (Canceled) or the callback failed; iwd surfaces
+			// this as an association failure.
+			return dbus.NewError(iwdbus.IwdErrorFailed, []interface{}{err.Error()})
+		}
+		if passphrase != securedNetworkPassphrase {
+			return invalidPassphraseError()
+		}
 	}
 
 	n.Connected = true

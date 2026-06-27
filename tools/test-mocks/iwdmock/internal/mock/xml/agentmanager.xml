@@ -1,0 +1,8 @@
+  <interface name="net.connman.iwd.AgentManager">
+    <method name="RegisterAgent">
+      <arg direction="in" name="path" type="o"/>
+    </method>
+    <method name="UnregisterAgent">
+      <arg direction="in" name="path" type="o"/>
+    </method>
+  </interface>

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"slices"
+	"strings"
 
 	"github.com/chrispypip/spiderw"
 )
@@ -36,6 +37,9 @@ type fakeClient struct {
 	allBSSErr     error
 	allNetErr     error
 	allKnownErr   error
+	registerErr   error                // returned by RegisterAgent(...)
+	registeredCfg *spiderw.AgentConfig // last config passed to RegisterAgent
+	agent         *fakeAgent
 	closed        bool
 }
 
@@ -96,9 +100,31 @@ func (f *fakeClient) AllKnownNetworks(context.Context) ([]knownNetworkAPI, error
 	return f.allKnownNets, f.allKnownErr
 }
 
+func (f *fakeClient) RegisterAgent(_ context.Context, cfg spiderw.AgentConfig) (agentAPI, error) {
+	if f.registerErr != nil {
+		return nil, f.registerErr
+	}
+	c := cfg
+	f.registeredCfg = &c
+	if f.agent == nil {
+		f.agent = &fakeAgent{}
+	}
+	return f.agent, nil
+}
+
 func (f *fakeClient) Close() error {
 	f.closed = true
 	return nil
+}
+
+type fakeAgent struct {
+	unregistered  bool
+	unregisterErr error
+}
+
+func (a *fakeAgent) Unregister(context.Context) error {
+	a.unregistered = true
+	return a.unregisterErr
 }
 
 type fakeDaemon struct {
@@ -472,6 +498,26 @@ func driveCLI(fake clientAPI, clientErr error, jsonOut bool, args ...string) (st
 			}
 			return fake, nil
 		},
+	}
+	code := runApp(app, args)
+	return buf.String(), code
+}
+
+// driveConnect drives the CLI with a stdin source and a passphrase-prompt
+// override, for exercising the secured-connect flow. A nil prompt leaves the
+// default (terminal) prompt in place; an empty stdin leaves the default.
+func driveConnect(fake clientAPI, stdin string, prompt func(string) (string, error), args ...string) (string, int) {
+	var buf bytes.Buffer
+	app := &App{
+		Stdout: &buf,
+		Stderr: &buf,
+		NewClient: func(context.Context, spiderw.Bus) (clientAPI, error) {
+			return fake, nil
+		},
+		PromptPassphrase: prompt,
+	}
+	if stdin != "" {
+		app.Stdin = strings.NewReader(stdin)
 	}
 	code := runApp(app, args)
 	return buf.String(), code

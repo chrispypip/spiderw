@@ -70,6 +70,10 @@ const (
 	// ResourceKnownNetwork identifies failures involving an iwd known-network
 	// object.
 	ResourceKnownNetwork Resource = Resource(failure.ResourceKnownNetwork)
+
+	// ResourceAgent identifies failures involving the iwd credentials agent or
+	// agent manager.
+	ResourceAgent Resource = Resource(failure.ResourceAgent)
 )
 
 // -----------------------------------------------------------------------------
@@ -117,6 +121,23 @@ var (
 	ErrTimeout       = core.ErrTimeout
 	ErrInProgress    = core.ErrInProgress
 	ErrNotConfigured = core.ErrNotConfigured
+
+	// ErrNotFound and ErrAlreadyExists are surfaced by the agent manager
+	// (UnregisterAgent on an unregistered agent; RegisterAgent when another agent
+	// already owns the connection), among other operations.
+	ErrNotFound      = core.ErrNotFound
+	ErrAlreadyExists = core.ErrAlreadyExists
+	// ErrInvalidArguments matches iwd's named net.connman.iwd.InvalidArguments
+	// error. It is distinct from ErrInvalidArgument (singular), which matches any
+	// public KindInvalidArgument error spiderw itself raises.
+	ErrInvalidArguments   = core.ErrInvalidArguments
+	ErrInvalidFormat      = core.ErrInvalidFormat
+	ErrNotConnected       = core.ErrNotConnected
+	ErrNotImplemented     = core.ErrNotImplemented
+	ErrServiceSetOverlap  = core.ErrServiceSetOverlap
+	ErrAlreadyProvisioned = core.ErrAlreadyProvisioned
+	ErrNotHidden          = core.ErrNotHidden
+	ErrNotAvailable       = core.ErrNotAvailable
 )
 
 // -----------------------------------------------------------------------------
