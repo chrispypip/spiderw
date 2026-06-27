@@ -45,12 +45,17 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
 
 ## Compatibility & Requirements
 
-- **iwd:** Developed and tested against **iwd 3.12**. spiderw talks to iwd over
-  its stable D-Bus API (`net.connman.iwd`) using **runtime introspection** rather
-  than compiled-in interface definitions, so other iwd releases that expose a
-  compatible D-Bus surface are expected to work. iwd 3.12 is the reference
-  version the project targets and validates against; the bundled mock's
-  introspection XML is modeled on it.
+- **iwd:** Developed and tested against **iwd 3.12**. spiderw targets iwd **3.12
+  and newer**, not a range of older releases. It talks to iwd over the
+  `net.connman.iwd` D-Bus API using **runtime introspection** rather than
+  compiled-in interface definitions, so *newer* iwd releases that keep a
+  compatible D-Bus surface are expected to work without changes. *Older* releases
+  are **not supported**: they may be missing interfaces or properties spiderw uses
+  (for example the `BasicServiceSet` interface and the `Network.ExtendedServiceSet`
+  property are absent on iwd too old to have that feature), and spiderw will fail
+  clearly rather than silently degrade. iwd 3.12 is the reference version the
+  project targets and validates against; the bundled mock's introspection XML is
+  modeled on it.
 - **Supported iwd interfaces:** `Daemon`, `Adapter`, `Device`,
   `BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
   (`net.connman.iwd.Agent` / `AgentManager`). Network `Connect()` works for open
