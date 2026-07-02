@@ -14,18 +14,18 @@ Wi-Fi interfaces, iwd, and mockable runtime behavior. It provides:
 - A Go-based iwd mock for integration testing without real iwd, Wi-Fi hardware, or kernel modules
 - Utilities and automation to ensure consistent behavior across environments
 
-> **Project status: early development (pre-v1).** The public API is **unstable**
-> and may change without notice until the first tagged release. The implemented
-> surface today covers `Client`, `Daemon`, `Adapter`, `Device`,
-> `BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
-> (identity, powered/mode state, supported modes, property subscriptions,
-> connecting to open, already-known, **and secured (PSK)** networks via a
-> registered agent, and managing saved networks) — with much more of the iwd API
-> planned.
-> It is developed and tested
-> against **iwd 3.12** (see [Compatibility & Requirements](#compatibility--requirements)).
-> Issues are welcome; pull requests for new features are not being accepted yet
-> (see [CONTRIBUTING](CONTRIBUTING.md)).
+**Project status: early development (pre-v1).** The public API is **unstable**
+and may change without notice until the first tagged release. The implemented
+surface today covers `Client`, `Daemon`, `Adapter`, `Device`,
+`BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
+(identity, powered/mode state, supported modes, property subscriptions,
+connecting to open, already-known, **and secured (PSK)** networks via a
+registered agent, and managing saved networks) — with much more of the iwd API
+planned.
+It is developed and tested
+against **iwd 3.12** (see [Compatibility & Requirements](#compatibility--requirements)).
+Issues are welcome; pull requests for new features are not being accepted yet
+(see [CONTRIBUTING](CONTRIBUTING.md)).
 
 **Pronunciation:** **spider double u**.
 
