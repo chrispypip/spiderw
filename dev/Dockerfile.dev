@@ -12,7 +12,7 @@
 #   - The build stage caches Go modules for fast rebuilds.
 #   - The project source is mounted at /workspace.
 #-------------------------------------------------------------------------------
-FROM ubuntu@sha256:1c4cc37c10c4678fd5369d172a4e079af8a28a6e6f724647ccaa311b4801c3c9
+FROM ubuntu@sha256:6fee4abc5fe6a21f40022199b2d5063eb591743c80d3d2f5fadf620a98cbae0d
 
 ENV DEBIAN_FRONTEND=noninteractive
 
