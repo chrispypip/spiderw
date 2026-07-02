@@ -1,0 +1,84 @@
+---
+name: iwd release watch
+
+# Upstream iwd lives on kernel.org, not GitHub, so there is no Releases API or
+# Dependabot to watch it. This workflow queries the iwd git tags weekly and
+# opens a tracking issue when a newer version than we've recorded appears,
+# prompting a real-hardware test pass.
+#
+# Dedup is stateless: an issue is created only if none already exists (open OR
+# closed) for the detected version, so a tested-and-closed version never
+# re-triggers and there is no state file to maintain.
+#
+# NOTE: scheduled + workflow_dispatch runs only fire from the DEFAULT branch,
+# so this takes effect once merged to main.
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"  # Mondays 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: check for new iwd release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}  # gh needs this without a checkout
+      IWD_REPO: https://git.kernel.org/pub/scm/network/wireless/iwd.git
+      LABEL: iwd-release
+    steps:
+      - name: Resolve latest upstream iwd version
+        id: iwd
+        run: |
+          latest=$(git ls-remote --tags --refs "$IWD_REPO" \
+            | sed 's#.*refs/tags/##' \
+            | grep -E '^[0-9]+(\.[0-9]+)+$' \
+            | sort -V | tail -n1) || true
+          if [ -z "$latest" ]; then
+            echo "Could not determine latest iwd version from $IWD_REPO" >&2
+            exit 1
+          fi
+          echo "Latest upstream iwd: $latest"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Open tracking issue if new
+        env:
+          LATEST: ${{ steps.iwd.outputs.latest }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          title="Test spiderw against iwd ${LATEST}"
+
+          # Stateless dedup: skip if any issue (open or closed) with our label
+          # already has this exact title.
+          existing=$(gh issue list --state all --label "$LABEL" --limit 500 \
+            --json title --jq "[.[] | select(.title == \"$title\")] | length")
+          if [ "$existing" -gt 0 ]; then
+            echo "Issue already exists for iwd ${LATEST}; nothing to do."
+            exit 0
+          fi
+
+          cat > issue-body.md <<EOF
+          Upstream **iwd ${LATEST}** is available.
+          spiderw has not been verified against this release yet.
+
+          iwd ships on kernel.org (no Releases feed), so it's tracked here.
+
+          ## Checklist
+          - [ ] Build spiderw against iwd ${LATEST}
+          - [ ] Run the integration suite on the Pi against real iwd ${LATEST}
+          - [ ] Confirm/update the documented support floor (README "iwd 3.12")
+          - [ ] Note any API or behavior changes
+
+          _Opened automatically by the \`iwd release watch\` workflow._
+          EOF
+
+          gh issue create \
+            --title "$title" \
+            --label "$LABEL" \
+            --assignee "$OWNER" \
+            --body-file issue-body.md
