@@ -317,6 +317,14 @@ func (c *Client) Device(ctx context.Context, path string) (*Device, error) {
 	return clientObject(c, ctx, "Client.Device", path, (*connect.Wiring).NewDevice, newDevice)
 }
 
+// Station creates a Station wrapper for a specific iwd station object path.
+//
+// A station shares its object with a device (a device in station mode), so path
+// is a device object path. Use Daemon.Stations to discover valid station paths.
+func (c *Client) Station(ctx context.Context, path string) (*Station, error) {
+	return clientObject(c, ctx, "Client.Station", path, (*connect.Wiring).NewStation, newStation)
+}
+
 // AllDevices mints live Device handles for every device iwd currently exposes.
 //
 // It enumerates devices via the daemon, then constructs a handle for each,
@@ -366,6 +374,58 @@ func (c *Client) AllDevices(ctx context.Context) ([]*Device, error) {
 	}
 
 	return devices, nil
+}
+
+// AllStations mints live Station handles for every station iwd currently
+// exposes.
+//
+// It enumerates stations via the daemon, then constructs a handle for each,
+// preserving the daemon's enumeration order. Use Station to obtain a single
+// station by path, or Daemon.Stations for lightweight references without
+// constructing handles.
+func (c *Client) AllStations(ctx context.Context) ([]*Station, error) {
+	const op = "Client.AllStations"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil || c.daemon == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	// Enumeration is the daemon's job; construction is the client's.
+	refs, err := c.daemon.Stations(ctx)
+	if err != nil {
+		log.Error(ctx, "station enumeration failed", "op", op, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	stations := make([]*Station, 0, len(refs))
+	for _, ref := range refs {
+		coreStation, err := c.wire.NewStation(ctx, ref.Path)
+		if err != nil {
+			log.Error(ctx, "station wiring failed", "op", op, "path", ref.Path, "err", err)
+			return nil, wrapPublicError(op, err)
+		}
+		pub := newStation(coreStation, ref.Path)
+		if pub == nil {
+			log.Error(ctx, "station wrapper unexpectedly nil", "op", op, "path", ref.Path)
+			return nil, wrapPublicError(op, ErrInternal)
+		}
+		stations = append(stations, pub)
+	}
+
+	return stations, nil
 }
 
 // BasicServiceSet creates a BasicServiceSet wrapper for a specific iwd BSS

@@ -16,12 +16,12 @@ Wi-Fi interfaces, iwd, and mockable runtime behavior. It provides:
 
 **Project status: early development (pre-v1).** The public API is **unstable**
 and may change without notice until the first tagged release. The implemented
-surface today covers `Client`, `Daemon`, `Adapter`, `Device`,
+surface today covers `Client`, `Daemon`, `Adapter`, `Device`, `Station`,
 `BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
 (identity, powered/mode state, supported modes, property subscriptions,
-connecting to open, already-known, **and secured (PSK)** networks via a
-registered agent, and managing saved networks) — with much more of the iwd API
-planned.
+read-only station connection state, connecting to open, already-known, **and
+secured (PSK)** networks via a registered agent, and managing saved networks) —
+with much more of the iwd API planned.
 It is developed and tested
 against **iwd 3.12** (see [Compatibility & Requirements](#compatibility--requirements)).
 Issues are welcome; pull requests for new features are not being accepted yet
@@ -56,9 +56,13 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
   clearly rather than silently degrade. iwd 3.12 is the reference version the
   project targets and validates against; the bundled mock's introspection XML is
   modeled on it.
-- **Supported iwd interfaces:** `Daemon`, `Adapter`, `Device`,
+- **Supported iwd interfaces:** `Daemon`, `Adapter`, `Device`, `Station`,
   `BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
-  (`net.connman.iwd.Agent` / `AgentManager`). Network `Connect()` works for open
+  (`net.connman.iwd.Agent` / `AgentManager`). `Station` currently exposes
+  **read-only connection state** — `State`, `Scanning`, `ConnectedNetwork`, and
+  the experimental `ConnectedAccessPoint` / `Affinities` — plus change
+  subscriptions; scanning (`Scan`, ordered networks) and station-driven
+  disconnect/hidden-connect are planned. Network `Connect()` works for open
   and already-known networks with no agent; connecting to a not-yet-known secured
   network requires a registered agent (`Client.RegisterAgent`) to supply
   credentials — without one, `Connect()` surfaces an error matching
@@ -406,6 +410,17 @@ spiderw device wlan0 address
 spiderw device wlan0 adapter
 spiderw device wlan0 monitor powered
 spiderw device wlan0 monitor mode
+```
+
+Inspect the read-only connection state of stations (devices in station mode).
+`status` shows `State`, `Scanning`, `ConnectedNetwork`, and the experimental
+`ConnectedAccessPoint` / `Affinities`. A station is referenced by its object
+path (shared with the device):
+
+```bash
+spiderw station list
+spiderw station status
+spiderw station /net/connman/iwd/phy0/wlan0 status
 ```
 
 List basic service sets (BSSes), or print a full snapshot for every BSS. A

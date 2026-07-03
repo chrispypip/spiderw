@@ -63,6 +63,14 @@ type KnownNetworkRef struct {
 	Name string
 }
 
+// StationRef is a lightweight reference to a station discovered by ObjectManager.
+// The Station interface exposes no Name property (it shares the device object),
+// so a station is identified solely by its path.
+type StationRef struct {
+	// Path is the canonical D-Bus object path for the station (a device path).
+	Path dbus.ObjectPath
+}
+
 // Daemon provides typed access to the iwd daemon D-Bus interface.
 type Daemon struct {
 	conn  *dbus.Conn
@@ -368,6 +376,22 @@ func (d *Daemon) GetKnownNetworks(ctx context.Context) ([]KnownNetworkRef, error
 				return KnownNetworkRef{}, err
 			}
 			return KnownNetworkRef{Path: path, Name: name}, nil
+		})
+}
+
+// GetStations returns every object that implements net.connman.iwd.Station. The
+// Station interface has no Name property, so a station is identified by its path
+// alone (which is the owning device's path).
+func (d *Daemon) GetStations(ctx context.Context) ([]StationRef, error) {
+	if d == nil {
+		return nil, WrapConnection("Daemon.GetStations", ErrDaemonUninitialized)
+	}
+	return getRefs(ctx, d.conn, "Daemon.GetStations", IwdStationIface,
+		func(path dbus.ObjectPath, _ map[string]dbus.Variant) (StationRef, error) {
+			if !path.IsValid() || !strings.HasPrefix(string(path), "/") {
+				return StationRef{}, WrapVariant("Path", fmt.Errorf("invalid station path %q", path))
+			}
+			return StationRef{Path: path}, nil
 		})
 }
 

@@ -39,6 +39,9 @@ var (
 
 	//go:embed xml/agentmanager.xml
 	agentManagerIntrospectionXML []byte
+
+	//go:embed xml/station.xml
+	stationIntrospectionXML []byte
 )
 
 func exportDaemonIntrospection(conn *dbus.Conn) error {
@@ -55,8 +58,15 @@ func exportAdapterIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {
 	return conn.Export(introspectStub(adapterIntrospectionXML), path, iwdbus.DBusIntrospectableIface)
 }
 
-func exportDeviceIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {
-	return conn.Export(introspectStub(deviceIntrospectionXML), path, iwdbus.DBusIntrospectableIface)
+func exportDeviceIntrospection(conn *dbus.Conn, path dbus.ObjectPath, withStation bool) error {
+	xml := deviceIntrospectionXML
+	if withStation {
+		// Splice the Station interface block in before the closing </node> so
+		// client introspection sees it alongside the Device interface on the same
+		// object (mirroring iwd, where Station lives on the device object).
+		xml = []byte(strings.Replace(string(deviceIntrospectionXML), "</node>", string(stationIntrospectionXML)+"</node>", 1))
+	}
+	return conn.Export(introspectStub(xml), path, iwdbus.DBusIntrospectableIface)
 }
 
 func exportBSSIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {

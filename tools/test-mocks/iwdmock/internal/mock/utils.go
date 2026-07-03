@@ -29,6 +29,8 @@ var (
 	omitKnownNetworkFlag = flag.Bool("omit-knownnetwork", false, "Don't export the known-network objects")
 
 	omitAgentFlag = flag.Bool("omit-agent", false, "Don't export the AgentManager interface (so agent registration is unavailable)")
+
+	omitStationFlag = flag.Bool("omit-station", false, "Don't export the Station interface on the station-mode device (so station operations are unavailable)")
 )
 
 func emitPropertiesChanged(path dbus.ObjectPath, iface string, changed map[string]dbus.Variant, invalid []string) {

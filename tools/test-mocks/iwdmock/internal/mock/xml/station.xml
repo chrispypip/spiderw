@@ -1,0 +1,7 @@
+  <interface name="net.connman.iwd.Station">
+    <property name="State" type="s" access="read"/>
+    <property name="Scanning" type="b" access="read"/>
+    <property name="ConnectedNetwork" type="o" access="read"/>
+    <property name="ConnectedAccessPoint" type="o" access="read"/>
+    <property name="Affinities" type="ao" access="read"/>
+  </interface>

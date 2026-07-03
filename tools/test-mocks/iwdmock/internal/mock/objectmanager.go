@@ -60,9 +60,15 @@ func (o *ObjectManager) GetManagedObjects() (map[dbus.ObjectPath]map[string]map[
 	}
 
 	for _, device := range o.devices {
-		objects[device.Path] = map[string]map[string]dbus.Variant{
+		ifaces := map[string]map[string]dbus.Variant{
 			iwdbus.IwdDeviceIface: device.buildPropertyMap(),
 		}
+		// A station-mode device advertises the Station interface too, so station
+		// enumeration (Daemon.GetStations) finds it.
+		if device.HasStation {
+			ifaces[iwdbus.IwdStationIface] = device.buildStationPropertyMap()
+		}
+		objects[device.Path] = ifaces
 	}
 
 	for _, bss := range o.bsses {

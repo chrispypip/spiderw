@@ -19,21 +19,25 @@ type fakeClient struct {
 	daemon        daemonAPI
 	adapters      map[string]adapterAPI      // keyed by Path
 	devices       map[string]deviceAPI       // keyed by Path
+	stations      map[string]stationAPI      // keyed by Path
 	bsses         map[string]bssAPI          // keyed by Path
 	networks      map[string]networkAPI      // keyed by Path
 	knownNetworks map[string]knownNetworkAPI // keyed by Path
 	adapterErr    error                      // returned by Adapter(...)
 	deviceErr     error                      // returned by Device(...)
+	stationErr    error                      // returned by Station(...)
 	bssErr        error                      // returned by BasicServiceSet(...)
 	networkErr    error                      // returned by Network(...)
 	knownNetErr   error                      // returned by KnownNetwork(...)
 	allAdapters   []adapterAPI
 	allDevices    []deviceAPI
+	allStations   []stationAPI
 	allBSSes      []bssAPI
 	allNetworks   []networkAPI
 	allKnownNets  []knownNetworkAPI
 	allAdaptErr   error
 	allDeviceErr  error
+	allStationErr error
 	allBSSErr     error
 	allNetErr     error
 	allKnownErr   error
@@ -57,6 +61,13 @@ func (f *fakeClient) Device(_ context.Context, path string) (deviceAPI, error) {
 		return nil, f.deviceErr
 	}
 	return f.devices[path], nil
+}
+
+func (f *fakeClient) Station(_ context.Context, path string) (stationAPI, error) {
+	if f.stationErr != nil {
+		return nil, f.stationErr
+	}
+	return f.stations[path], nil
 }
 
 func (f *fakeClient) BasicServiceSet(_ context.Context, path string) (bssAPI, error) {
@@ -86,6 +97,10 @@ func (f *fakeClient) AllAdapters(context.Context) ([]adapterAPI, error) {
 
 func (f *fakeClient) AllDevices(context.Context) ([]deviceAPI, error) {
 	return f.allDevices, f.allDeviceErr
+}
+
+func (f *fakeClient) AllStations(context.Context) ([]stationAPI, error) {
+	return f.allStations, f.allStationErr
 }
 
 func (f *fakeClient) AllBasicServiceSets(context.Context) ([]bssAPI, error) {
@@ -131,6 +146,7 @@ type fakeDaemon struct {
 	info          *spiderw.DaemonInfo
 	adapters      []spiderw.AdapterRef
 	devices       []spiderw.DeviceRef
+	stations      []spiderw.StationRef
 	bsses         []spiderw.BasicServiceSetRef
 	networks      []spiderw.NetworkRef
 	knownNetworks []spiderw.KnownNetworkRef
@@ -168,6 +184,10 @@ func (f *fakeDaemon) Adapters(context.Context) ([]spiderw.AdapterRef, error) {
 
 func (f *fakeDaemon) Devices(context.Context) ([]spiderw.DeviceRef, error) {
 	return f.devices, f.err
+}
+
+func (f *fakeDaemon) Stations(context.Context) ([]spiderw.StationRef, error) {
+	return f.stations, f.err
 }
 
 func (f *fakeDaemon) BasicServiceSets(context.Context) ([]spiderw.BasicServiceSetRef, error) {
@@ -331,6 +351,18 @@ func (f *fakeDevice) SubscribePoweredChanged(context.Context, func(bool)) (spide
 
 func (f *fakeDevice) SubscribeModeChanged(context.Context, func(spiderw.Mode)) (spiderw.UnsubscribeFunc, error) {
 	return func() error { return nil }, f.err
+}
+
+type fakeStation struct {
+	path  string
+	props *spiderw.StationProperties
+	err   error
+}
+
+func (f *fakeStation) Path() string { return f.path }
+
+func (f *fakeStation) Properties(context.Context) (*spiderw.StationProperties, error) {
+	return f.props, f.err
 }
 
 type fakeBSS struct {

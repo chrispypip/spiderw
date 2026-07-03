@@ -23,6 +23,7 @@ type fakeCoreDaemon struct {
 	ncfg          atomic.Bool
 	adapters      atomic.Pointer[[]core.AdapterRef]
 	devices       atomic.Pointer[[]core.DeviceRef]
+	stations      atomic.Pointer[[]core.StationRef]
 	bsses         atomic.Pointer[[]core.BasicServiceSetRef]
 	networks      atomic.Pointer[[]core.NetworkRef]
 	knownNetworks atomic.Pointer[[]core.KnownNetworkRef]
@@ -71,6 +72,16 @@ func (f *fakeCoreDaemon) setDevices(devices []core.DeviceRef) {
 
 	devicesCopy := append([]core.DeviceRef(nil), devices...)
 	f.devices.Store(&devicesCopy)
+}
+
+func (f *fakeCoreDaemon) setStations(stations []core.StationRef) {
+	if stations == nil {
+		f.stations.Store(nil)
+		return
+	}
+
+	stationsCopy := append([]core.StationRef(nil), stations...)
+	f.stations.Store(&stationsCopy)
 }
 
 func (f *fakeCoreDaemon) setBasicServiceSets(bsses []core.BasicServiceSetRef) {
@@ -187,6 +198,18 @@ func (f *fakeCoreDaemon) Devices(ctx context.Context) ([]core.DeviceRef, error) 
 		return nil, nil
 	}
 	return append([]core.DeviceRef(nil), (*devices)...), nil
+}
+
+func (f *fakeCoreDaemon) Stations(ctx context.Context) ([]core.StationRef, error) {
+	if err := f.loadErr(); err != nil {
+		return nil, err
+	}
+
+	stations := f.stations.Load()
+	if stations == nil {
+		return nil, nil
+	}
+	return append([]core.StationRef(nil), (*stations)...), nil
 }
 
 func (f *fakeCoreDaemon) BasicServiceSets(ctx context.Context) ([]core.BasicServiceSetRef, error) {

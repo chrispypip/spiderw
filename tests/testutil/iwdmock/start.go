@@ -329,3 +329,10 @@ func StartMockWithoutKnownNetwork(t *testing.T, dir string) {
 func StartMockWithoutAgent(t *testing.T, dir string) {
 	startMockWithT(t, dir, []string{"--omit-agent"})
 }
+
+// StartMockWithoutStation starts an iwd mock that does not export the Station
+// interface on the station-mode device, which exercises the client's "station
+// unavailable" and empty station-enumeration paths.
+func StartMockWithoutStation(t *testing.T, dir string) {
+	startMockWithT(t, dir, []string{"--omit-station"})
+}

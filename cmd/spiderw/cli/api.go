@@ -17,11 +17,13 @@ type clientAPI interface {
 	Daemon() daemonAPI
 	Adapter(ctx context.Context, path string) (adapterAPI, error)
 	Device(ctx context.Context, path string) (deviceAPI, error)
+	Station(ctx context.Context, path string) (stationAPI, error)
 	BasicServiceSet(ctx context.Context, path string) (bssAPI, error)
 	Network(ctx context.Context, path string) (networkAPI, error)
 	KnownNetwork(ctx context.Context, path string) (knownNetworkAPI, error)
 	AllAdapters(ctx context.Context) ([]adapterAPI, error)
 	AllDevices(ctx context.Context) ([]deviceAPI, error)
+	AllStations(ctx context.Context) ([]stationAPI, error)
 	AllBasicServiceSets(ctx context.Context) ([]bssAPI, error)
 	AllNetworks(ctx context.Context) ([]networkAPI, error)
 	AllKnownNetworks(ctx context.Context) ([]knownNetworkAPI, error)
@@ -40,6 +42,7 @@ type daemonAPI interface {
 	NetworkConfigurationEnabled(ctx context.Context) (bool, error)
 	Adapters(ctx context.Context) ([]spiderw.AdapterRef, error)
 	Devices(ctx context.Context) ([]spiderw.DeviceRef, error)
+	Stations(ctx context.Context) ([]spiderw.StationRef, error)
 	BasicServiceSets(ctx context.Context) ([]spiderw.BasicServiceSetRef, error)
 	Networks(ctx context.Context) ([]spiderw.NetworkRef, error)
 	KnownNetworks(ctx context.Context) ([]spiderw.KnownNetworkRef, error)
@@ -73,6 +76,11 @@ type deviceAPI interface {
 	Properties(ctx context.Context) (*spiderw.DeviceProperties, error)
 	SubscribePoweredChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
 	SubscribeModeChanged(ctx context.Context, fn func(spiderw.Mode)) (spiderw.UnsubscribeFunc, error)
+}
+
+type stationAPI interface {
+	Path() string
+	Properties(ctx context.Context) (*spiderw.StationProperties, error)
 }
 
 type bssAPI interface {
@@ -137,6 +145,14 @@ func (r realClient) Device(ctx context.Context, path string) (deviceAPI, error) 
 	return d, err
 }
 
+func (r realClient) Station(ctx context.Context, path string) (stationAPI, error) {
+	s, err := r.c.Station(ctx, path)
+	if s == nil {
+		return nil, err
+	}
+	return s, err
+}
+
 func (r realClient) BasicServiceSet(ctx context.Context, path string) (bssAPI, error) {
 	b, err := r.c.BasicServiceSet(ctx, path)
 	if b == nil {
@@ -181,6 +197,18 @@ func (r realClient) AllDevices(ctx context.Context) ([]deviceAPI, error) {
 	out := make([]deviceAPI, 0, len(ds))
 	for _, d := range ds {
 		out = append(out, d)
+	}
+	return out, nil
+}
+
+func (r realClient) AllStations(ctx context.Context) ([]stationAPI, error) {
+	ss, err := r.c.AllStations(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]stationAPI, 0, len(ss))
+	for _, s := range ss {
+		out = append(out, s)
 	}
 	return out, nil
 }

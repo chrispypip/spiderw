@@ -67,6 +67,16 @@ func TestExampleFlows(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	// ExampleClient_Station
+	t.Run("Client_Station", func(t *testing.T) {
+		client := newMockClient(t, ctx)
+		stations, err := client.AllStations(ctx)
+		require.NoError(t, err)
+		require.NotEmpty(t, stations)
+		_, err = stations[0].Properties(ctx)
+		require.NoError(t, err)
+	})
+
 	// ExampleClient_BasicServiceSet
 	t.Run("Client_BasicServiceSet", func(t *testing.T) {
 		client := newMockClient(t, ctx)

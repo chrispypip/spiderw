@@ -333,6 +333,84 @@ func TestDaemon_Core(t *testing.T) {
 		})
 	})
 
+	t.Run("Stations", func(t *testing.T) {
+		t.Run("Uninitialized", func(t *testing.T) {
+			tests := []struct {
+				name   string
+				daemon *Daemon
+			}{
+				{name: "nil receiver", daemon: nil},
+				{name: "inner nil", daemon: &Daemon{raw: nil}},
+			}
+
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					_, err := tc.daemon.Stations(context.Background())
+					require.Error(t, err)
+					require.True(t, errors.Is(err, ErrDaemonNotInitialized))
+					require.True(t, errors.Is(err, ErrCore))
+				})
+			}
+		})
+
+		t.Run("DBusErrorMapping", func(t *testing.T) {
+			f := &fakeIwdbusDaemon{}
+			f.setErr(iwdbus.ErrDBusIntrospection)
+			d := NewDaemon(f)
+
+			_, err := d.Stations(context.Background())
+			require.Error(t, err)
+
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindUnavailable, ce.Kind)
+			require.Equal(t, ResourceDaemon, ce.Resource)
+			require.True(t, errors.Is(err, iwdbus.ErrDBusIntrospection))
+		})
+
+		t.Run("InvalidPath", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				stations []iwdbus.StationRef
+			}{
+				{name: "empty path", stations: []iwdbus.StationRef{{Path: ""}}},
+				{name: "path not absolute", stations: []iwdbus.StationRef{{Path: "not/abs"}}},
+			}
+
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					f := &fakeIwdbusDaemon{}
+					f.setStations(tc.stations)
+					d := NewDaemon(f)
+					_, err := d.Stations(context.Background())
+					require.Error(t, err)
+
+					var ce *Error
+					require.ErrorAs(t, err, &ce)
+					require.Equal(t, KindInvalidState, ce.Kind)
+					require.Equal(t, ResourceStation, ce.Resource)
+					require.Contains(t, err.Error(), "invalid path")
+				})
+			}
+		})
+
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeIwdbusDaemon{}
+			f.setStations([]iwdbus.StationRef{
+				{Path: "/net/connman/iwd/phy0/wlan0"},
+				{Path: "  /net/connman/iwd/phy1/wlan1  "},
+			})
+			d := NewDaemon(f)
+
+			out, err := d.Stations(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, []StationRef{
+				{Path: "/net/connman/iwd/phy0/wlan0"},
+				{Path: "/net/connman/iwd/phy1/wlan1"},
+			}, out)
+		})
+	})
+
 	t.Run("BasicServiceSets", func(t *testing.T) {
 		t.Run("Uninitialized", func(t *testing.T) {
 			tests := []struct {

@@ -18,6 +18,7 @@ var (
 	newIwdDaemonFn        = iwdbus.NewDaemon
 	newIwdAdapterFn       = iwdbus.NewAdapter
 	newIwdDeviceFn        = iwdbus.NewDevice
+	newIwdStationFn       = iwdbus.NewStation
 	newIwdBSSFn           = iwdbus.NewBasicServiceSet
 	newIwdNetworkFn       = iwdbus.NewNetwork
 	newIwdKnownNetworkFn  = iwdbus.NewKnownNetwork
@@ -26,6 +27,7 @@ var (
 	newCoreDaemonFn       = func(raw *iwdbus.Daemon) *core.Daemon { return core.NewDaemon(raw) }
 	newCoreAdapterFn      = func(raw *iwdbus.Adapter) *core.Adapter { return core.NewAdapter(raw) }
 	newCoreDeviceFn       = func(raw *iwdbus.Device) *core.Device { return core.NewDevice(raw) }
+	newCoreStationFn      = func(raw *iwdbus.Station) *core.Station { return core.NewStation(raw) }
 	newCoreBSSFn          = func(raw *iwdbus.BasicServiceSet) *core.BasicServiceSet { return core.NewBasicServiceSet(raw) }
 	newCoreNetworkFn      = func(raw *iwdbus.Network) *core.Network { return core.NewNetwork(raw) }
 	newCoreKnownNetworkFn = func(raw *iwdbus.KnownNetwork) *core.KnownNetwork {
@@ -102,6 +104,9 @@ type Wiring struct {
 
 	// DeviceFactory optionally overrides device construction for tests.
 	DeviceFactory func(ctx context.Context, path string) (core.DeviceIface, error)
+
+	// StationFactory optionally overrides station construction for tests.
+	StationFactory func(ctx context.Context, path string) (core.StationIface, error)
 
 	// BasicServiceSetFactory optionally overrides BSS construction for tests.
 	BasicServiceSetFactory func(ctx context.Context, path string) (core.BasicServiceSetIface, error)
@@ -190,6 +195,42 @@ func (w *Wiring) NewDevice(ctx context.Context, path string) (core.DeviceIface, 
 		return nil, core.WrapDeviceUnavailable(op, "device unavailable", fmt.Errorf("core device interface not available"))
 	}
 	return coreDevice, nil
+}
+
+// NewStation constructs a core station wrapper for the given iwd object path (a
+// device path, since the Station interface is exported on the device object).
+func (w *Wiring) NewStation(ctx context.Context, path string) (core.StationIface, error) {
+	const op = "NewStation"
+
+	if w == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "wiring cannot be nil", core.ErrCore)
+	}
+	if path == "" {
+		return nil, core.WrapInvalidArgument(core.ResourceStation, op, "station path cannot be empty", core.ErrCore)
+	}
+	if path[0] != '/' {
+		return nil, core.WrapInvalidArgument(core.ResourceStation, op, "station path must be absolute", core.ErrCore)
+	}
+	if w.StationFactory != nil {
+		return w.StationFactory(ctx, path)
+	}
+	if w.Conn == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "D-Bus conn cannot be nil", core.ErrCore)
+	}
+
+	iwdStation, err := newIwdStationFn(ctx, w.Conn, dbus.ObjectPath(path))
+	if err != nil {
+		return nil, core.WrapStationUnavailable(op, "station unavailable", err)
+	}
+	if iwdStation == nil {
+		return nil, core.WrapStationUnavailable(op, "station unavailable", iwdbus.WrapIntrospection(path, fmt.Errorf("iwd station interface not available")))
+	}
+
+	coreStation := newCoreStationFn(iwdStation)
+	if coreStation == nil {
+		return nil, core.WrapStationUnavailable(op, "station unavailable", fmt.Errorf("core station interface not available"))
+	}
+	return coreStation, nil
 }
 
 // NewBasicServiceSet constructs a core BSS wrapper for the given iwd object path.

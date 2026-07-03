@@ -32,6 +32,9 @@ var (
 	// ErrDeviceUninitialized indicates that a Device was used before initialization.
 	ErrDeviceUninitialized = errors.New("device is not initialized")
 
+	// ErrStationUninitialized indicates that a Station was used before initialization.
+	ErrStationUninitialized = errors.New("station is not initialized")
+
 	// ErrBasicServiceSetUninitialized indicates that a BasicServiceSet was used
 	// before initialization.
 	ErrBasicServiceSetUninitialized = errors.New("basic service set is not initialized")

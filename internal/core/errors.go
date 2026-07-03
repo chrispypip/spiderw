@@ -104,6 +104,10 @@ var (
 	// has no raw backend.
 	ErrBasicServiceSetNotInitialized = errors.New("basic service set not initialized")
 
+	// ErrStationNotInitialized indicates that a Station wrapper has no raw
+	// backend.
+	ErrStationNotInitialized = errors.New("station not initialized")
+
 	// ErrNetworkNotInitialized indicates that a Network wrapper has no raw
 	// backend.
 	ErrNetworkNotInitialized = errors.New("network not initialized")
@@ -204,6 +208,7 @@ var (
 	daemonUnavailablePolicy       = unavailablePolicy{resource: ResourceDaemon}
 	adapterUnavailablePolicy      = unavailablePolicy{resource: ResourceAdapter, includeDBusProperty: true}
 	deviceUnavailablePolicy       = unavailablePolicy{resource: ResourceDevice, includeDBusProperty: true}
+	stationUnavailablePolicy      = unavailablePolicy{resource: ResourceStation, includeDBusProperty: true}
 	bssUnavailablePolicy          = unavailablePolicy{resource: ResourceBasicServiceSet, includeDBusProperty: true}
 	networkUnavailablePolicy      = unavailablePolicy{resource: ResourceNetwork, includeDBusProperty: true}
 	knownNetworkUnavailablePolicy = unavailablePolicy{resource: ResourceKnownNetwork, includeDBusProperty: true}
@@ -245,6 +250,11 @@ func WrapAdapterUnavailable(op, details string, err error) error {
 // WrapDeviceUnavailable classifies D-Bus device failures by kind and resource.
 func WrapDeviceUnavailable(op, details string, err error) error {
 	return wrapUnavailable(op, details, err, deviceUnavailablePolicy)
+}
+
+// WrapStationUnavailable classifies D-Bus station failures by kind and resource.
+func WrapStationUnavailable(op, details string, err error) error {
+	return wrapUnavailable(op, details, err, stationUnavailablePolicy)
 }
 
 // WrapBasicServiceSetUnavailable classifies D-Bus basic-service-set failures by

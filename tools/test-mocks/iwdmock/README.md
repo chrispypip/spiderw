@@ -216,6 +216,10 @@ defined across:
   Don't export the `net.connman.iwd.AgentManager` interface, so agent
   registration is unavailable. Exercises the client's "agent manager
   unavailable" path.
+* `--omit-station`
+  Don't export the `net.connman.iwd.Station` interface on the station-mode
+  device, so the device still exists but has no Station. Exercises the client's
+  "station unavailable" path and empty station enumeration.
 
 The mock exports multiple basic service sets by default, mirroring iwd reporting
 one BSS per access point/radio a device can hear during a scan. It also exports
@@ -223,6 +227,17 @@ three networks — an open network, a known (provisioned) secured network, and a
 unknown secured network — so `Network.Connect` exercises both the no-agent
 success paths and the `net.connman.iwd.NoAgent` rejection. The open network's
 `ExtendedServiceSet` lists both mock BSSes, demonstrating multi-BSS membership.
+
+### Station
+
+The station-mode device (`wlan0`) also exports the `net.connman.iwd.Station`
+interface on the same object, mirroring iwd (where Station lives on the device
+object in station mode). The AP-mode device (`wlan1`) does not, so station
+enumeration returns exactly one station. The mock seeds a "connected" station
+wired to real mock objects: `ConnectedNetwork` points at the known network,
+`ConnectedAccessPoint` and the single `Affinities` entry point at a mock BSS, and
+`Scanning` is `false`. The properties are read-only in this slice. Use
+`--omit-station` to drop the interface while keeping the device.
 
 ### Credentials agent (AgentManager)
 

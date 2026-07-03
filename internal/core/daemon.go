@@ -56,6 +56,14 @@ type KnownNetworkRef struct {
 	Name string
 }
 
+// StationRef is a lightweight reference to a station discovered by the iwd
+// daemon. A station has no Name of its own, so it is identified by its path (the
+// owning device's path).
+type StationRef struct {
+	// Path is the canonical D-Bus object path for the station.
+	Path string
+}
+
 // DaemonIface defines the core daemon operations used by the public layer.
 type DaemonIface interface {
 	Info(ctx context.Context) (*DaemonInfo, error)
@@ -64,6 +72,7 @@ type DaemonIface interface {
 	NetworkConfigurationEnabled(ctx context.Context) (bool, error)
 	Adapters(ctx context.Context) ([]AdapterRef, error)
 	Devices(ctx context.Context) ([]DeviceRef, error)
+	Stations(ctx context.Context) ([]StationRef, error)
 	BasicServiceSets(ctx context.Context) ([]BasicServiceSetRef, error)
 	Networks(ctx context.Context) ([]NetworkRef, error)
 	KnownNetworks(ctx context.Context) ([]KnownNetworkRef, error)
@@ -85,6 +94,7 @@ type daemonRaw interface {
 	GetInfo(ctx context.Context) (*iwdbus.DaemonInfo, error)
 	GetAdapters(ctx context.Context) ([]iwdbus.AdapterRef, error)
 	GetDevices(ctx context.Context) ([]iwdbus.DeviceRef, error)
+	GetStations(ctx context.Context) ([]iwdbus.StationRef, error)
 	GetBasicServiceSets(ctx context.Context) ([]iwdbus.BasicServiceSetRef, error)
 	GetNetworks(ctx context.Context) ([]iwdbus.NetworkRef, error)
 	GetKnownNetworks(ctx context.Context) ([]iwdbus.KnownNetworkRef, error)
@@ -231,6 +241,31 @@ func (d *Daemon) Devices(ctx context.Context) ([]DeviceRef, error) {
 		}
 
 		refs = append(refs, DeviceRef{Path: p, Name: n})
+	}
+	return refs, nil
+}
+
+// Stations returns the stations (station-mode devices) currently exposed by the
+// iwd daemon. A station has no Name, so each ref carries only its path.
+func (d *Daemon) Stations(ctx context.Context) ([]StationRef, error) {
+	const op = "Daemon.Stations"
+
+	rawDaemon, err := d.rawDaemon(op)
+	if err != nil {
+		return nil, err
+	}
+
+	rawRefs, err := rawDaemon.GetStations(ctx)
+	if err != nil {
+		return nil, WrapDaemonUnavailable(op, "failed getting stations", err)
+	}
+	refs := make([]StationRef, 0, len(rawRefs))
+	for _, r := range rawRefs {
+		p := strings.TrimSpace(string(r.Path))
+		if p == "" || !strings.HasPrefix(p, "/") {
+			return nil, WrapInvalidState(ResourceStation, op, "station returned invalid path", fmt.Errorf("invalid station path %q", p))
+		}
+		refs = append(refs, StationRef{Path: p})
 	}
 	return refs, nil
 }

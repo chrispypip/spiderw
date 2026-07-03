@@ -38,6 +38,27 @@ type Device struct {
 
 	// Adapter is the mock Adapter property (owning adapter object path).
 	Adapter dbus.ObjectPath
+
+	// HasStation reports whether this device also exports the Station interface
+	// (true for a station-mode device unless --omit-station is set). The Station
+	// property fields below are only meaningful when HasStation is true.
+	HasStation bool
+
+	// StationState is the mock Station.State property.
+	StationState string
+
+	// StationScanning is the mock Station.Scanning property.
+	StationScanning bool
+
+	// StationConnectedNetwork is the mock Station.ConnectedNetwork property.
+	StationConnectedNetwork dbus.ObjectPath
+
+	// StationConnectedAccessPoint is the mock Station.ConnectedAccessPoint
+	// property (experimental).
+	StationConnectedAccessPoint dbus.ObjectPath
+
+	// StationAffinities is the mock Station.Affinities property (experimental).
+	StationAffinities []dbus.ObjectPath
 }
 
 // ExportDevice exports the mock device objects on the D-Bus connection. A single
@@ -53,12 +74,18 @@ func ExportDevice(conn *dbus.Conn) error {
 
 	devices := []*Device{
 		{
-			Path:    devicePath,
-			Name:    "wlan0",
-			Address: "aa:bb:cc:dd:ee:ff",
-			Powered: true,
-			Mode:    "station",
-			Adapter: adapterPath,
+			Path:                        devicePath,
+			Name:                        "wlan0",
+			Address:                     "aa:bb:cc:dd:ee:ff",
+			Powered:                     true,
+			Mode:                        "station",
+			Adapter:                     adapterPath,
+			HasStation:                  stationExported(),
+			StationState:                stationConnectedState,
+			StationScanning:             false,
+			StationConnectedNetwork:     stationConnectedNetworkPath,
+			StationConnectedAccessPoint: stationConnectedAccessPointPath,
+			StationAffinities:           []dbus.ObjectPath{stationConnectedAccessPointPath},
 		},
 		{
 			Path:    device1Path,
@@ -78,7 +105,14 @@ func ExportDevice(conn *dbus.Conn) error {
 		if err := conn.Export(d, d.Path, "org.freedesktop.DBus.Properties"); err != nil {
 			return err
 		}
-		if err := exportDeviceIntrospection(conn, d.Path); err != nil {
+		// A station-mode device also carries the Station interface (gated by
+		// --omit-station); the Properties handler above serves its properties.
+		if d.HasStation {
+			if err := conn.Export(d, d.Path, iwdbus.IwdStationIface); err != nil {
+				return err
+			}
+		}
+		if err := exportDeviceIntrospection(conn, d.Path, d.HasStation); err != nil {
 			return err
 		}
 		exportedDevices = append(exportedDevices, d)
@@ -97,21 +131,39 @@ func (d *Device) buildPropertyMap() map[string]dbus.Variant {
 	}
 }
 
-// GetAll returns all mock device properties for the requested interface.
+// GetAll returns all mock properties for the requested interface. The device
+// object serves both its Device interface and, when HasStation is set, the
+// Station interface exported on the same path.
 func (d *Device) GetAll(iface string) (map[string]dbus.Variant, *dbus.Error) {
-	if iface != iwdbus.IwdDeviceIface {
+	switch iface {
+	case iwdbus.IwdDeviceIface:
+		return d.buildPropertyMap(), nil
+	case iwdbus.IwdStationIface:
+		if !d.HasStation {
+			return nil, dbus.MakeFailedError(fmt.Errorf("unknown property %q", iface))
+		}
+		return d.buildStationPropertyMap(), nil
+	default:
 		return nil, dbus.MakeFailedError(fmt.Errorf("unknown property %q", iface))
 	}
-	return d.buildPropertyMap(), nil
 }
 
-// Get returns a single mock device property for the requested interface.
+// Get returns a single mock property for the requested interface (Device or, when
+// HasStation is set, Station).
 func (d *Device) Get(iface, p string) (dbus.Variant, *dbus.Error) {
-	if iface != iwdbus.IwdDeviceIface {
+	var props map[string]dbus.Variant
+	switch iface {
+	case iwdbus.IwdDeviceIface:
+		props = d.buildPropertyMap()
+	case iwdbus.IwdStationIface:
+		if !d.HasStation {
+			return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("unknown property %q", iface))
+		}
+		props = d.buildStationPropertyMap()
+	default:
 		return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("unknown property %q", iface))
 	}
 
-	props := d.buildPropertyMap()
 	v, ok := props[p]
 	if !ok {
 		return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("unknown property %q", p))

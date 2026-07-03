@@ -141,6 +141,7 @@ func rootCommand(app *App) *Command {
 			"daemon":        daemonCommand(app),
 			"adapter":       adapterCommand(app),
 			"device":        deviceCommand(app),
+			"station":       stationCommand(app),
 			"bss":           bssCommand(app),
 			"network":       networkCommand(app),
 			"known-network": knownNetworkCommand(app),

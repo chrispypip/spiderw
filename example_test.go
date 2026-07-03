@@ -126,6 +126,40 @@ func ExampleClient_Device() {
 		props.Name, props.Address, props.Mode, props.Powered, props.Adapter)
 }
 
+// ExampleClient_Station discovers a station (a device in station mode) and reads
+// its read-only connection state. ConnectedNetwork is nil when the station is
+// not connected.
+func ExampleClient_Station() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	stations, err := client.AllStations(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(stations) == 0 {
+		log.Fatal("no stations found")
+	}
+
+	station := stations[0]
+	props, err := station.Properties(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	connected := "<none>"
+	if props.ConnectedNetwork != nil {
+		connected = *props.ConnectedNetwork
+	}
+	fmt.Printf("%s: state=%s scanning=%t connected=%s\n",
+		station.Path(), props.State, props.Scanning, connected)
+}
+
 // ExampleClient_BasicServiceSet discovers a basic service set (BSS) and reads
 // its address. A BSS is a single access point/radio the device can see; iwd
 // reports one per detected AP.
