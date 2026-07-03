@@ -42,7 +42,7 @@ func (f *fakeCoreKnownNetwork) setForgetErr(err error) *fakeCoreKnownNetwork {
 }
 
 func (f *fakeCoreKnownNetwork) setAutoConnectEvent(autoConnect bool) *fakeCoreKnownNetwork {
-	f.autoConnEvnt.Store(&autoConnect)
+	f.autoConnEvnt.Store(new(autoConnect))
 	return f
 }
 
@@ -109,12 +109,11 @@ func (f *fakeCoreKnownNetwork) SubscribeAutoConnectChanged(_ context.Context, fn
 }
 
 func validCoreKnownNetworkProps() core.KnownNetworkProperties {
-	lt := "2024-01-02T03:04:05Z"
 	return core.KnownNetworkProperties{
 		Name:              "HomeNet",
 		Type:              core.NetworkTypePSK,
 		Hidden:            false,
-		LastConnectedTime: &lt,
+		LastConnectedTime: new("2024-01-02T03:04:05Z"),
 		AutoConnect:       true,
 	}
 }

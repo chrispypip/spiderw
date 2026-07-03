@@ -166,11 +166,10 @@ func (f *fakeIwdbusAdapter) SubscribePoweredChanged(ctx context.Context, fn func
 func newTestAdapter(t *testing.T) *Adapter {
 	t.Helper()
 
-	model := "Broadcomm"
 	f := &fakeIwdbusAdapter{}
 	f.powered.Store(true)
 	f.name.Store("phy0")
-	f.vendor.Store(&model)
+	f.vendor.Store(new("Broadcomm"))
 
 	a := NewAdapter(f)
 	require.NotNil(t, a)

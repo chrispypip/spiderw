@@ -14,15 +14,13 @@ import (
 )
 
 func fakeWithAdapter() *fakeClient {
-	model := "MockModel"
-	vendor := "MockVendor"
 	ad := &fakeAdapter{
 		path: "/net/connman/iwd/phy0",
 		props: &spiderw.AdapterProperties{
 			Powered:        true,
 			Name:           "phy0",
-			Model:          &model,
-			Vendor:         &vendor,
+			Model:          new("MockModel"),
+			Vendor:         new("MockVendor"),
 			SupportedModes: []spiderw.Mode{spiderw.ModeStation, spiderw.ModeAP},
 		},
 	}
@@ -213,8 +211,7 @@ func TestAdapterScalarResults_String(t *testing.T) {
 	require.Equal(t, "true", adapterBoolResult{Value: true}.String())
 	require.Equal(t, "phy0", adapterStringResult{Value: "phy0"}.String())
 
-	model := "Intel"
-	require.Equal(t, "Intel", adapterOptionalStringResult{Value: &model}.String())
+	require.Equal(t, "Intel", adapterOptionalStringResult{Value: new("Intel")}.String())
 	require.Equal(t, "", adapterOptionalStringResult{Value: nil}.String())
 
 	require.Equal(t, "station\nap", adapterSupportedModesResult{SupportedModes: []string{"station", "ap"}}.String())
@@ -225,13 +222,12 @@ func TestAdapterStatusResult_String(t *testing.T) {
 
 	require.Equal(t, "no adapters available", adapterStatusResult{}.String())
 
-	model := "MockModel"
 	out := adapterStatusResult{
 		{
 			Path:           "/net/connman/iwd/phy0",
 			Name:           "phy0",
 			Powered:        true,
-			Model:          &model,
+			Model:          new("MockModel"),
 			Vendor:         nil, // absent optional renders as "-"
 			SupportedModes: []string{"station", "ap"},
 		},

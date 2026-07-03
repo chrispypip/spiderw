@@ -51,7 +51,7 @@ func (f *fakeIwdbusKnownNetwork) setForgetErr(err error) *fakeIwdbusKnownNetwork
 }
 
 func (f *fakeIwdbusKnownNetwork) setAutoConnectEvent(autoConnect bool) *fakeIwdbusKnownNetwork {
-	f.autoConnEvnt.Store(&autoConnect)
+	f.autoConnEvnt.Store(new(autoConnect))
 	return f
 }
 
@@ -133,12 +133,11 @@ func (f *fakeIwdbusKnownNetwork) SubscribeAutoConnectChanged(_ context.Context, 
 // validKnownNetworkProps returns a fully-populated set of valid known-network
 // properties.
 func validKnownNetworkProps() iwdbus.KnownNetworkProperties {
-	lt := "2024-01-02T03:04:05Z"
 	return iwdbus.KnownNetworkProperties{
 		Name:              "HomeNet",
 		Type:              iwdbus.NetworkTypePSK,
 		Hidden:            false,
-		LastConnectedTime: &lt,
+		LastConnectedTime: new("2024-01-02T03:04:05Z"),
 		AutoConnect:       true,
 	}
 }

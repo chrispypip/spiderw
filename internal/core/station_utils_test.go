@@ -145,8 +145,7 @@ func newTestStation(t *testing.T) *Station {
 	f := &fakeIwdbusStation{}
 	f.state.Store(iwdbus.StationStateConnected)
 	f.scanning.Store(false)
-	net := "/net/connman/iwd/phy0/wlan0/net0"
-	f.connectedNetwork.Store(&net)
+	f.connectedNetwork.Store(new("/net/connman/iwd/phy0/wlan0/net0"))
 
 	s := NewStation(f)
 	require.NotNil(t, s)

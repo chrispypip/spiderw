@@ -14,14 +14,13 @@ import (
 )
 
 func fakeWithKnownNetwork() *fakeClient {
-	lt := "2024-01-02T03:04:05Z"
 	known := &fakeKnownNetwork{
 		path: "/net/connman/iwd/known_networks/1",
 		props: &spiderw.KnownNetworkProperties{
 			Name:              "KnownNet",
 			Type:              spiderw.NetworkTypePSK,
 			Hidden:            false,
-			LastConnectedTime: &lt,
+			LastConnectedTime: new("2024-01-02T03:04:05Z"),
 			AutoConnect:       true,
 		},
 	}

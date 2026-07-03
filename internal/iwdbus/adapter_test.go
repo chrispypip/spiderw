@@ -323,8 +323,6 @@ func testParseSupportedModes(t *testing.T) {
 func testParseOptionalString(t *testing.T) {
 	t.Parallel()
 
-	strString := "Broadcom"
-	strVariant := "Intel"
 	tests := []struct {
 		name            string
 		in              any
@@ -334,12 +332,12 @@ func testParseOptionalString(t *testing.T) {
 		{
 			name: "string",
 			in:   "Broadcom",
-			want: &strString,
+			want: new("Broadcom"),
 		},
 		{
 			name: "variant string",
 			in:   dbus.MakeVariant("Intel"),
-			want: &strVariant,
+			want: new("Intel"),
 		},
 		{
 			name: "variant wrong type",

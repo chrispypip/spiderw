@@ -43,7 +43,7 @@ func (f *fakeCoreNetwork) setConnectErr(err error) *fakeCoreNetwork {
 }
 
 func (f *fakeCoreNetwork) setConnectedEvent(connected bool) *fakeCoreNetwork {
-	f.connectedEvnt.Store(&connected)
+	f.connectedEvnt.Store(new(connected))
 	return f
 }
 

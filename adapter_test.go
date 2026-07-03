@@ -44,9 +44,8 @@ func TestAdapter_Public(t *testing.T) {
 			name: "Model",
 			op:   func(a *Adapter) (any, error) { return a.Model(ctx) },
 			newBackend: func() *fakeCoreAdapter {
-				model := "Broadcomm"
 				f := &fakeCoreAdapter{}
-				f.model.Store(&model)
+				f.model.Store(new("Broadcomm"))
 				return f
 			},
 		},
@@ -54,9 +53,8 @@ func TestAdapter_Public(t *testing.T) {
 			name: "Vendor",
 			op:   func(a *Adapter) (any, error) { return a.Vendor(ctx) },
 			newBackend: func() *fakeCoreAdapter {
-				vendor := "Intel"
 				f := &fakeCoreAdapter{}
-				f.vendor.Store(&vendor)
+				f.vendor.Store(new("Intel"))
 				return f
 			},
 		},
@@ -411,11 +409,10 @@ func TestAdapter_Properties(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("DelegatesAndConvertsModes", func(t *testing.T) {
-		model := "Broadcom"
 		f := &fakeCoreAdapter{}
 		f.powered.Store(true)
 		f.name.Store("phy0")
-		f.model.Store(&model)
+		f.model.Store(new("Broadcom"))
 		f.modes.Store([]core.Mode{core.ModeStation, core.ModeAP})
 		a := newAdapter(f, "/net/connman/iwd/phy0")
 

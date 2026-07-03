@@ -18,8 +18,6 @@ import (
 // an open network, a known (provisioned) network, and an unknown secured network
 // that needs a credentials agent to connect.
 func fakeWithNetwork() *fakeClient {
-	known := "/net/connman/iwd/known_networks/1"
-
 	open := &fakeNetwork{
 		path: "/net/connman/iwd/phy0/wlan0/open",
 		props: &spiderw.NetworkProperties{
@@ -35,7 +33,7 @@ func fakeWithNetwork() *fakeClient {
 			Name:         "KnownNet",
 			Device:       "/net/connman/iwd/phy0/wlan0",
 			Type:         spiderw.NetworkTypePSK,
-			KnownNetwork: &known,
+			KnownNetwork: new("/net/connman/iwd/known_networks/1"),
 		},
 	}
 	secured := &fakeNetwork{

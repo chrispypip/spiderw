@@ -51,11 +51,10 @@ func TestClient(t *testing.T) {
 						Version:        "1",
 						StateDirectory: "/x",
 					})
-					mockModel := "Broadcomm"
 					fakeAdapter := &fakeCoreAdapter{}
 					fakeAdapter.powered.Store(true)
 					fakeAdapter.name.Store("phy0")
-					fakeAdapter.model.Store(&mockModel)
+					fakeAdapter.model.Store(new("Broadcomm"))
 					fakeAdapter.modes.Store([]core.Mode{core.ModeAP, core.ModeAdHoc})
 
 					resetClientSeams(t)
@@ -145,11 +144,10 @@ func TestClient(t *testing.T) {
 				Version:        "1",
 				StateDirectory: "/state",
 			})
-			mockModel := "Broadcomm"
 			fakeCoreAdapter := &fakeCoreAdapter{}
 			fakeCoreAdapter.powered.Store(true)
 			fakeCoreAdapter.name.Store("phy0")
-			fakeCoreAdapter.model.Store(&mockModel)
+			fakeCoreAdapter.model.Store(new("Broadcomm"))
 			fakeCoreAdapter.modes.Store([]core.Mode{core.ModeAP, core.ModeAdHoc})
 			w := &connect.Wiring{
 				Conn:    &dbus.Conn{},

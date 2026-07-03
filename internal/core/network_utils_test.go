@@ -42,7 +42,7 @@ func (f *fakeIwdbusNetwork) setConnectErr(err error) *fakeIwdbusNetwork {
 }
 
 func (f *fakeIwdbusNetwork) setConnectedEvent(connected bool) *fakeIwdbusNetwork {
-	f.connectedEvnt.Store(&connected)
+	f.connectedEvnt.Store(new(connected))
 	return f
 }
 
@@ -119,13 +119,12 @@ func (f *fakeIwdbusNetwork) SubscribeConnectedChanged(_ context.Context, fn func
 
 // validNetworkProps returns a fully-populated set of valid network properties.
 func validNetworkProps() iwdbus.NetworkProperties {
-	known := "/net/connman/iwd/known_networks/1"
 	return iwdbus.NetworkProperties{
 		Name:               "OpenNet",
 		Connected:          false,
 		Device:             "/net/connman/iwd/phy0/wlan0",
 		Type:               iwdbus.NetworkTypeOpen,
-		KnownNetwork:       &known,
+		KnownNetwork:       new("/net/connman/iwd/known_networks/1"),
 		ExtendedServiceSet: []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"},
 	}
 }

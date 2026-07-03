@@ -443,13 +443,11 @@ func TestAdapter_Properties(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("NormalizesAndValidates", func(t *testing.T) {
-		model := "  Broadcom  "
-		vendor := "  Acme  "
 		f := &fakeIwdbusAdapter{}
 		f.powered.Store(true)
 		f.name.Store("  phy0  ")
-		f.model.Store(&model)
-		f.vendor.Store(&vendor)
+		f.model.Store(new("  Broadcom  "))
+		f.vendor.Store(new("  Acme  "))
 		f.modes.Store([]iwdbus.Mode{iwdbus.ModeStation, iwdbus.ModeAP})
 		a := NewAdapter(f)
 
