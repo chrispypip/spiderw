@@ -27,5 +27,8 @@ go.work.sum
 # Build output
 build/
 
+# Cross-compiled CLI binaries (make amd64 / make arm64)
+dist/
+
 # Go fuzzing artifacts
 **/testdata/fuzz/
