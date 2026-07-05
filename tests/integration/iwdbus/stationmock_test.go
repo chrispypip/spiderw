@@ -223,7 +223,11 @@ func TestStationMock_SetAffinities(t *testing.T) {
 	station, err := client.Station(ctx, devicePath)
 	require.NoError(t, err)
 
-	want := []string{"/net/connman/iwd/phy0/wlan0/bbccddeeff00"}
+	// Set multiple affinities and read the full list back.
+	want := []string{
+		"/net/connman/iwd/phy0/wlan0/aabbccddeeff",
+		"/net/connman/iwd/phy0/wlan0/bbccddeeff00",
+	}
 	require.NoError(t, station.SetAffinities(ctx, want))
 
 	got, err := station.Affinities(ctx)

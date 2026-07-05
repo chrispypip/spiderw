@@ -623,9 +623,15 @@ func testStation_SetAffinities(t *testing.T) {
 		},
 	}}
 
-	err := s.SetAffinities(context.Background(), []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"})
+	err := s.SetAffinities(context.Background(), []string{
+		"/net/connman/iwd/phy0/wlan0/aabbccddeeff",
+		"/net/connman/iwd/phy0/wlan0/bbccddeeff00",
+	})
 	require.NoError(t, err)
-	require.Equal(t, []dbus.ObjectPath{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"}, got)
+	require.Equal(t, []dbus.ObjectPath{
+		"/net/connman/iwd/phy0/wlan0/aabbccddeeff",
+		"/net/connman/iwd/phy0/wlan0/bbccddeeff00",
+	}, got)
 }
 
 func testStation_SetAffinities_Err(t *testing.T) {
