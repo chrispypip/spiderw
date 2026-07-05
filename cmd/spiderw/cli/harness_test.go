@@ -354,14 +354,19 @@ func (f *fakeDevice) SubscribeModeChanged(context.Context, func(spiderw.Mode)) (
 }
 
 type fakeStation struct {
-	path            string
-	props           *spiderw.StationProperties
-	ordered         []spiderw.OrderedNetwork
-	scanErr         error
-	setAffErr       error
-	setAffinitiesTo []string
-	scanCalled      bool
-	err             error
+	path              string
+	props             *spiderw.StationProperties
+	ordered           []spiderw.OrderedNetwork
+	hiddenAPs         []spiderw.HiddenAccessPoint
+	scanErr           error
+	setAffErr         error
+	disconnectErr     error
+	connectHiddenErr  error
+	setAffinitiesTo   []string
+	connectHiddenName string
+	scanCalled        bool
+	disconnectCalled  bool
+	err               error
 }
 
 func (f *fakeStation) Path() string { return f.path }
@@ -395,6 +400,23 @@ func (f *fakeStation) SetAffinities(_ context.Context, paths []string) error {
 	}
 	f.setAffinitiesTo = paths
 	return nil
+}
+
+func (f *fakeStation) Disconnect(context.Context) error {
+	f.disconnectCalled = true
+	return f.disconnectErr
+}
+
+func (f *fakeStation) ConnectHiddenNetwork(_ context.Context, name string) error {
+	if f.connectHiddenErr != nil {
+		return f.connectHiddenErr
+	}
+	f.connectHiddenName = name
+	return nil
+}
+
+func (f *fakeStation) HiddenAccessPoints(context.Context) ([]spiderw.HiddenAccessPoint, error) {
+	return f.hiddenAPs, f.err
 }
 
 func (f *fakeStation) SubscribeScanningChanged(_ context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {

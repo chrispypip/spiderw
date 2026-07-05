@@ -54,6 +54,9 @@ type stationRaw interface {
 	Scan(ctx context.Context) error
 	GetOrderedNetworks(ctx context.Context) ([]iwdbus.OrderedNetwork, error)
 	SetAffinities(ctx context.Context, paths []string) error
+	Disconnect(ctx context.Context) error
+	ConnectHiddenNetwork(ctx context.Context, name string) error
+	GetHiddenAccessPoints(ctx context.Context) ([]iwdbus.HiddenAccessPoint, error)
 	SubscribePropertiesChanged(ctx context.Context, fn func(iwdbus.StationPropertiesChanged)) (iwdbus.UnsubscribeFunc, error)
 	SubscribeStateChanged(ctx context.Context, fn func(iwdbus.StationState)) (iwdbus.UnsubscribeFunc, error)
 	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (iwdbus.UnsubscribeFunc, error)
@@ -70,6 +73,9 @@ type StationIface interface {
 	Scan(ctx context.Context) error
 	OrderedNetworks(ctx context.Context) ([]OrderedNetwork, error)
 	SetAffinities(ctx context.Context, paths []string) error
+	Disconnect(ctx context.Context) error
+	ConnectHiddenNetwork(ctx context.Context, name string) error
+	HiddenAccessPoints(ctx context.Context) ([]HiddenAccessPoint, error)
 	SubscribePropertiesChanged(ctx context.Context, fn func(StationPropertiesChanged)) (UnsubscribeFunc, error)
 	SubscribeStateChanged(ctx context.Context, fn func(StationState)) (UnsubscribeFunc, error)
 	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (UnsubscribeFunc, error)
@@ -300,6 +306,85 @@ func (s *Station) SetAffinities(ctx context.Context, paths []string) error {
 		return WrapStationUnavailable(op, "failed setting iwd Station affinities", err)
 	}
 	return nil
+}
+
+// HiddenAccessPoint is one hidden access point found in the last scan, as
+// returned by HiddenAccessPoints.
+type HiddenAccessPoint struct {
+	// Address is the BSS hardware (BSSID) address.
+	Address string
+
+	// SignalStrength is the signal strength in units of 100 * dBm (iwd's native
+	// unit), e.g. -6000 means -60 dBm.
+	SignalStrength int16
+
+	// Type is the network security type.
+	Type NetworkType
+}
+
+// Disconnect disconnects the station from its current network.
+func (s *Station) Disconnect(ctx context.Context) error {
+	const op = "Station.Disconnect"
+
+	rawStation, err := s.rawStation(op)
+	if err != nil {
+		return err
+	}
+
+	if err := rawStation.Disconnect(ctx); err != nil {
+		return WrapStationUnavailable(op, "failed disconnecting iwd Station", err)
+	}
+	return nil
+}
+
+// ConnectHiddenNetwork connects to a hidden network by SSID. A secured hidden
+// network requires a registered credentials agent.
+func (s *Station) ConnectHiddenNetwork(ctx context.Context, name string) error {
+	const op = "Station.ConnectHiddenNetwork"
+
+	rawStation, err := s.rawStation(op)
+	if err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(name) == "" {
+		return WrapInvalidArgument(ResourceStation, op, "network name cannot be empty", fmt.Errorf("empty network name"))
+	}
+
+	if err := rawStation.ConnectHiddenNetwork(ctx, name); err != nil {
+		return WrapStationUnavailable(op, "failed connecting iwd Station to hidden network", err)
+	}
+	return nil
+}
+
+// HiddenAccessPoints returns the hidden access points found in the most recent
+// scan, validating each network type.
+func (s *Station) HiddenAccessPoints(ctx context.Context) ([]HiddenAccessPoint, error) {
+	const op = "Station.HiddenAccessPoints"
+
+	rawStation, err := s.rawStation(op)
+	if err != nil {
+		return nil, err
+	}
+
+	raw, err := rawStation.GetHiddenAccessPoints(ctx)
+	if err != nil {
+		return nil, WrapStationUnavailable(op, "failed querying iwd Station hidden access points", err)
+	}
+
+	out := make([]HiddenAccessPoint, 0, len(raw))
+	for _, ap := range raw {
+		netType, err := validateNetworkType(ResourceStation, op, ap.Type)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, HiddenAccessPoint{
+			Address:        strings.TrimSpace(ap.Address),
+			SignalStrength: ap.SignalStrength,
+			Type:           netType,
+		})
+	}
+	return out, nil
 }
 
 // SubscribePropertiesChanged registers fn for normalized property-change events.

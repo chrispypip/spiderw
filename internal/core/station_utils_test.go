@@ -24,10 +24,13 @@ type fakeIwdbusStation struct {
 	connectedAccessPoint atomic.Pointer[string]
 	affinities           atomic.Pointer[[]string]
 	orderedNetworks      atomic.Pointer[[]iwdbus.OrderedNetwork]
+	hiddenAPs            atomic.Pointer[[]iwdbus.HiddenAccessPoint]
 	subPropsEvent        atomic.Value // iwdbus.StationPropertiesChanged
 
-	scanCalled       atomic.Bool
-	setAffinitiesArg atomic.Pointer[[]string]
+	scanCalled        atomic.Bool
+	disconnectCalled  atomic.Bool
+	setAffinitiesArg  atomic.Pointer[[]string]
+	connectHiddenName atomic.Pointer[string]
 
 	err atomic.Pointer[fakeStationError]
 }
@@ -115,6 +118,29 @@ func (f *fakeIwdbusStation) SetAffinities(_ context.Context, paths []string) err
 	cp := append([]string(nil), paths...)
 	f.setAffinitiesArg.Store(&cp)
 	return nil
+}
+
+func (f *fakeIwdbusStation) Disconnect(context.Context) error {
+	f.disconnectCalled.Store(true)
+	return f.loadErr()
+}
+
+func (f *fakeIwdbusStation) ConnectHiddenNetwork(_ context.Context, name string) error {
+	if err := f.loadErr(); err != nil {
+		return err
+	}
+	f.connectHiddenName.Store(&name)
+	return nil
+}
+
+func (f *fakeIwdbusStation) GetHiddenAccessPoints(context.Context) ([]iwdbus.HiddenAccessPoint, error) {
+	if err := f.loadErr(); err != nil {
+		return nil, err
+	}
+	if v := f.hiddenAPs.Load(); v != nil {
+		return *v, nil
+	}
+	return nil, nil
 }
 
 func (f *fakeIwdbusStation) SubscribePropertiesChanged(ctx context.Context, fn func(iwdbus.StationPropertiesChanged)) (iwdbus.UnsubscribeFunc, error) {

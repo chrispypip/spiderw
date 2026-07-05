@@ -307,6 +307,85 @@ func (s *Station) SetAffinities(ctx context.Context, paths []string) error {
 	return nil
 }
 
+// HiddenAccessPoint is one hidden access point found in the last scan, as
+// returned by GetHiddenAccessPoints.
+type HiddenAccessPoint struct {
+	// Address is the BSS hardware (BSSID) address.
+	Address string
+
+	// SignalStrength is the signal strength in units of 100 * dBm (iwd's native
+	// unit), e.g. -6000 means -60 dBm.
+	SignalStrength int16
+
+	// Type is the network security type (open, psk, 8021x).
+	Type NetworkType
+}
+
+// Disconnect disconnects the station from its current network.
+func (s *Station) Disconnect(ctx context.Context) error {
+	if err := s.ensureInitialized(); err != nil {
+		return WrapConnection("Station.ensureInitialized", err)
+	}
+
+	if _, err := s.call.Call(ctx, IwdStationIface, "Disconnect"); err != nil {
+		return wrapIwdMethod(IwdStationIface, "Disconnect", err)
+	}
+	return nil
+}
+
+// ConnectHiddenNetwork connects to a hidden network by SSID. A secured hidden
+// network requires a registered credentials agent (as with Network.Connect). iwd
+// returns matchable errors: NotFound (no such hidden network in scan results),
+// NotHidden (a network with that name is visible), or NoAgent.
+func (s *Station) ConnectHiddenNetwork(ctx context.Context, name string) error {
+	if err := s.ensureInitialized(); err != nil {
+		return WrapConnection("Station.ensureInitialized", err)
+	}
+
+	if _, err := s.call.Call(ctx, IwdStationIface, "ConnectHiddenNetwork", name); err != nil {
+		return wrapIwdMethod(IwdStationIface, "ConnectHiddenNetwork", err)
+	}
+	return nil
+}
+
+// GetHiddenAccessPoints returns the hidden access points found in the most recent
+// scan. It is an experimental iwd method; hardware that cannot provide it makes
+// iwd reject the call, surfaced as a matchable ErrNotSupported.
+func (s *Station) GetHiddenAccessPoints(ctx context.Context) ([]HiddenAccessPoint, error) {
+	if err := s.ensureInitialized(); err != nil {
+		return nil, WrapConnection("Station.ensureInitialized", err)
+	}
+
+	body, err := s.call.Call(ctx, IwdStationIface, "GetHiddenAccessPoints")
+	if err != nil {
+		return nil, wrapIwdMethod(IwdStationIface, "GetHiddenAccessPoints", err)
+	}
+
+	// The reply is a(sns): an array of (address, int16 signal, type string).
+	var tuples []struct {
+		Address string
+		Signal  int16
+		Type    string
+	}
+	if err := dbus.Store(body, &tuples); err != nil {
+		return nil, WrapVariant("GetHiddenAccessPoints", fmt.Errorf("unexpected reply shape: %w", err))
+	}
+
+	out := make([]HiddenAccessPoint, 0, len(tuples))
+	for _, t := range tuples {
+		netType, err := parseNetworkType(t.Type)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, HiddenAccessPoint{
+			Address:        t.Address,
+			SignalStrength: t.Signal,
+			Type:           netType,
+		})
+	}
+	return out, nil
+}
+
 // SubscribePropertiesChanged registers fn for raw station property-change signals.
 func (s *Station) SubscribePropertiesChanged(ctx context.Context, fn func(StationPropertiesChanged)) (UnsubscribeFunc, error) {
 	if fn == nil {

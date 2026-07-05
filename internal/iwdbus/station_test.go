@@ -60,6 +60,17 @@ func TestStation_Iwdbus(t *testing.T) {
 		t.Run("Station_SetAffinities_Err", testStation_SetAffinities_Err)
 		t.Run("Station_SetAffinities_NotSupportedMatchable", testStation_SetAffinities_NotSupportedMatchable)
 		t.Run("Station_SetAffinities_NoIntro", testStation_SetAffinities_NoIntro)
+		t.Run("Station_Disconnect", testStation_Disconnect)
+		t.Run("Station_Disconnect_Err", testStation_Disconnect_Err)
+		t.Run("Station_Disconnect_NoIntro", testStation_Disconnect_NoIntro)
+		t.Run("Station_ConnectHiddenNetwork", testStation_ConnectHiddenNetwork)
+		t.Run("Station_ConnectHiddenNetwork_NotFoundMatchable", testStation_ConnectHiddenNetwork_NotFoundMatchable)
+		t.Run("Station_ConnectHiddenNetwork_NoIntro", testStation_ConnectHiddenNetwork_NoIntro)
+		t.Run("Station_GetHiddenAccessPoints", testStation_GetHiddenAccessPoints)
+		t.Run("Station_GetHiddenAccessPoints_Empty", testStation_GetHiddenAccessPoints_Empty)
+		t.Run("Station_GetHiddenAccessPoints_BadType", testStation_GetHiddenAccessPoints_BadType)
+		t.Run("Station_GetHiddenAccessPoints_Err", testStation_GetHiddenAccessPoints_Err)
+		t.Run("Station_GetHiddenAccessPoints_NoIntro", testStation_GetHiddenAccessPoints_NoIntro)
 	})
 
 	t.Run("Subscribe", func(t *testing.T) {
@@ -645,7 +656,7 @@ func testStation_SetAffinities_NotSupportedMatchable(t *testing.T) {
 		},
 	}}
 
-	err := s.SetAffinities(context.Background(), []string{"/net/connman/iwd/0/3/net/cc28aad1fed0"})
+	err := s.SetAffinities(context.Background(), []string{"/net/connman/iwd/0/3/net/a0b1c2d3e4f5"})
 	require.Error(t, err)
 	require.True(t, errors.Is(err, ErrNotSupported), "expected ErrNotSupported, got %v", err)
 	require.True(t, errors.Is(err, ErrDBusProperty), "should still classify as a property error")
@@ -657,6 +668,164 @@ func testStation_SetAffinities_NoIntro(t *testing.T) {
 	s := &Station{call: nil}
 
 	err := s.SetAffinities(context.Background(), []string{"/x"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "station is not initialized")
+}
+
+func testStation_Disconnect(t *testing.T) {
+	t.Parallel()
+
+	var called bool
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			called = true
+			require.Equal(t, IwdStationIface, iface)
+			require.Equal(t, "Disconnect", method)
+			return nil, nil
+		},
+	}}
+
+	require.NoError(t, s.Disconnect(context.Background()))
+	require.True(t, called)
+}
+
+func testStation_Disconnect_Err(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			return nil, fmt.Errorf("dbus failure")
+		},
+	}}
+
+	err := s.Disconnect(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "dbus failure")
+}
+
+func testStation_Disconnect_NoIntro(t *testing.T) {
+	t.Parallel()
+
+	err := (&Station{call: nil}).Disconnect(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "station is not initialized")
+}
+
+func testStation_ConnectHiddenNetwork(t *testing.T) {
+	t.Parallel()
+
+	var gotName string
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			require.Equal(t, IwdStationIface, iface)
+			require.Equal(t, "ConnectHiddenNetwork", method)
+			require.Len(t, args, 1)
+			gotName, _ = args[0].(string)
+			return nil, nil
+		},
+	}}
+
+	require.NoError(t, s.ConnectHiddenNetwork(context.Background(), "HiddenNet"))
+	require.Equal(t, "HiddenNet", gotName)
+}
+
+func testStation_ConnectHiddenNetwork_NotFoundMatchable(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			return nil, dbus.Error{Name: IwdErrorNotFound, Body: []interface{}{"no such hidden network"}}
+		},
+	}}
+
+	err := s.ConnectHiddenNetwork(context.Background(), "Nope")
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrNotFound))
+}
+
+func testStation_ConnectHiddenNetwork_NoIntro(t *testing.T) {
+	t.Parallel()
+
+	err := (&Station{call: nil}).ConnectHiddenNetwork(context.Background(), "x")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "station is not initialized")
+}
+
+func testStation_GetHiddenAccessPoints(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			require.Equal(t, IwdStationIface, iface)
+			require.Equal(t, "GetHiddenAccessPoints", method)
+			// a(sns): array of (address, int16 signal, type).
+			return []interface{}{
+				[][]interface{}{
+					{"aa:bb:cc:dd:ee:ff", int16(-6000), "psk"},
+					{"11:22:33:44:55:66", int16(-7800), "open"},
+				},
+			}, nil
+		},
+	}}
+
+	got, err := s.GetHiddenAccessPoints(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, []HiddenAccessPoint{
+		{Address: "aa:bb:cc:dd:ee:ff", SignalStrength: -6000, Type: NetworkTypePSK},
+		{Address: "11:22:33:44:55:66", SignalStrength: -7800, Type: NetworkTypeOpen},
+	}, got)
+}
+
+func testStation_GetHiddenAccessPoints_Empty(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			return []interface{}{[][]interface{}{}}, nil
+		},
+	}}
+
+	got, err := s.GetHiddenAccessPoints(context.Background())
+	require.NoError(t, err)
+	require.Empty(t, got)
+}
+
+func testStation_GetHiddenAccessPoints_BadType(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			return []interface{}{
+				[][]interface{}{
+					{"aa:bb:cc:dd:ee:ff", int16(-6000), "bogus"},
+				},
+			}, nil
+		},
+	}}
+
+	_, err := s.GetHiddenAccessPoints(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid network type")
+}
+
+func testStation_GetHiddenAccessPoints_Err(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			return nil, fmt.Errorf("dbus failure")
+		},
+	}}
+
+	_, err := s.GetHiddenAccessPoints(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "dbus failure")
+}
+
+func testStation_GetHiddenAccessPoints_NoIntro(t *testing.T) {
+	t.Parallel()
+
+	_, err := (&Station{call: nil}).GetHiddenAccessPoints(context.Background())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "station is not initialized")
 }

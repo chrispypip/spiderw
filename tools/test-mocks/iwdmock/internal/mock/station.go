@@ -112,3 +112,106 @@ func (d *Device) setStationAffinities(paths []dbus.ObjectPath) {
 func (d *Device) emitStationPropertiesChanged(changed map[string]dbus.Variant) {
 	emitPropertiesChanged(d.Path, iwdbus.IwdStationIface, changed, []string{})
 }
+
+// hiddenConnectedNetworkPath is the synthesized network path the mock reports as
+// ConnectedNetwork after a successful ConnectHiddenNetwork.
+const hiddenConnectedNetworkPath = dbus.ObjectPath("/net/connman/iwd/phy0/wlan0/hidden0")
+
+// hiddenNetworkTypes maps a connectable hidden SSID to its security type; a
+// secured one drives the credentials agent, an open one connects directly.
+var hiddenNetworkTypes = map[string]string{
+	"HiddenOpen":    "open",
+	"HiddenSecured": "psk",
+}
+
+// visibleNetworkNames are the SSIDs of the mock's *visible* networks;
+// ConnectHiddenNetwork rejects them with NotHidden.
+var visibleNetworkNames = map[string]bool{
+	"KnownNet":   true,
+	"OpenNet":    true,
+	"SecuredNet": true,
+}
+
+// mockHiddenAP is one (address, int16 signal, type) tuple of
+// GetHiddenAccessPoints; godbus marshals a slice of these to a(sns).
+type mockHiddenAP struct {
+	Address string
+	Signal  int16
+	Type    string
+}
+
+// stationHiddenAccessPoints is the seeded hidden-AP scan result (signal in
+// 100 * dBm).
+var stationHiddenAccessPoints = []mockHiddenAP{
+	{Address: "de:ad:be:ef:00:01", Signal: -6500, Type: "psk"},
+	{Address: "de:ad:be:ef:00:02", Signal: -8100, Type: "open"},
+}
+
+// Disconnect implements net.connman.iwd.Station.Disconnect: transition to
+// disconnected, clear the connected network/AP (root path = no object), and emit
+// a live State change.
+func (d *Device) Disconnect() *dbus.Error {
+	if !d.HasStation {
+		return dbus.MakeFailedError(fmt.Errorf("device has no station interface"))
+	}
+	d.stationMu.Lock()
+	d.StationState = "disconnected"
+	d.StationConnectedNetwork = "/"
+	d.StationConnectedAccessPoint = "/"
+	d.stationMu.Unlock()
+	d.emitStationPropertiesChanged(map[string]dbus.Variant{
+		"State":                dbus.MakeVariant("disconnected"),
+		"ConnectedNetwork":     dbus.MakeVariant(dbus.ObjectPath("/")),
+		"ConnectedAccessPoint": dbus.MakeVariant(dbus.ObjectPath("/")),
+	})
+	return nil
+}
+
+// ConnectHiddenNetwork implements net.connman.iwd.Station.ConnectHiddenNetwork.
+// A secured hidden SSID drives the same agent callback as a secured
+// Network.Connect; a visible SSID is rejected NotHidden, an unknown one NotFound.
+func (d *Device) ConnectHiddenNetwork(name string) *dbus.Error {
+	if !d.HasStation {
+		return dbus.MakeFailedError(fmt.Errorf("device has no station interface"))
+	}
+
+	secType, isHidden := hiddenNetworkTypes[name]
+	if !isHidden {
+		if visibleNetworkNames[name] {
+			return dbus.NewError(iwdbus.IwdErrorNotHidden, []interface{}{"network is not hidden"})
+		}
+		return dbus.NewError(iwdbus.IwdErrorNotFound, []interface{}{"no such hidden network"})
+	}
+
+	if secType != "open" {
+		passphrase, ok, err := agents.requestPassphrase(hiddenConnectedNetworkPath)
+		if !ok {
+			return dbus.NewError(iwdbus.IwdErrorNoAgent, []interface{}{"No agent registered"})
+		}
+		if err != nil {
+			return dbus.NewError(iwdbus.IwdErrorFailed, []interface{}{err.Error()})
+		}
+		if passphrase != securedNetworkPassphrase {
+			return invalidPassphraseError()
+		}
+	}
+
+	d.stationMu.Lock()
+	d.StationState = "connected"
+	d.StationConnectedNetwork = hiddenConnectedNetworkPath
+	d.stationMu.Unlock()
+	d.emitStationPropertiesChanged(map[string]dbus.Variant{
+		"State":            dbus.MakeVariant("connected"),
+		"ConnectedNetwork": dbus.MakeVariant(hiddenConnectedNetworkPath),
+	})
+	return nil
+}
+
+// GetHiddenAccessPoints implements net.connman.iwd.Station.GetHiddenAccessPoints,
+// returning the seeded hidden APs as a(sns).
+func (d *Device) GetHiddenAccessPoints() ([]mockHiddenAP, *dbus.Error) {
+	if !d.HasStation {
+		return nil, dbus.MakeFailedError(fmt.Errorf("device has no station interface"))
+	}
+	return stationHiddenAccessPoints, nil
+}

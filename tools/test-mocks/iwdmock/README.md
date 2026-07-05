@@ -243,8 +243,15 @@ wired to real mock objects: `ConnectedNetwork` points at the known network,
 later — so subscribers observe the true→false transition. `GetOrderedNetworks`
 returns the three mock networks with seeded signal strengths (in 100 × dBm),
 strongest first. `Affinities` is writable: setting it stores the BSS paths and
-emits a change. Use `--omit-station` to drop the interface while keeping the
-device.
+emits a change.
+
+`Disconnect` transitions the station to `disconnected` and emits a live `State`
+change. `ConnectHiddenNetwork` accepts two seeded hidden SSIDs: `HiddenOpen`
+(connects directly) and `HiddenSecured` (drives the same agent callback as a
+secured `Network.Connect`, so it needs a registered agent supplying
+`mock-secret-passphrase`, else `NoAgent`); a *visible* network name is rejected
+`NotHidden` and any other `NotFound`. `GetHiddenAccessPoints` returns two seeded
+hidden APs. Use `--omit-station` to drop the interface while keeping the device.
 
 ### Credentials agent (AgentManager)
 

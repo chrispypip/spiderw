@@ -197,13 +197,74 @@ func TestStation_Public(t *testing.T) {
 			// ErrNotSupported through the public boundary.
 			f := &fakeCoreStation{}
 			f.setErr(core.ErrNotSupported)
-			err := newStation(f, "/p").SetAffinities(ctx, []string{"/net/connman/iwd/0/3/net/cc28aad1fed0"})
+			err := newStation(f, "/p").SetAffinities(ctx, []string{"/net/connman/iwd/0/3/net/a0b1c2d3e4f5"})
 			require.Error(t, err)
 			require.ErrorIs(t, err, ErrNotSupported)
 		})
 
 		t.Run("NilReceiver", func(t *testing.T) {
 			require.ErrorIs(t, (*Station)(nil).SetAffinities(ctx, []string{"/x"}), ErrInternal)
+		})
+	})
+
+	t.Run("Disconnect", func(t *testing.T) {
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			require.NoError(t, newStation(f, "/p").Disconnect(ctx))
+			require.True(t, f.disconnectCalled.Load())
+		})
+
+		t.Run("NilReceiver", func(t *testing.T) {
+			require.ErrorIs(t, (*Station)(nil).Disconnect(ctx), ErrInternal)
+		})
+	})
+
+	t.Run("ConnectHiddenNetwork", func(t *testing.T) {
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			require.NoError(t, newStation(f, "/p").ConnectHiddenNetwork(ctx, "HiddenNet"))
+			require.Equal(t, "HiddenNet", *f.connectHiddenName.Load())
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			f.setErr(errors.New("boom"))
+			require.Error(t, newStation(f, "/p").ConnectHiddenNetwork(ctx, "HiddenNet"))
+		})
+
+		t.Run("NilReceiver", func(t *testing.T) {
+			require.ErrorIs(t, (*Station)(nil).ConnectHiddenNetwork(ctx, "x"), ErrInternal)
+		})
+	})
+
+	t.Run("HiddenAccessPoints", func(t *testing.T) {
+		t.Run("ConvertsSignalAndType", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			aps := []core.HiddenAccessPoint{
+				{Address: "aa:bb:cc:dd:ee:ff", SignalStrength: -6000, Type: core.NetworkTypePSK},
+				{Address: "11:22:33:44:55:66", SignalStrength: -7250, Type: core.NetworkTypeOpen},
+			}
+			f.hiddenAPs.Store(&aps)
+
+			got, err := newStation(f, "/p").HiddenAccessPoints(ctx)
+			require.NoError(t, err)
+			require.Equal(t, []HiddenAccessPoint{
+				{Address: "aa:bb:cc:dd:ee:ff", SignalStrength: -60, Type: NetworkTypePSK},
+				{Address: "11:22:33:44:55:66", SignalStrength: -72.5, Type: NetworkTypeOpen},
+			}, got)
+		})
+
+		t.Run("Empty", func(t *testing.T) {
+			got, err := newStation(&fakeCoreStation{}, "/p").HiddenAccessPoints(ctx)
+			require.NoError(t, err)
+			require.Empty(t, got)
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			f.setErr(errors.New("boom"))
+			_, err := newStation(f, "/p").HiddenAccessPoints(ctx)
+			require.Error(t, err)
 		})
 	})
 

@@ -243,3 +243,82 @@ func TestStationCmd_Affinities_Set_Missing(t *testing.T) {
 	require.Equal(t, 1, code)
 	require.Contains(t, out, "usage: spiderw station <station> affinities set")
 }
+
+func TestStationCmd_Disconnect(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath}
+	out, code := driveCLI(stationClient(st), nil, false, "station", testStationPath, "disconnect")
+	require.Equal(t, 0, code, out)
+	require.True(t, st.disconnectCalled)
+	require.Contains(t, out, "disconnected")
+}
+
+func TestStationCmd_Disconnect_Error(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath, disconnectErr: errors.New("not connected")}
+	out, code := driveCLI(stationClient(st), nil, false, "station", testStationPath, "disconnect")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "not connected")
+}
+
+func TestStationCmd_ConnectHidden(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationPath, "connect-hidden", "MyHidden", "--passphrase=secret")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "MyHidden", st.connectHiddenName)
+	require.Contains(t, out, "connected to MyHidden")
+}
+
+func TestStationCmd_ConnectHidden_MissingSSID(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithStation(), nil, false, "station", testStationPath, "connect-hidden")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "usage: spiderw station <station> connect-hidden")
+}
+
+func TestStationCmd_ConnectHidden_Error(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath, connectHiddenErr: errors.New("no agent")}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationPath, "connect-hidden", "MyHidden", "--passphrase=x")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "no agent")
+}
+
+func TestStationCmd_HiddenAPs_JSON(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{
+		path: testStationPath,
+		hiddenAPs: []spiderw.HiddenAccessPoint{
+			{Address: "aa:bb:cc:dd:ee:ff", SignalStrength: -60, Type: spiderw.NetworkTypePSK},
+			{Address: "11:22:33:44:55:66", SignalStrength: -72.5, Type: spiderw.NetworkTypeOpen},
+		},
+	}
+	out, code := driveCLI(stationClient(st), nil, true, "station", testStationPath, "hidden-aps")
+	require.Equal(t, 0, code, out)
+
+	var list []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &list))
+	require.Len(t, list, 2)
+	require.Equal(t, "aa:bb:cc:dd:ee:ff", list[0]["Address"])
+	require.Equal(t, -60.0, list[0]["SignalDBm"])
+	require.Equal(t, "psk", list[0]["Type"])
+	require.Equal(t, "open", list[1]["Type"])
+}
+
+func TestStationCmd_HiddenAPs_Empty(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath}
+	out, code := driveCLI(stationClient(st), nil, false, "station", testStationPath, "hidden-aps")
+	require.Equal(t, 0, code, out)
+	require.Contains(t, out, "no hidden access points available")
+}

@@ -88,6 +88,21 @@ func TestExampleFlows(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	// ExampleStation_ConnectHiddenNetwork
+	t.Run("Station_ConnectHiddenNetwork", func(t *testing.T) {
+		client := newMockClient(t, ctx)
+		agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
+			Passphrase: func(context.Context, string) (string, error) { return mockSecuredPassphrase, nil },
+		})
+		require.NoError(t, err)
+		defer func() { _ = agent.Unregister(ctx) }()
+
+		stations, err := client.AllStations(ctx)
+		require.NoError(t, err)
+		require.NotEmpty(t, stations)
+		require.NoError(t, stations[0].ConnectHiddenNetwork(ctx, "HiddenSecured"))
+	})
+
 	// ExampleClient_BasicServiceSet
 	t.Run("Client_BasicServiceSet", func(t *testing.T) {
 		client := newMockClient(t, ctx)

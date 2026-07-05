@@ -367,6 +367,103 @@ func TestStation_Core(t *testing.T) {
 		})
 	})
 
+	t.Run("Disconnect", func(t *testing.T) {
+		t.Run("Uninitialized", func(t *testing.T) {
+			err := (*Station)(nil).Disconnect(ctx)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, ErrStationNotInitialized))
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			require.Error(t, NewStation(f).Disconnect(ctx))
+		})
+
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			require.NoError(t, NewStation(f).Disconnect(ctx))
+			require.True(t, f.disconnectCalled.Load())
+		})
+	})
+
+	t.Run("ConnectHiddenNetwork", func(t *testing.T) {
+		t.Run("Uninitialized", func(t *testing.T) {
+			err := (*Station)(nil).ConnectHiddenNetwork(ctx, "HiddenNet")
+			require.Error(t, err)
+			require.True(t, errors.Is(err, ErrStationNotInitialized))
+		})
+
+		t.Run("EmptyNameIsInvalidArgument", func(t *testing.T) {
+			for _, bad := range []string{"", "   "} {
+				f := &fakeIwdbusStation{}
+				err := NewStation(f).ConnectHiddenNetwork(ctx, bad)
+				require.Error(t, err)
+				var ce *Error
+				require.ErrorAs(t, err, &ce)
+				require.Equal(t, KindInvalidArgument, ce.Kind)
+				require.Equal(t, ResourceStation, ce.Resource)
+				require.Nil(t, f.connectHiddenName.Load(), "backend must not be called for empty name")
+			}
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			f.setErr(iwdbus.ErrNoAgent)
+			err := NewStation(f).ConnectHiddenNetwork(ctx, "HiddenSecured")
+			require.Error(t, err)
+			require.True(t, errors.Is(err, iwdbus.ErrNoAgent))
+		})
+
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			require.NoError(t, NewStation(f).ConnectHiddenNetwork(ctx, "HiddenNet"))
+			require.Equal(t, "HiddenNet", *f.connectHiddenName.Load())
+		})
+	})
+
+	t.Run("HiddenAccessPoints", func(t *testing.T) {
+		t.Run("Uninitialized", func(t *testing.T) {
+			_, err := (*Station)(nil).HiddenAccessPoints(ctx)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, ErrStationNotInitialized))
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewStation(f).HiddenAccessPoints(ctx)
+			require.Error(t, err)
+		})
+
+		t.Run("UnknownTypeIsInvalidState", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			aps := []iwdbus.HiddenAccessPoint{{Address: "aa:bb:cc:dd:ee:ff", SignalStrength: -6000, Type: iwdbus.NetworkType("bogus")}}
+			f.hiddenAPs.Store(&aps)
+			_, err := NewStation(f).HiddenAccessPoints(ctx)
+			require.Error(t, err)
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindInvalidState, ce.Kind)
+			require.Equal(t, ResourceStation, ce.Resource)
+		})
+
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			aps := []iwdbus.HiddenAccessPoint{
+				{Address: "  aa:bb:cc:dd:ee:ff  ", SignalStrength: -6000, Type: iwdbus.NetworkTypePSK},
+				{Address: "11:22:33:44:55:66", SignalStrength: -7800, Type: iwdbus.NetworkTypeOpen},
+			}
+			f.hiddenAPs.Store(&aps)
+			got, err := NewStation(f).HiddenAccessPoints(ctx)
+			require.NoError(t, err)
+			require.Equal(t, []HiddenAccessPoint{
+				{Address: "aa:bb:cc:dd:ee:ff", SignalStrength: -6000, Type: NetworkTypePSK},
+				{Address: "11:22:33:44:55:66", SignalStrength: -7800, Type: NetworkTypeOpen},
+			}, got)
+		})
+	})
+
 	t.Run("SubscribePropertiesChanged", func(t *testing.T) {
 		t.Run("Uninitialized", func(t *testing.T) {
 			_, err := (*Station)(nil).SubscribePropertiesChanged(ctx, func(StationPropertiesChanged) {})

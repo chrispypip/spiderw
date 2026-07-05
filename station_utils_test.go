@@ -20,10 +20,13 @@ type fakeCoreStation struct {
 	connectedAccessPoint atomic.Pointer[string]
 	affinities           atomic.Pointer[[]string]
 	orderedNetworks      atomic.Pointer[[]core.OrderedNetwork]
+	hiddenAPs            atomic.Pointer[[]core.HiddenAccessPoint]
 	subPropsEvent        atomic.Value // core.StationPropertiesChanged
 
-	scanCalled       atomic.Bool
-	setAffinitiesArg atomic.Pointer[[]string]
+	scanCalled        atomic.Bool
+	disconnectCalled  atomic.Bool
+	setAffinitiesArg  atomic.Pointer[[]string]
+	connectHiddenName atomic.Pointer[string]
 
 	err atomic.Pointer[fakeCoreStationError]
 }
@@ -111,6 +114,29 @@ func (f *fakeCoreStation) SetAffinities(_ context.Context, paths []string) error
 	cp := append([]string(nil), paths...)
 	f.setAffinitiesArg.Store(&cp)
 	return nil
+}
+
+func (f *fakeCoreStation) Disconnect(context.Context) error {
+	f.disconnectCalled.Store(true)
+	return f.loadErr()
+}
+
+func (f *fakeCoreStation) ConnectHiddenNetwork(_ context.Context, name string) error {
+	if err := f.loadErr(); err != nil {
+		return err
+	}
+	f.connectHiddenName.Store(&name)
+	return nil
+}
+
+func (f *fakeCoreStation) HiddenAccessPoints(context.Context) ([]core.HiddenAccessPoint, error) {
+	if err := f.loadErr(); err != nil {
+		return nil, err
+	}
+	if v := f.hiddenAPs.Load(); v != nil {
+		return *v, nil
+	}
+	return nil, nil
 }
 
 func (f *fakeCoreStation) SubscribePropertiesChanged(ctx context.Context, fn func(core.StationPropertiesChanged)) (core.UnsubscribeFunc, error) {

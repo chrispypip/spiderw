@@ -1,7 +1,14 @@
   <interface name="net.connman.iwd.Station">
     <method name="Scan"/>
+    <method name="Disconnect"/>
+    <method name="ConnectHiddenNetwork">
+      <arg direction="in" name="name" type="s"/>
+    </method>
     <method name="GetOrderedNetworks">
       <arg direction="out" name="networks" type="a(on)"/>
+    </method>
+    <method name="GetHiddenAccessPoints">
+      <arg direction="out" name="accesspoints" type="a(sns)"/>
     </method>
     <property name="State" type="s" access="read"/>
     <property name="Scanning" type="b" access="read"/>

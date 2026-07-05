@@ -60,10 +60,11 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
   `BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
   (`net.connman.iwd.Agent` / `AgentManager`). `Station` exposes connection state
   (`State`, `Scanning`, `ConnectedNetwork`, and the experimental
-  `ConnectedAccessPoint` / `Affinities`) with change subscriptions, plus
-  **scanning** (`Scan`, `OrderedNetworks`) and writing `Affinities`
-  (`SetAffinities`); station-driven disconnect and hidden-network connect are
-  planned. Network `Connect()` works for open
+  `ConnectedAccessPoint` / `Affinities`) with change subscriptions, scanning
+  (`Scan`, `OrderedNetworks`), writing `Affinities` (`SetAffinities`),
+  `Disconnect`, connecting to a hidden network (`ConnectHiddenNetwork`, which
+  drives the credentials agent for secured hidden networks), and listing hidden
+  access points (`HiddenAccessPoints`). Network `Connect()` works for open
   and already-known networks with no agent; connecting to a not-yet-known secured
   network requires a registered agent (`Client.RegisterAgent`) to supply
   credentials — without one, `Connect()` surfaces an error matching
@@ -413,12 +414,14 @@ spiderw device wlan0 monitor powered
 spiderw device wlan0 monitor mode
 ```
 
-Inspect and scan with stations (devices in station mode). `status` shows
+Inspect, scan, and control stations (devices in station mode). `status` shows
 `State`, `Scanning`, `ConnectedNetwork`, and the experimental
 `ConnectedAccessPoint` / `Affinities`; `scan` triggers a scan (waiting for it to
 finish, then listing results, unless `--no-wait`); `networks` lists the last
-scan's results by signal. A station is referenced by its object path (shared
-with the device):
+scan's results by signal; `disconnect` and `connect-hidden` control the
+connection (a secured hidden network prompts for, or takes, a passphrase);
+`hidden-aps` lists hidden access points. A station is referenced by its object
+path (shared with the device):
 
 ```bash
 spiderw station list
@@ -426,6 +429,9 @@ spiderw station status
 spiderw station /net/connman/iwd/phy0/wlan0 status
 spiderw station /net/connman/iwd/phy0/wlan0 scan
 spiderw station /net/connman/iwd/phy0/wlan0 networks
+spiderw station /net/connman/iwd/phy0/wlan0 disconnect
+spiderw station /net/connman/iwd/phy0/wlan0 connect-hidden MyHidden --passphrase=secret
+spiderw station /net/connman/iwd/phy0/wlan0 hidden-aps
 spiderw station /net/connman/iwd/phy0/wlan0 affinities
 spiderw station /net/connman/iwd/phy0/wlan0 affinities set /net/connman/iwd/phy0/wlan0/aabbccddeeff
 ```

@@ -85,6 +85,9 @@ type stationAPI interface {
 	Scan(ctx context.Context) error
 	OrderedNetworks(ctx context.Context) ([]spiderw.OrderedNetwork, error)
 	SetAffinities(ctx context.Context, paths []string) error
+	Disconnect(ctx context.Context) error
+	ConnectHiddenNetwork(ctx context.Context, name string) error
+	HiddenAccessPoints(ctx context.Context) ([]spiderw.HiddenAccessPoint, error)
 	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
 }
 

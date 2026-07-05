@@ -253,3 +253,132 @@ func TestStationMock_CLINetworks(t *testing.T) {
 	require.Contains(t, out, stationConnectedNetworkPath)
 	require.Contains(t, out, "-60 dBm")
 }
+
+// TestStationMock_DisconnectLiveTransition drives a real disconnect and observes
+// the State property transition connected->disconnected over live signals.
+func TestStationMock_DisconnectLiveTransition(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	station, err := client.Station(ctx, devicePath)
+	require.NoError(t, err)
+
+	states := make(chan spiderw.StationState, 8)
+	unsubscribe, err := station.SubscribeStateChanged(ctx, func(s spiderw.StationState) {
+		states <- s
+	})
+	require.NoError(t, err)
+	defer func() { _ = unsubscribe.Unsubscribe() }()
+
+	require.NoError(t, station.Disconnect(ctx))
+
+	select {
+	case got := <-states:
+		require.Equal(t, spiderw.StationStateDisconnected, got)
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for State=disconnected")
+	}
+}
+
+// TestStationMock_ConnectHidden covers the open, not-found, and secured (with and
+// without an agent) hidden-connect paths.
+func TestStationMock_ConnectHidden(t *testing.T) {
+	t.Run("Open", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		iwdmock.StartMockNormal(t, tmpDir)
+		ctx := context.Background()
+		station, err := newMockClient(t, ctx).Station(ctx, devicePath)
+		require.NoError(t, err)
+		require.NoError(t, station.ConnectHiddenNetwork(ctx, "HiddenOpen"))
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		iwdmock.StartMockNormal(t, tmpDir)
+		ctx := context.Background()
+		station, err := newMockClient(t, ctx).Station(ctx, devicePath)
+		require.NoError(t, err)
+		err = station.ConnectHiddenNetwork(ctx, "NoSuchNet")
+		require.Error(t, err)
+		require.ErrorIs(t, err, spiderw.ErrNotFound)
+	})
+
+	t.Run("SecuredNoAgent", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		iwdmock.StartMockNormal(t, tmpDir)
+		ctx := context.Background()
+		station, err := newMockClient(t, ctx).Station(ctx, devicePath)
+		require.NoError(t, err)
+		err = station.ConnectHiddenNetwork(ctx, "HiddenSecured")
+		require.Error(t, err)
+		require.ErrorIs(t, err, spiderw.ErrNoAgent)
+	})
+
+	t.Run("SecuredWithAgent", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		iwdmock.StartMockNormal(t, tmpDir)
+		ctx := context.Background()
+		client := newMockClient(t, ctx)
+
+		agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
+			Passphrase: func(context.Context, string) (string, error) {
+				return mockSecuredPassphrase, nil
+			},
+		})
+		require.NoError(t, err)
+		defer func() { _ = agent.Unregister(ctx) }()
+
+		station, err := client.Station(ctx, devicePath)
+		require.NoError(t, err)
+		require.NoError(t, station.ConnectHiddenNetwork(ctx, "HiddenSecured"))
+	})
+}
+
+// TestStationMock_HiddenAccessPoints reads the seeded hidden-AP list, confirming
+// the signal (100*dBm -> dBm) and type conversions.
+func TestStationMock_HiddenAccessPoints(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+	ctx := context.Background()
+	station, err := newMockClient(t, ctx).Station(ctx, devicePath)
+	require.NoError(t, err)
+
+	aps, err := station.HiddenAccessPoints(ctx)
+	require.NoError(t, err)
+	require.Len(t, aps, 2)
+	require.Equal(t, "de:ad:be:ef:00:01", aps[0].Address)
+	require.Equal(t, -65.0, aps[0].SignalStrength)
+	require.Equal(t, spiderw.NetworkTypePSK, aps[0].Type)
+	require.Equal(t, spiderw.NetworkTypeOpen, aps[1].Type)
+}
+
+// TestStationMock_CLIDisconnectHiddenAPs drives the disconnect / connect-hidden /
+// hidden-aps CLI verbs against the mock.
+func TestStationMock_CLIDisconnectHiddenAPs(t *testing.T) {
+	t.Run("disconnect", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		iwdmock.StartMockNormal(t, tmpDir)
+		out, err := runSpider(t, "station", devicePath, "disconnect")
+		require.NoError(t, err, out)
+		require.Contains(t, out, "disconnected")
+	})
+
+	t.Run("connect-hidden secured", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		iwdmock.StartMockNormal(t, tmpDir)
+		out, err := runSpider(t, "station", devicePath, "connect-hidden", "HiddenSecured", "--passphrase="+mockSecuredPassphrase)
+		require.NoError(t, err, out)
+		require.Contains(t, out, "connected to HiddenSecured")
+	})
+
+	t.Run("hidden-aps", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		iwdmock.StartMockNormal(t, tmpDir)
+		out, err := runSpider(t, "station", devicePath, "hidden-aps")
+		require.NoError(t, err, out)
+		require.Contains(t, out, "de:ad:be:ef:00:01")
+		require.Contains(t, out, "psk")
+	})
+}

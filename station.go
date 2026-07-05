@@ -238,6 +238,63 @@ func (s *Station) SetAffinities(ctx context.Context, paths []string) error {
 	})
 }
 
+// HiddenAccessPoint is one hidden access point found in the last scan, as
+// returned by HiddenAccessPoints.
+type HiddenAccessPoint struct {
+	// Address is the BSS hardware (BSSID) address.
+	Address string
+
+	// SignalStrength is the signal strength in dBm (e.g. -60.5). iwd reports it in
+	// units of 100 * dBm; spiderw exposes it as dBm here.
+	SignalStrength float64
+
+	// Type is the network security type.
+	Type NetworkType
+}
+
+// Disconnect disconnects the station from its current network.
+func (s *Station) Disconnect(ctx context.Context) error {
+	return do(ctx, "Station.Disconnect", s.coreStation, func(ctx context.Context, c core.StationIface) error {
+		return c.Disconnect(ctx)
+	})
+}
+
+// ConnectHiddenNetwork connects to a hidden network by SSID. A secured hidden
+// network requires a registered credentials agent (register one with
+// Client.RegisterAgent before calling); without one, iwd surfaces an error
+// matching ErrNoAgent.
+func (s *Station) ConnectHiddenNetwork(ctx context.Context, name string) error {
+	return do(ctx, "Station.ConnectHiddenNetwork", s.coreStation, func(ctx context.Context, c core.StationIface) error {
+		return c.ConnectHiddenNetwork(ctx, name)
+	})
+}
+
+// HiddenAccessPoints returns the hidden access points found in the most recent
+// scan. It is an experimental iwd operation: hardware that cannot provide it
+// makes iwd reject the call, and the returned error matches ErrNotSupported via
+// errors.Is.
+func (s *Station) HiddenAccessPoints(ctx context.Context) ([]HiddenAccessPoint, error) {
+	return delegate(ctx, "Station.HiddenAccessPoints", s.coreStation, func(ctx context.Context, c core.StationIface) ([]HiddenAccessPoint, error) {
+		raw, err := c.HiddenAccessPoints(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]HiddenAccessPoint, 0, len(raw))
+		for _, ap := range raw {
+			netType, err := convertNetworkType(ap.Type)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, HiddenAccessPoint{
+				Address:        ap.Address,
+				SignalStrength: float64(ap.SignalStrength) / 100,
+				Type:           netType,
+			})
+		}
+		return out, nil
+	})
+}
+
 // SubscribePropertiesChanged registers fn for station property-change signals and
 // returns a handle that unregisters the callback.
 func (s *Station) SubscribePropertiesChanged(ctx context.Context, fn func(StationPropertiesChanged)) (UnsubscribeFunc, error) {

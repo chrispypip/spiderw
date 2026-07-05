@@ -46,16 +46,18 @@ The following areas are currently implemented and tested end to end:
 - Station support (`net.connman.iwd.Station`): discovery and enumeration of
   station-mode devices; the `State`, `Scanning`, `ConnectedNetwork`, and
   experimental `ConnectedAccessPoint` / `Affinities` properties with
-  state/scanning change subscriptions; scanning (`Scan`, `OrderedNetworks`); and
-  writing `Affinities` (`SetAffinities`). Station-driven disconnect/hidden-connect
-  and the `SignalLevelAgent` are planned follow-ups.
+  state/scanning change subscriptions; scanning (`Scan`, `OrderedNetworks`);
+  writing `Affinities` (`SetAffinities`); `Disconnect`; connecting to a hidden
+  network (`ConnectHiddenNetwork`, driving the credentials agent for secured
+  hidden networks); and listing hidden APs (`GetHiddenAccessPoints`). Only the
+  `SignalLevelAgent` remains as a planned follow-up.
 - Known-network discovery, construction, and properties (name, type, hidden,
   last-connected time, auto-connect), plus toggling auto-connect, forgetting, and
   auto-connect subscriptions.
 - CLI coverage for daemon, adapter, device, station (`list` / `status` / `scan` /
-  `networks` / `affinities`), basic service set, network (including interactive
-  secured connect with `--passphrase` / `--passphrase-stdin`), and known-network
-  operations.
+  `networks` / `disconnect` / `connect-hidden` / `hidden-aps` / `affinities`),
+  basic service set, network (including interactive secured connect with
+  `--passphrase` / `--passphrase-stdin`), and known-network operations.
 - Mock iwd integration tests, including signal firehose coverage.
 - Shared adapter mode and network type parsing and formatting across layers.
 - Structured error handling using generic error kinds plus resource metadata,
@@ -71,9 +73,9 @@ The following areas are currently implemented and tested end to end:
 
 Likely future vertical slices include:
 
-- Station-driven `Disconnect` and hidden-network connect (`ConnectHiddenNetwork`,
-  `GetHiddenAccessPoints`), and the `SignalLevelAgent` — building on the station
-  state, scanning, and affinities support already implemented.
+- The station `SignalLevelAgent` (`RegisterSignalLevelAgent` /
+  `UnregisterSignalLevelAgent`) — a second exported agent, building on the
+  credentials-agent machinery.
 - End-to-end test coverage for the 802.1x credential agent callbacks (a mock
   fixture that drives `RequestUserNameAndPassword` / `RequestUserPassword` /
   `RequestPrivateKeyPassphrase`), promoting them from experimental to tested.

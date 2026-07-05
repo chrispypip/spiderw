@@ -360,6 +360,132 @@ func runStationAffinities(app *App, ctx context.Context, stationRef string, args
 	})
 }
 
+type stationDisconnectResult struct {
+	Station string `json:"Station"`
+}
+
+// String returns the CLI string form of the value.
+func (r stationDisconnectResult) String() string { return "disconnected" }
+
+func runStationDisconnect(app *App, ctx context.Context, stationRef string, args []string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("usage: spiderw station <station> disconnect")
+	}
+	return withStation(app, ctx, stationRef, func(ctx context.Context, s stationAPI) error {
+		if err := s.Disconnect(ctx); err != nil {
+			return err
+		}
+		return app.printOutput(stationDisconnectResult{Station: stationRef})
+	})
+}
+
+type stationConnectHiddenResult struct {
+	Station   string `json:"Station"`
+	Network   string `json:"Network"`
+	Connected bool   `json:"Connected"`
+}
+
+// String returns the CLI string form of the value.
+func (r stationConnectHiddenResult) String() string {
+	return fmt.Sprintf("connected to %s", r.Network)
+}
+
+const stationConnectHiddenUsage = "usage: spiderw station <station> connect-hidden <ssid> [--passphrase=<secret> | --passphrase-stdin]"
+
+func runStationConnectHidden(app *App, ctx context.Context, stationRef string, args []string) error {
+	// The SSID is the first positional; flags follow it (args[1:]).
+	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+		return fmt.Errorf("%s", stationConnectHiddenUsage)
+	}
+	ssid := args[0]
+
+	fs := flag.NewFlagSet("connect-hidden", flag.ContinueOnError)
+	fs.SetOutput(app.stderr())
+	passphrase := fs.String("passphrase", "", "passphrase for a secured (PSK) hidden network")
+	passStdin := fs.Bool("passphrase-stdin", false, "read the passphrase from the first line of stdin")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("%s", stationConnectHiddenUsage)
+	}
+
+	passphraseSet := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "passphrase" {
+			passphraseSet = true
+		}
+	})
+	if passphraseSet && *passStdin {
+		return fmt.Errorf("specify only one of --passphrase or --passphrase-stdin")
+	}
+
+	return app.withClient(ctx, func(client clientAPI) error {
+		s, err := stationByRef(ctx, client, stationRef)
+		if err != nil {
+			return err
+		}
+
+		// The network is hidden, so security can't be checked up front. Register an
+		// agent whose passphrase callback resolves the secret lazily: iwd invokes it
+		// only for a secured hidden network, so open ones never prompt.
+		agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
+			Passphrase: func(context.Context, string) (string, error) {
+				return resolveConnectPassphrase(app, ssid, passphraseSet, *passphrase, *passStdin)
+			},
+		})
+		if err != nil {
+			return err
+		}
+		defer func() { _ = agent.Unregister(context.Background()) }()
+
+		if err := s.ConnectHiddenNetwork(ctx, ssid); err != nil {
+			return err
+		}
+		return app.printOutput(stationConnectHiddenResult{Station: stationRef, Network: ssid, Connected: true})
+	})
+}
+
+type stationHiddenAPResult struct {
+	Address   string  `json:"Address"`
+	SignalDBm float64 `json:"SignalDBm"`
+	Type      string  `json:"Type"`
+}
+
+type stationHiddenAPsResult []stationHiddenAPResult
+
+// String returns the CLI string form of the value.
+func (r stationHiddenAPsResult) String() string {
+	if len(r) == 0 {
+		return "no hidden access points available"
+	}
+	var b strings.Builder
+	for i, ap := range r {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		fmt.Fprintf(&b, "%s\t%g dBm\t%s", ap.Address, ap.SignalDBm, ap.Type)
+	}
+	return b.String()
+}
+
+func runStationHiddenAPs(app *App, ctx context.Context, stationRef string, args []string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("usage: spiderw station <station> hidden-aps")
+	}
+	return withStation(app, ctx, stationRef, func(ctx context.Context, s stationAPI) error {
+		aps, err := s.HiddenAccessPoints(ctx)
+		if err != nil {
+			return err
+		}
+		out := make(stationHiddenAPsResult, 0, len(aps))
+		for _, ap := range aps {
+			out = append(out, stationHiddenAPResult{Address: ap.Address, SignalDBm: ap.SignalStrength, Type: ap.Type.String()})
+		}
+		return app.printOutput(out)
+	})
+}
+
 func runStationWithRef(app *App, args []string) error {
 	if len(args) < 2 {
 		printStationUsage(app)
@@ -380,6 +506,12 @@ func runStationWithRef(app *App, args []string) error {
 		return runStationNetworks(app, ctx, stationRef, rest)
 	case "affinities":
 		return runStationAffinities(app, ctx, stationRef, rest)
+	case "disconnect":
+		return runStationDisconnect(app, ctx, stationRef, rest)
+	case "connect-hidden":
+		return runStationConnectHidden(app, ctx, stationRef, rest)
+	case "hidden-aps":
+		return runStationHiddenAPs(app, ctx, stationRef, rest)
 	default:
 		printStationUsage(app)
 		return fmt.Errorf("unknown station command %q for station %q", op, stationRef)
@@ -403,17 +535,21 @@ func runStation(app *App, args []string) error {
 }
 
 const stationHelpText = `Commands:
-  list                             List stations (object paths)
-  status                           Show a snapshot of every station
-  <station> status                 Show a snapshot of one station (by path)
-  <station> scan [--no-wait]       Scan for networks (waits for completion,
-                                   then lists results, unless --no-wait)
-  <station> networks               List networks from the last scan, by signal
-  <station> affinities             Show the station's affinity BSS paths
-  <station> affinities set <p>...  Set the station's affinity BSS paths
+  list                                  List stations (object paths)
+  status                                Show a snapshot of every station
+  <station> status                      Show a snapshot of one station (by path)
+  <station> scan [--no-wait]            Scan for networks (waits for completion,
+                                        then lists results, unless --no-wait)
+  <station> networks                    List networks from the last scan
+  <station> disconnect                  Disconnect from the current network
+  <station> connect-hidden <ssid> [--passphrase=<s> | --passphrase-stdin]
+                                        Connect to a hidden network by SSID
+  <station> hidden-aps                  List hidden access points from the scan
+  <station> affinities                  Show the station's affinity BSS paths
+  <station> affinities set <p>...       Set the station's affinity BSS paths
 
-A station is a device in station mode. Scanning and disconnect are covered here;
-connecting to a network is done via 'network <ssid> connect'.`
+A station is a device in station mode. Connecting to a *visible* network is done
+via 'network <ssid> connect'.`
 
 func stationCommand(app *App) *Command {
 	return &Command{

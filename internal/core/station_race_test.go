@@ -18,7 +18,7 @@ func TestRace_Core_Station_MixedCalls(t *testing.T) {
 		wg.Go(func() {
 			ctx := context.Background()
 
-			switch i % 7 {
+			switch i % 10 {
 			case 0:
 				_, _ = station.State(ctx)
 			case 1:
@@ -33,6 +33,12 @@ func TestRace_Core_Station_MixedCalls(t *testing.T) {
 				_, _ = station.OrderedNetworks(ctx)
 			case 6:
 				_ = station.SetAffinities(ctx, []string{"/net/connman/iwd/phy0/wlan0/aaa"})
+			case 7:
+				_ = station.Disconnect(ctx)
+			case 8:
+				_ = station.ConnectHiddenNetwork(ctx, "HiddenNet")
+			case 9:
+				_, _ = station.HiddenAccessPoints(ctx)
 			}
 		})
 	}

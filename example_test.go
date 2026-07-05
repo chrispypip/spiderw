@@ -194,6 +194,43 @@ func ExampleStation_Scan() {
 	}
 }
 
+// ExampleStation_ConnectHiddenNetwork connects to a secured hidden network. iwd
+// invokes the registered agent's Passphrase callback for the credentials, so
+// register an agent before connecting.
+func ExampleStation_ConnectHiddenNetwork() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	// Supply the passphrase for a secured hidden network via a credentials agent.
+	agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) {
+			return "hunter2", nil
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = agent.Unregister(ctx) }()
+
+	stations, err := client.AllStations(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(stations) == 0 {
+		log.Fatal("no stations found")
+	}
+
+	if err := stations[0].ConnectHiddenNetwork(ctx, "MyHiddenSSID"); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("connected")
+}
+
 // ExampleClient_BasicServiceSet discovers a basic service set (BSS) and reads
 // its address. A BSS is a single access point/radio the device can see; iwd
 // reports one per detected AP.
