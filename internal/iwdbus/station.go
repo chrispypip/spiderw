@@ -288,7 +288,9 @@ func (s *Station) GetOrderedNetworks(ctx context.Context) ([]OrderedNetwork, err
 }
 
 // SetAffinities sets the Affinities property, the BSS object paths the station
-// should stay affine to. Affinities is an experimental read-write property.
+// should stay affine to. Affinities is an experimental read-write property and
+// depends on driver support: hardware that cannot honor it makes iwd reject the
+// write, which is surfaced as a matchable ErrNotSupported.
 func (s *Station) SetAffinities(ctx context.Context, paths []string) error {
 	if err := s.ensureInitialized(); err != nil {
 		return WrapConnection("Station.ensureInitialized", err)
@@ -300,7 +302,7 @@ func (s *Station) SetAffinities(ctx context.Context, paths []string) error {
 	}
 
 	if err := s.call.SetProperty(ctx, IwdStationIface, "Affinities", objPaths); err != nil {
-		return WrapProperty(IwdStationIface, "Affinities", err)
+		return wrapIwdProperty(IwdStationIface, "Affinities", err)
 	}
 	return nil
 }

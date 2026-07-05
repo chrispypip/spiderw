@@ -88,7 +88,7 @@ func (a *Adapter) SetPowered(ctx context.Context, val bool) error {
 	}
 
 	if err := a.call.SetProperty(ctx, IwdAdapterIface, "Powered", val); err != nil {
-		return WrapProperty(IwdAdapterIface, "Powered", err)
+		return wrapIwdProperty(IwdAdapterIface, "Powered", err)
 	}
 	return nil
 }

@@ -144,7 +144,7 @@ func (k *KnownNetwork) SetAutoConnect(ctx context.Context, val bool) error {
 	}
 
 	if err := k.call.SetProperty(ctx, IwdKnownNetworkIface, "AutoConnect", val); err != nil {
-		return WrapProperty(IwdKnownNetworkIface, "AutoConnect", err)
+		return wrapIwdProperty(IwdKnownNetworkIface, "AutoConnect", err)
 	}
 	return nil
 }

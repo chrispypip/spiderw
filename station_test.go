@@ -192,6 +192,16 @@ func TestStation_Public(t *testing.T) {
 			require.Error(t, newStation(f, "/p").SetAffinities(ctx, []string{"/x"}))
 		})
 
+		t.Run("NotSupportedMatchable", func(t *testing.T) {
+			// A driver rejection surfaced by iwd stays matchable as
+			// ErrNotSupported through the public boundary.
+			f := &fakeCoreStation{}
+			f.setErr(core.ErrNotSupported)
+			err := newStation(f, "/p").SetAffinities(ctx, []string{"/net/connman/iwd/0/3/net/cc28aad1fed0"})
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrNotSupported)
+		})
+
 		t.Run("NilReceiver", func(t *testing.T) {
 			require.ErrorIs(t, (*Station)(nil).SetAffinities(ctx, []string{"/x"}), ErrInternal)
 		})

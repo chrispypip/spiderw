@@ -225,7 +225,13 @@ func (s *Station) OrderedNetworks(ctx context.Context) ([]OrderedNetwork, error)
 }
 
 // SetAffinities sets the BSS object paths the station should stay affine to (an
-// experimental iwd property). Each path must be a non-empty absolute object path.
+// experimental iwd property). Each path must be a non-empty absolute object path,
+// and should be a BSS of the currently connected network (see
+// Network.ExtendedServiceSet).
+//
+// Affinities depends on driver support: on hardware that cannot honor it, iwd
+// rejects the write and the returned error matches ErrNotSupported via
+// errors.Is.
 func (s *Station) SetAffinities(ctx context.Context, paths []string) error {
 	return do(ctx, "Station.SetAffinities", s.coreStation, func(ctx context.Context, c core.StationIface) error {
 		return c.SetAffinities(ctx, slices.Clone(paths))

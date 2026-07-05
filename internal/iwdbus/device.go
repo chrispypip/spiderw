@@ -104,7 +104,7 @@ func (d *Device) SetPowered(ctx context.Context, val bool) error {
 	}
 
 	if err := d.call.SetProperty(ctx, IwdDeviceIface, "Powered", val); err != nil {
-		return WrapProperty(IwdDeviceIface, "Powered", err)
+		return wrapIwdProperty(IwdDeviceIface, "Powered", err)
 	}
 	return nil
 }
@@ -133,7 +133,7 @@ func (d *Device) SetMode(ctx context.Context, mode Mode) error {
 	}
 
 	if err := d.call.SetProperty(ctx, IwdDeviceIface, "Mode", mode.String()); err != nil {
-		return WrapProperty(IwdDeviceIface, "Mode", err)
+		return wrapIwdProperty(IwdDeviceIface, "Mode", err)
 	}
 	return nil
 }

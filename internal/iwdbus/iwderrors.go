@@ -183,3 +183,22 @@ func wrapIwdMethod(iface, method string, err error) error {
 	}
 	return WrapMethod(iface, method, err)
 }
+
+// wrapIwdProperty wraps a D-Bus property Get/Set error, mapping recognized iwd
+// error names to their sentinels so callers can match them with errors.Is (e.g.
+// a writable property that hardware rejects with NotSupported). The original
+// D-Bus error is preserved in the chain. Unrecognized errors fall back to a
+// generic property error.
+func wrapIwdProperty(iface, property string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if sentinel := iwdErrorSentinel(err); sentinel != nil {
+		return &Error{
+			Kind:    ErrDBusProperty,
+			Context: fmt.Sprintf("iface=%s, property=%s", iface, property),
+			Err:     fmt.Errorf("%w: %w", sentinel, err),
+		}
+	}
+	return WrapProperty(iface, property, err)
+}

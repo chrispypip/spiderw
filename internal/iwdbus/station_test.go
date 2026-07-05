@@ -4,6 +4,7 @@ package iwdbus
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -57,6 +58,7 @@ func TestStation_Iwdbus(t *testing.T) {
 		t.Run("Station_GetOrderedNetworks_NoIntro", testStation_GetOrderedNetworks_NoIntro)
 		t.Run("Station_SetAffinities", testStation_SetAffinities)
 		t.Run("Station_SetAffinities_Err", testStation_SetAffinities_Err)
+		t.Run("Station_SetAffinities_NotSupportedMatchable", testStation_SetAffinities_NotSupportedMatchable)
 		t.Run("Station_SetAffinities_NoIntro", testStation_SetAffinities_NoIntro)
 	})
 
@@ -627,6 +629,26 @@ func testStation_SetAffinities_Err(t *testing.T) {
 	err := s.SetAffinities(context.Background(), []string{"/x"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "dbus failure")
+}
+
+func testStation_SetAffinities_NotSupportedMatchable(t *testing.T) {
+	t.Parallel()
+
+	// iwd rejects the write on hardware that can't honor it; the named
+	// net.connman.iwd.NotSupported error must surface as a matchable sentinel.
+	s := &Station{call: &fakeCaller{
+		setPropFn: func(ctx context.Context, iface, prop string, value interface{}) error {
+			return dbus.Error{
+				Name: IwdErrorNotSupported,
+				Body: []interface{}{"Operation not supported"},
+			}
+		},
+	}}
+
+	err := s.SetAffinities(context.Background(), []string{"/net/connman/iwd/0/3/net/cc28aad1fed0"})
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrNotSupported), "expected ErrNotSupported, got %v", err)
+	require.True(t, errors.Is(err, ErrDBusProperty), "should still classify as a property error")
 }
 
 func testStation_SetAffinities_NoIntro(t *testing.T) {
