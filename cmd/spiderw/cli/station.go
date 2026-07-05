@@ -2,11 +2,17 @@ package cli
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/chrispypip/spiderw"
 )
+
+// scanWaitTimeout bounds how long `station <path> scan` (wait mode) blocks for a
+// scan to finish before giving up.
+const scanWaitTimeout = 15 * time.Second
 
 type stationRefResult struct {
 	Path string `json:"Path"`
@@ -213,6 +219,147 @@ func withStation(app *App, ctx context.Context, stationRef string, fn func(conte
 	})
 }
 
+type stationScanResult struct {
+	Station string `json:"Station"`
+	Started bool   `json:"Started"`
+}
+
+// String returns the CLI string form of the value.
+func (r stationScanResult) String() string {
+	return "scan started"
+}
+
+func runStationScan(app *App, ctx context.Context, stationRef string, args []string) error {
+	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
+	fs.SetOutput(app.stderr())
+	noWait := fs.Bool("no-wait", false, "trigger the scan and return without waiting for it to finish")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("usage: spiderw station <station> scan [--no-wait]")
+	}
+
+	return withStation(app, ctx, stationRef, func(ctx context.Context, s stationAPI) error {
+		if *noWait {
+			if err := s.Scan(ctx); err != nil {
+				return err
+			}
+			return app.printOutput(stationScanResult{Station: stationRef, Started: true})
+		}
+
+		// Wait: subscribe to Scanning, start the scan, then block until Scanning
+		// returns to false. Subscribing before Scan avoids missing the transition.
+		done := make(chan struct{}, 1)
+		unsubscribe, err := s.SubscribeScanningChanged(ctx, func(scanning bool) {
+			if !scanning {
+				select {
+				case done <- struct{}{}:
+				default:
+				}
+			}
+		})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = unsubscribe.Unsubscribe()
+		}()
+
+		if err := s.Scan(ctx); err != nil {
+			return err
+		}
+
+		select {
+		case <-done:
+		case <-time.After(scanWaitTimeout):
+			return fmt.Errorf("timed out waiting for scan to finish")
+		}
+
+		return printStationNetworks(app, ctx, s)
+	})
+}
+
+type stationNetworkResult struct {
+	Network   string  `json:"Network"`
+	SignalDBm float64 `json:"SignalDBm"`
+}
+
+type stationNetworksResult []stationNetworkResult
+
+// String returns the CLI string form of the value.
+func (r stationNetworksResult) String() string {
+	if len(r) == 0 {
+		return "no networks available"
+	}
+	var b strings.Builder
+	for i, n := range r {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		fmt.Fprintf(&b, "%s\t%g dBm", n.Network, n.SignalDBm)
+	}
+	return b.String()
+}
+
+func printStationNetworks(app *App, ctx context.Context, s stationAPI) error {
+	nets, err := s.OrderedNetworks(ctx)
+	if err != nil {
+		return err
+	}
+	out := make(stationNetworksResult, 0, len(nets))
+	for _, n := range nets {
+		out = append(out, stationNetworkResult{Network: n.Network, SignalDBm: n.SignalStrength})
+	}
+	return app.printOutput(out)
+}
+
+func runStationNetworks(app *App, ctx context.Context, stationRef string, args []string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("usage: spiderw station <station> networks")
+	}
+	return withStation(app, ctx, stationRef, func(ctx context.Context, s stationAPI) error {
+		return printStationNetworks(app, ctx, s)
+	})
+}
+
+type stationAffinitiesResult []string
+
+// String returns the CLI string form of the value.
+func (r stationAffinitiesResult) String() string {
+	if len(r) == 0 {
+		return "no affinities set"
+	}
+	return strings.Join(r, "\n")
+}
+
+func runStationAffinities(app *App, ctx context.Context, stationRef string, args []string) error {
+	// `affinities` shows the current list; `affinities set <bss-path>...` writes it.
+	if len(args) > 0 && args[0] == "set" {
+		paths := args[1:]
+		if len(paths) == 0 {
+			return fmt.Errorf("usage: spiderw station <station> affinities set <bss-path> [<bss-path>...]")
+		}
+		return withStation(app, ctx, stationRef, func(ctx context.Context, s stationAPI) error {
+			if err := s.SetAffinities(ctx, paths); err != nil {
+				return err
+			}
+			return app.printOutput(stationAffinitiesResult(paths))
+		})
+	}
+	if len(args) != 0 {
+		return fmt.Errorf("usage: spiderw station <station> affinities [set <bss-path>...]")
+	}
+
+	return withStation(app, ctx, stationRef, func(ctx context.Context, s stationAPI) error {
+		affinities, err := s.Affinities(ctx)
+		if err != nil {
+			return err
+		}
+		return app.printOutput(stationAffinitiesResult(affinities))
+	})
+}
+
 func runStationWithRef(app *App, args []string) error {
 	if len(args) < 2 {
 		printStationUsage(app)
@@ -227,6 +374,12 @@ func runStationWithRef(app *App, args []string) error {
 	switch op {
 	case "status":
 		return runStationSingleStatus(app, ctx, stationRef, rest)
+	case "scan":
+		return runStationScan(app, ctx, stationRef, rest)
+	case "networks":
+		return runStationNetworks(app, ctx, stationRef, rest)
+	case "affinities":
+		return runStationAffinities(app, ctx, stationRef, rest)
 	default:
 		printStationUsage(app)
 		return fmt.Errorf("unknown station command %q for station %q", op, stationRef)
@@ -250,13 +403,17 @@ func runStation(app *App, args []string) error {
 }
 
 const stationHelpText = `Commands:
-  list                 List stations (object paths)
-  status               Show a snapshot of every station
-  <station> status     Show a snapshot of one station (by path)
+  list                             List stations (object paths)
+  status                           Show a snapshot of every station
+  <station> status                 Show a snapshot of one station (by path)
+  <station> scan [--no-wait]       Scan for networks (waits for completion,
+                                   then lists results, unless --no-wait)
+  <station> networks               List networks from the last scan, by signal
+  <station> affinities             Show the station's affinity BSS paths
+  <station> affinities set <p>...  Set the station's affinity BSS paths
 
-A station is a device in station mode; its read-only connection state covers
-State, Scanning, ConnectedNetwork, and the experimental ConnectedAccessPoint and
-Affinities. Scanning and disconnect are planned.`
+A station is a device in station mode. Scanning and disconnect are covered here;
+connecting to a network is done via 'network <ssid> connect'.`
 
 func stationCommand(app *App) *Command {
 	return &Command{

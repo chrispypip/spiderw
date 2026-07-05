@@ -1,7 +1,11 @@
   <interface name="net.connman.iwd.Station">
+    <method name="Scan"/>
+    <method name="GetOrderedNetworks">
+      <arg direction="out" name="networks" type="a(on)"/>
+    </method>
     <property name="State" type="s" access="read"/>
     <property name="Scanning" type="b" access="read"/>
     <property name="ConnectedNetwork" type="o" access="read"/>
     <property name="ConnectedAccessPoint" type="o" access="read"/>
-    <property name="Affinities" type="ao" access="read"/>
+    <property name="Affinities" type="ao" access="readwrite"/>
   </interface>

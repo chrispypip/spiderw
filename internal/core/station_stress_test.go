@@ -20,7 +20,7 @@ func TestStress_Core_Station_MixedMethods(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
-			switch i % 4 {
+			switch i % 7 {
 			case 0:
 				_, _ = station.State(ctx)
 			case 1:
@@ -29,6 +29,12 @@ func TestStress_Core_Station_MixedMethods(t *testing.T) {
 				_, _ = station.ConnectedNetwork(ctx)
 			case 3:
 				_, _ = station.Properties(ctx)
+			case 4:
+				_ = station.Scan(ctx)
+			case 5:
+				_, _ = station.OrderedNetworks(ctx)
+			case 6:
+				_ = station.SetAffinities(ctx, []string{"/net/connman/iwd/phy0/wlan0/aaa"})
 			}
 		})
 	}

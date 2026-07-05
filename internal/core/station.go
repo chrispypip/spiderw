@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/chrispypip/spiderw/internal/iwdbus"
 	"github.com/chrispypip/spiderw/internal/iwdvalue"
@@ -50,6 +51,9 @@ type stationRaw interface {
 	GetConnectedAccessPoint(ctx context.Context) (*string, error)
 	GetAffinities(ctx context.Context) ([]string, error)
 	GetProperties(ctx context.Context) (*iwdbus.StationProperties, error)
+	Scan(ctx context.Context) error
+	GetOrderedNetworks(ctx context.Context) ([]iwdbus.OrderedNetwork, error)
+	SetAffinities(ctx context.Context, paths []string) error
 	SubscribePropertiesChanged(ctx context.Context, fn func(iwdbus.StationPropertiesChanged)) (iwdbus.UnsubscribeFunc, error)
 	SubscribeStateChanged(ctx context.Context, fn func(iwdbus.StationState)) (iwdbus.UnsubscribeFunc, error)
 	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (iwdbus.UnsubscribeFunc, error)
@@ -63,6 +67,9 @@ type StationIface interface {
 	ConnectedAccessPoint(ctx context.Context) (*string, error)
 	Affinities(ctx context.Context) ([]string, error)
 	Properties(ctx context.Context) (*StationProperties, error)
+	Scan(ctx context.Context) error
+	OrderedNetworks(ctx context.Context) ([]OrderedNetwork, error)
+	SetAffinities(ctx context.Context, paths []string) error
 	SubscribePropertiesChanged(ctx context.Context, fn func(StationPropertiesChanged)) (UnsubscribeFunc, error)
 	SubscribeStateChanged(ctx context.Context, fn func(StationState)) (UnsubscribeFunc, error)
 	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (UnsubscribeFunc, error)
@@ -216,6 +223,81 @@ func (s *Station) Properties(ctx context.Context) (*StationProperties, error) {
 		ConnectedAccessPoint: normalizeOptionalString(raw.ConnectedAccessPoint),
 		Affinities:           raw.Affinities,
 	}, nil
+}
+
+// OrderedNetwork is one scanned network and its signal strength, as returned by
+// OrderedNetworks.
+type OrderedNetwork struct {
+	// Network is the object path of the network.
+	Network string
+
+	// SignalStrength is the signal strength in units of 100 * dBm (iwd's native
+	// unit), e.g. -6000 means -60 dBm.
+	SignalStrength int16
+}
+
+// Scan schedules a network scan. It is asynchronous; the station's Scanning
+// property tracks progress (subscribe to observe it return to false).
+func (s *Station) Scan(ctx context.Context) error {
+	const op = "Station.Scan"
+
+	rawStation, err := s.rawStation(op)
+	if err != nil {
+		return err
+	}
+
+	if err := rawStation.Scan(ctx); err != nil {
+		return WrapStationUnavailable(op, "failed scheduling iwd Station scan", err)
+	}
+	return nil
+}
+
+// OrderedNetworks returns the networks from the most recent scan, ordered by iwd
+// (best signal first). Each network path is validated to be absolute.
+func (s *Station) OrderedNetworks(ctx context.Context) ([]OrderedNetwork, error) {
+	const op = "Station.OrderedNetworks"
+
+	rawStation, err := s.rawStation(op)
+	if err != nil {
+		return nil, err
+	}
+
+	raw, err := rawStation.GetOrderedNetworks(ctx)
+	if err != nil {
+		return nil, WrapStationUnavailable(op, "failed querying iwd Station ordered networks", err)
+	}
+
+	out := make([]OrderedNetwork, 0, len(raw))
+	for _, n := range raw {
+		path := strings.TrimSpace(string(n.Network))
+		if path == "" || !strings.HasPrefix(path, "/") {
+			return nil, WrapInvalidState(ResourceStation, op, "station returned invalid network path", fmt.Errorf("invalid network path %q", n.Network))
+		}
+		out = append(out, OrderedNetwork{Network: path, SignalStrength: n.SignalStrength})
+	}
+	return out, nil
+}
+
+// SetAffinities sets the BSS object paths the station should stay affine to.
+// Each path must be a non-empty absolute object path.
+func (s *Station) SetAffinities(ctx context.Context, paths []string) error {
+	const op = "Station.SetAffinities"
+
+	rawStation, err := s.rawStation(op)
+	if err != nil {
+		return err
+	}
+
+	for _, p := range paths {
+		if strings.TrimSpace(p) == "" || !strings.HasPrefix(p, "/") {
+			return WrapInvalidArgument(ResourceStation, op, "affinity path must be a non-empty absolute object path", fmt.Errorf("invalid affinity path %q", p))
+		}
+	}
+
+	if err := rawStation.SetAffinities(ctx, paths); err != nil {
+		return WrapStationUnavailable(op, "failed setting iwd Station affinities", err)
+	}
+	return nil
 }
 
 // SubscribePropertiesChanged registers fn for normalized property-change events.

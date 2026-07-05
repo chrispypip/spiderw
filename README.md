@@ -19,7 +19,7 @@ and may change without notice until the first tagged release. The implemented
 surface today covers `Client`, `Daemon`, `Adapter`, `Device`, `Station`,
 `BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
 (identity, powered/mode state, supported modes, property subscriptions,
-read-only station connection state, connecting to open, already-known, **and
+station connection state and scanning, connecting to open, already-known, **and
 secured (PSK)** networks via a registered agent, and managing saved networks) —
 with much more of the iwd API planned.
 It is developed and tested
@@ -58,11 +58,12 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
   modeled on it.
 - **Supported iwd interfaces:** `Daemon`, `Adapter`, `Device`, `Station`,
   `BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
-  (`net.connman.iwd.Agent` / `AgentManager`). `Station` currently exposes
-  **read-only connection state** — `State`, `Scanning`, `ConnectedNetwork`, and
-  the experimental `ConnectedAccessPoint` / `Affinities` — plus change
-  subscriptions; scanning (`Scan`, ordered networks) and station-driven
-  disconnect/hidden-connect are planned. Network `Connect()` works for open
+  (`net.connman.iwd.Agent` / `AgentManager`). `Station` exposes connection state
+  (`State`, `Scanning`, `ConnectedNetwork`, and the experimental
+  `ConnectedAccessPoint` / `Affinities`) with change subscriptions, plus
+  **scanning** (`Scan`, `OrderedNetworks`) and writing `Affinities`
+  (`SetAffinities`); station-driven disconnect and hidden-network connect are
+  planned. Network `Connect()` works for open
   and already-known networks with no agent; connecting to a not-yet-known secured
   network requires a registered agent (`Client.RegisterAgent`) to supply
   credentials — without one, `Connect()` surfaces an error matching
@@ -412,15 +413,21 @@ spiderw device wlan0 monitor powered
 spiderw device wlan0 monitor mode
 ```
 
-Inspect the read-only connection state of stations (devices in station mode).
-`status` shows `State`, `Scanning`, `ConnectedNetwork`, and the experimental
-`ConnectedAccessPoint` / `Affinities`. A station is referenced by its object
-path (shared with the device):
+Inspect and scan with stations (devices in station mode). `status` shows
+`State`, `Scanning`, `ConnectedNetwork`, and the experimental
+`ConnectedAccessPoint` / `Affinities`; `scan` triggers a scan (waiting for it to
+finish, then listing results, unless `--no-wait`); `networks` lists the last
+scan's results by signal. A station is referenced by its object path (shared
+with the device):
 
 ```bash
 spiderw station list
 spiderw station status
 spiderw station /net/connman/iwd/phy0/wlan0 status
+spiderw station /net/connman/iwd/phy0/wlan0 scan
+spiderw station /net/connman/iwd/phy0/wlan0 networks
+spiderw station /net/connman/iwd/phy0/wlan0 affinities
+spiderw station /net/connman/iwd/phy0/wlan0 affinities set /net/connman/iwd/phy0/wlan0/aabbccddeeff
 ```
 
 List basic service sets (BSSes), or print a full snapshot for every BSS. A

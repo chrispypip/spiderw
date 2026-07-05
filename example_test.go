@@ -160,6 +160,40 @@ func ExampleClient_Station() {
 		station.Path(), props.State, props.Scanning, connected)
 }
 
+// ExampleStation_Scan triggers a scan and lists the resulting networks by signal
+// strength. Scan is asynchronous; subscribe to Scanning (or poll it) to know when
+// results are ready. This example reads the last results immediately.
+func ExampleStation_Scan() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	stations, err := client.AllStations(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(stations) == 0 {
+		log.Fatal("no stations found")
+	}
+	station := stations[0]
+
+	if err := station.Scan(ctx); err != nil {
+		log.Fatal(err)
+	}
+
+	networks, err := station.OrderedNetworks(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, n := range networks {
+		fmt.Printf("%s: %.0f dBm\n", n.Network, n.SignalStrength)
+	}
+}
+
 // ExampleClient_BasicServiceSet discovers a basic service set (BSS) and reads
 // its address. A BSS is a single access point/radio the device can see; iwd
 // reports one per detected AP.

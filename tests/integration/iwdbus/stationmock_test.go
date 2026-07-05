@@ -5,6 +5,7 @@ package integration_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -158,4 +159,97 @@ func TestStationMock_CLIList(t *testing.T) {
 	out, err := runSpider(t, "station", "list")
 	require.NoError(t, err, out)
 	require.Contains(t, out, devicePath)
+}
+
+// TestStationMock_ScanLiveTransition is the headline S2 test: it drives a real
+// scan and observes the Scanning property transition true->false over live
+// PropertiesChanged signals -- the first end-to-end exercise of a subscription.
+func TestStationMock_ScanLiveTransition(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	station, err := client.Station(ctx, devicePath)
+	require.NoError(t, err)
+
+	events := make(chan bool, 8)
+	unsubscribe, err := station.SubscribeScanningChanged(ctx, func(scanning bool) {
+		events <- scanning
+	})
+	require.NoError(t, err)
+	defer func() { _ = unsubscribe.Unsubscribe() }()
+
+	require.NoError(t, station.Scan(ctx))
+
+	waitFor := func(want bool) {
+		select {
+		case got := <-events:
+			require.Equal(t, want, got)
+		case <-time.After(3 * time.Second):
+			t.Fatalf("timed out waiting for Scanning=%v", want)
+		}
+	}
+	waitFor(true)  // scan started
+	waitFor(false) // scan finished
+}
+
+// TestStationMock_OrderedNetworks reads the seeded scan results and confirms the
+// signal strength is converted from iwd's 100*dBm to dBm.
+func TestStationMock_OrderedNetworks(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	station, err := client.Station(ctx, devicePath)
+	require.NoError(t, err)
+
+	nets, err := station.OrderedNetworks(ctx)
+	require.NoError(t, err)
+	require.Len(t, nets, 3)
+	require.Equal(t, stationConnectedNetworkPath, nets[0].Network)
+	require.Equal(t, -60.0, nets[0].SignalStrength) // mock seeds -6000 (100*dBm)
+}
+
+// TestStationMock_SetAffinities round-trips: write affinities, then read them
+// back through the Affinities getter.
+func TestStationMock_SetAffinities(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	station, err := client.Station(ctx, devicePath)
+	require.NoError(t, err)
+
+	want := []string{"/net/connman/iwd/phy0/wlan0/bbccddeeff00"}
+	require.NoError(t, station.SetAffinities(ctx, want))
+
+	got, err := station.Affinities(ctx)
+	require.NoError(t, err)
+	require.Equal(t, want, got)
+}
+
+// TestStationMock_CLIScan drives `station <path> scan` (wait mode) against the
+// mock: it waits for the scan to finish, then lists the networks.
+func TestStationMock_CLIScan(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	out, err := runSpider(t, "station", devicePath, "scan")
+	require.NoError(t, err, out)
+	require.Contains(t, out, stationConnectedNetworkPath)
+	require.Contains(t, out, "dBm")
+}
+
+// TestStationMock_CLINetworks drives `station <path> networks` against the mock.
+func TestStationMock_CLINetworks(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	out, err := runSpider(t, "station", devicePath, "networks")
+	require.NoError(t, err, out)
+	require.Contains(t, out, stationConnectedNetworkPath)
+	require.Contains(t, out, "-60 dBm")
 }

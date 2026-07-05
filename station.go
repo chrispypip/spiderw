@@ -184,6 +184,54 @@ func (s *Station) Properties(ctx context.Context) (*StationProperties, error) {
 	})
 }
 
+// OrderedNetwork is one scanned network and its signal strength, as returned by
+// OrderedNetworks.
+type OrderedNetwork struct {
+	// Network is the object path of the network. Resolve it with Client.Network.
+	Network string
+
+	// SignalStrength is the signal strength in dBm (e.g. -60.5). iwd reports it in
+	// units of 100 * dBm; spiderw exposes it as dBm here.
+	SignalStrength float64
+}
+
+// Scan schedules a network scan on the station. It is asynchronous: the call
+// returns once the scan is scheduled, and the station's Scanning property tracks
+// progress. Subscribe with SubscribeScanningChanged to observe completion, then
+// read results with OrderedNetworks.
+func (s *Station) Scan(ctx context.Context) error {
+	return do(ctx, "Station.Scan", s.coreStation, func(ctx context.Context, c core.StationIface) error {
+		return c.Scan(ctx)
+	})
+}
+
+// OrderedNetworks returns the networks from the most recent scan, ordered by iwd
+// with the strongest signal first. No scan is required to read the last results.
+func (s *Station) OrderedNetworks(ctx context.Context) ([]OrderedNetwork, error) {
+	return delegate(ctx, "Station.OrderedNetworks", s.coreStation, func(ctx context.Context, c core.StationIface) ([]OrderedNetwork, error) {
+		raw, err := c.OrderedNetworks(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]OrderedNetwork, 0, len(raw))
+		for _, n := range raw {
+			out = append(out, OrderedNetwork{
+				Network:        n.Network,
+				SignalStrength: float64(n.SignalStrength) / 100,
+			})
+		}
+		return out, nil
+	})
+}
+
+// SetAffinities sets the BSS object paths the station should stay affine to (an
+// experimental iwd property). Each path must be a non-empty absolute object path.
+func (s *Station) SetAffinities(ctx context.Context, paths []string) error {
+	return do(ctx, "Station.SetAffinities", s.coreStation, func(ctx context.Context, c core.StationIface) error {
+		return c.SetAffinities(ctx, slices.Clone(paths))
+	})
+}
+
 // SubscribePropertiesChanged registers fn for station property-change signals and
 // returns a handle that unregisters the callback.
 func (s *Station) SubscribePropertiesChanged(ctx context.Context, fn func(StationPropertiesChanged)) (UnsubscribeFunc, error) {

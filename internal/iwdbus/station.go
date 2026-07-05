@@ -232,6 +232,79 @@ func (s *Station) GetProperties(ctx context.Context) (*StationProperties, error)
 	return props, nil
 }
 
+// OrderedNetwork is one entry of GetOrderedNetworks: a scanned network and its
+// signal strength.
+type OrderedNetwork struct {
+	// Network is the D-Bus object path of the network.
+	Network dbus.ObjectPath
+
+	// SignalStrength is the signal strength in units of 100 * dBm (iwd's native
+	// unit), e.g. -6000 means -60 dBm.
+	SignalStrength int16
+}
+
+// Scan schedules a network scan. It is asynchronous: the call returns once the
+// scan is scheduled, and the station's Scanning property tracks progress (true
+// while scanning, false when results are ready). iwd rejects a scan that is
+// already in progress with a matchable Busy/InProgress error.
+func (s *Station) Scan(ctx context.Context) error {
+	if err := s.ensureInitialized(); err != nil {
+		return WrapConnection("Station.ensureInitialized", err)
+	}
+
+	if _, err := s.call.Call(ctx, IwdStationIface, "Scan"); err != nil {
+		return wrapIwdMethod(IwdStationIface, "Scan", err)
+	}
+	return nil
+}
+
+// GetOrderedNetworks returns the networks from the most recent scan, ordered by
+// iwd (best signal first). No scan is required to read the last results.
+func (s *Station) GetOrderedNetworks(ctx context.Context) ([]OrderedNetwork, error) {
+	if err := s.ensureInitialized(); err != nil {
+		return nil, WrapConnection("Station.ensureInitialized", err)
+	}
+
+	body, err := s.call.Call(ctx, IwdStationIface, "GetOrderedNetworks")
+	if err != nil {
+		return nil, wrapIwdMethod(IwdStationIface, "GetOrderedNetworks", err)
+	}
+
+	// The reply is a(on): an array of (network object path, int16 signal). godbus
+	// maps the (on) struct to a Go struct by field order.
+	var tuples []struct {
+		Path   dbus.ObjectPath
+		Signal int16
+	}
+	if err := dbus.Store(body, &tuples); err != nil {
+		return nil, WrapVariant("GetOrderedNetworks", fmt.Errorf("unexpected reply shape: %w", err))
+	}
+
+	out := make([]OrderedNetwork, 0, len(tuples))
+	for _, t := range tuples {
+		out = append(out, OrderedNetwork{Network: t.Path, SignalStrength: t.Signal})
+	}
+	return out, nil
+}
+
+// SetAffinities sets the Affinities property, the BSS object paths the station
+// should stay affine to. Affinities is an experimental read-write property.
+func (s *Station) SetAffinities(ctx context.Context, paths []string) error {
+	if err := s.ensureInitialized(); err != nil {
+		return WrapConnection("Station.ensureInitialized", err)
+	}
+
+	objPaths := make([]dbus.ObjectPath, 0, len(paths))
+	for _, p := range paths {
+		objPaths = append(objPaths, dbus.ObjectPath(p))
+	}
+
+	if err := s.call.SetProperty(ctx, IwdStationIface, "Affinities", objPaths); err != nil {
+		return WrapProperty(IwdStationIface, "Affinities", err)
+	}
+	return nil
+}
+
 // SubscribePropertiesChanged registers fn for raw station property-change signals.
 func (s *Station) SubscribePropertiesChanged(ctx context.Context, fn func(StationPropertiesChanged)) (UnsubscribeFunc, error) {
 	if fn == nil {

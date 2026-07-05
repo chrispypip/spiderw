@@ -2,6 +2,7 @@ package mock
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/godbus/dbus/v5"
 
@@ -59,6 +60,10 @@ type Device struct {
 
 	// StationAffinities is the mock Station.Affinities property (experimental).
 	StationAffinities []dbus.ObjectPath
+
+	// stationMu guards the mutable Station state (Scanning, Affinities), which
+	// Scan and Set mutate from goroutines godbus dispatches concurrently.
+	stationMu sync.Mutex
 }
 
 // ExportDevice exports the mock device objects on the D-Bus connection. A single
@@ -173,6 +178,20 @@ func (d *Device) Get(iface, p string) (dbus.Variant, *dbus.Error) {
 
 // Set stores supported mock device properties and emits matching change signals.
 func (d *Device) Set(iface, p string, v dbus.Variant) *dbus.Error {
+	if iface == iwdbus.IwdStationIface {
+		if !d.HasStation {
+			return dbus.MakeFailedError(fmt.Errorf("device has no station interface"))
+		}
+		if p != "Affinities" {
+			return dbus.MakeFailedError(fmt.Errorf("cannot set station property %q", p))
+		}
+		paths, ok := v.Value().([]dbus.ObjectPath)
+		if !ok {
+			return dbus.MakeFailedError(fmt.Errorf("property Affinities must be an object-path array, got %T", v.Value()))
+		}
+		d.setStationAffinities(paths)
+		return nil
+	}
 	if iface != iwdbus.IwdDeviceIface {
 		return nil
 	}

@@ -236,8 +236,15 @@ object in station mode). The AP-mode device (`wlan1`) does not, so station
 enumeration returns exactly one station. The mock seeds a "connected" station
 wired to real mock objects: `ConnectedNetwork` points at the known network,
 `ConnectedAccessPoint` and the single `Affinities` entry point at a mock BSS, and
-`Scanning` is `false`. The properties are read-only in this slice. Use
-`--omit-station` to drop the interface while keeping the device.
+`Scanning` is `false`.
+
+`Scan` models the asynchronous scan: it sets `Scanning` to true and emits a
+`PropertiesChanged`, then flips it back to false and emits again a short moment
+later — so subscribers observe the true→false transition. `GetOrderedNetworks`
+returns the three mock networks with seeded signal strengths (in 100 × dBm),
+strongest first. `Affinities` is writable: setting it stores the BSS paths and
+emits a change. Use `--omit-station` to drop the interface while keeping the
+device.
 
 ### Credentials agent (AgentManager)
 

@@ -129,6 +129,74 @@ func TestStation_Public(t *testing.T) {
 		require.Equal(t, affinities, props.Affinities)
 	})
 
+	t.Run("Scan", func(t *testing.T) {
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			require.NoError(t, newStation(f, "/p").Scan(ctx))
+			require.True(t, f.scanCalled.Load())
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			f.setErr(errors.New("boom"))
+			require.Error(t, newStation(f, "/p").Scan(ctx))
+		})
+
+		t.Run("NilReceiver", func(t *testing.T) {
+			require.ErrorIs(t, (*Station)(nil).Scan(ctx), ErrInternal)
+		})
+	})
+
+	t.Run("OrderedNetworks", func(t *testing.T) {
+		t.Run("ConvertsSignalToDBm", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			nets := []core.OrderedNetwork{
+				{Network: "/net/connman/iwd/phy0/wlan0/net0", SignalStrength: -6000},
+				{Network: "/net/connman/iwd/phy0/wlan0/net1", SignalStrength: -7250},
+			}
+			f.orderedNetworks.Store(&nets)
+
+			got, err := newStation(f, "/p").OrderedNetworks(ctx)
+			require.NoError(t, err)
+			require.Equal(t, []OrderedNetwork{
+				{Network: "/net/connman/iwd/phy0/wlan0/net0", SignalStrength: -60},
+				{Network: "/net/connman/iwd/phy0/wlan0/net1", SignalStrength: -72.5},
+			}, got)
+		})
+
+		t.Run("Empty", func(t *testing.T) {
+			got, err := newStation(&fakeCoreStation{}, "/p").OrderedNetworks(ctx)
+			require.NoError(t, err)
+			require.Empty(t, got)
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			f.setErr(errors.New("boom"))
+			_, err := newStation(f, "/p").OrderedNetworks(ctx)
+			require.Error(t, err)
+		})
+	})
+
+	t.Run("SetAffinities", func(t *testing.T) {
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			paths := []string{"/net/connman/iwd/phy0/wlan0/aaa"}
+			require.NoError(t, newStation(f, "/p").SetAffinities(ctx, paths))
+			require.Equal(t, paths, *f.setAffinitiesArg.Load())
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			f.setErr(errors.New("boom"))
+			require.Error(t, newStation(f, "/p").SetAffinities(ctx, []string{"/x"}))
+		})
+
+		t.Run("NilReceiver", func(t *testing.T) {
+			require.ErrorIs(t, (*Station)(nil).SetAffinities(ctx, []string{"/x"}), ErrInternal)
+		})
+	})
+
 	t.Run("SubscribeStateChanged", func(t *testing.T) {
 		t.Run("NilCallback", func(t *testing.T) {
 			_, err := newStation(&fakeCoreStation{}, "/p").SubscribeStateChanged(ctx, nil)

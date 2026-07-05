@@ -19,7 +19,7 @@ const (
 )
 
 func fakeWithStation() *fakeClient {
-	st := &fakeStation{
+	return stationClient(&fakeStation{
 		path: testStationPath,
 		props: &spiderw.StationProperties{
 			State:                spiderw.StationStateConnected,
@@ -28,7 +28,14 @@ func fakeWithStation() *fakeClient {
 			ConnectedAccessPoint: new(testStationAP),
 			Affinities:           []string{testStationAP},
 		},
-	}
+		ordered: []spiderw.OrderedNetwork{
+			{Network: testStationNet, SignalStrength: -60},
+			{Network: "/net/connman/iwd/phy0/wlan0/open", SignalStrength: -72.5},
+		},
+	})
+}
+
+func stationClient(st *fakeStation) *fakeClient {
 	return &fakeClient{
 		daemon:      &fakeDaemon{stations: []spiderw.StationRef{{Path: st.path}}},
 		stations:    map[string]stationAPI{st.path: st},
@@ -156,4 +163,83 @@ func TestStationCmd_MissingCommand(t *testing.T) {
 	require.Equal(t, 1, code)
 	require.Contains(t, out, "missing station command")
 	require.Contains(t, out, "Commands:")
+}
+
+func TestStationCmd_Scan_WaitsThenListsNetworks(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{
+		path:    testStationPath,
+		ordered: []spiderw.OrderedNetwork{{Network: testStationNet, SignalStrength: -60}},
+	}
+	out, code := driveCLI(stationClient(st), nil, false, "station", testStationPath, "scan")
+	require.Equal(t, 0, code, out)
+	require.True(t, st.scanCalled)
+	// The fake's SubscribeScanningChanged fires true then false, so wait mode
+	// completes and prints the ordered networks.
+	require.Contains(t, out, testStationNet)
+	require.Contains(t, out, "-60 dBm")
+}
+
+func TestStationCmd_Scan_NoWait(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath}
+	out, code := driveCLI(stationClient(st), nil, false, "station", testStationPath, "scan", "--no-wait")
+	require.Equal(t, 0, code, out)
+	require.True(t, st.scanCalled)
+	require.Contains(t, out, "scan started")
+}
+
+func TestStationCmd_Scan_Error(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath, scanErr: errors.New("scan boom")}
+	out, code := driveCLI(stationClient(st), nil, false, "station", testStationPath, "scan", "--no-wait")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "scan boom")
+}
+
+func TestStationCmd_Networks_JSON(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithStation(), nil, true, "station", testStationPath, "networks")
+	require.Equal(t, 0, code, out)
+
+	var list []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &list))
+	require.Len(t, list, 2)
+	require.Equal(t, testStationNet, list[0]["Network"])
+	require.Equal(t, -60.0, list[0]["SignalDBm"])
+	require.Equal(t, -72.5, list[1]["SignalDBm"])
+}
+
+func TestStationCmd_Affinities_Get(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithStation(), nil, false, "station", testStationPath, "affinities")
+	require.Equal(t, 0, code, out)
+	require.Contains(t, out, testStationAP)
+}
+
+func TestStationCmd_Affinities_Set(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationPath, "affinities", "set",
+		"/net/connman/iwd/phy0/wlan0/aaa", "/net/connman/iwd/phy0/wlan0/bbb")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, []string{
+		"/net/connman/iwd/phy0/wlan0/aaa",
+		"/net/connman/iwd/phy0/wlan0/bbb",
+	}, st.setAffinitiesTo)
+}
+
+func TestStationCmd_Affinities_Set_Missing(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithStation(), nil, false, "station", testStationPath, "affinities", "set")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "usage: spiderw station <station> affinities set")
 }

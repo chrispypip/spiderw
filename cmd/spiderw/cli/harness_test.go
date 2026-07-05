@@ -354,15 +354,60 @@ func (f *fakeDevice) SubscribeModeChanged(context.Context, func(spiderw.Mode)) (
 }
 
 type fakeStation struct {
-	path  string
-	props *spiderw.StationProperties
-	err   error
+	path            string
+	props           *spiderw.StationProperties
+	ordered         []spiderw.OrderedNetwork
+	scanErr         error
+	setAffErr       error
+	setAffinitiesTo []string
+	scanCalled      bool
+	err             error
 }
 
 func (f *fakeStation) Path() string { return f.path }
 
 func (f *fakeStation) Properties(context.Context) (*spiderw.StationProperties, error) {
 	return f.props, f.err
+}
+
+func (f *fakeStation) Affinities(context.Context) ([]string, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.props == nil {
+		return nil, nil
+	}
+	return f.props.Affinities, nil
+}
+
+func (f *fakeStation) Scan(context.Context) error {
+	f.scanCalled = true
+	return f.scanErr
+}
+
+func (f *fakeStation) OrderedNetworks(context.Context) ([]spiderw.OrderedNetwork, error) {
+	return f.ordered, f.err
+}
+
+func (f *fakeStation) SetAffinities(_ context.Context, paths []string) error {
+	if f.setAffErr != nil {
+		return f.setAffErr
+	}
+	f.setAffinitiesTo = paths
+	return nil
+}
+
+func (f *fakeStation) SubscribeScanningChanged(_ context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	// Simulate a completed scan (true then false) so `station scan` (wait mode)
+	// returns promptly in unit tests.
+	if fn != nil {
+		fn(true)
+		fn(false)
+	}
+	return func() error { return nil }, nil
 }
 
 type fakeBSS struct {

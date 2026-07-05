@@ -23,7 +23,11 @@ type fakeIwdbusStation struct {
 	connectedNetwork     atomic.Pointer[string]
 	connectedAccessPoint atomic.Pointer[string]
 	affinities           atomic.Pointer[[]string]
+	orderedNetworks      atomic.Pointer[[]iwdbus.OrderedNetwork]
 	subPropsEvent        atomic.Value // iwdbus.StationPropertiesChanged
+
+	scanCalled       atomic.Bool
+	setAffinitiesArg atomic.Pointer[[]string]
 
 	err atomic.Pointer[fakeStationError]
 }
@@ -87,6 +91,30 @@ func (f *fakeIwdbusStation) GetProperties(context.Context) (*iwdbus.StationPrope
 		props.Affinities = *v
 	}
 	return props, nil
+}
+
+func (f *fakeIwdbusStation) Scan(context.Context) error {
+	f.scanCalled.Store(true)
+	return f.loadErr()
+}
+
+func (f *fakeIwdbusStation) GetOrderedNetworks(context.Context) ([]iwdbus.OrderedNetwork, error) {
+	if err := f.loadErr(); err != nil {
+		return nil, err
+	}
+	if v := f.orderedNetworks.Load(); v != nil {
+		return *v, nil
+	}
+	return nil, nil
+}
+
+func (f *fakeIwdbusStation) SetAffinities(_ context.Context, paths []string) error {
+	if err := f.loadErr(); err != nil {
+		return err
+	}
+	cp := append([]string(nil), paths...)
+	f.setAffinitiesArg.Store(&cp)
+	return nil
 }
 
 func (f *fakeIwdbusStation) SubscribePropertiesChanged(ctx context.Context, fn func(iwdbus.StationPropertiesChanged)) (iwdbus.UnsubscribeFunc, error) {

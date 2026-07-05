@@ -81,6 +81,11 @@ type deviceAPI interface {
 type stationAPI interface {
 	Path() string
 	Properties(ctx context.Context) (*spiderw.StationProperties, error)
+	Affinities(ctx context.Context) ([]string, error)
+	Scan(ctx context.Context) error
+	OrderedNetworks(ctx context.Context) ([]spiderw.OrderedNetwork, error)
+	SetAffinities(ctx context.Context, paths []string) error
+	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
 }
 
 type bssAPI interface {

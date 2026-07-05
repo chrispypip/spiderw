@@ -267,6 +267,106 @@ func TestStation_Core(t *testing.T) {
 		})
 	})
 
+	t.Run("Scan", func(t *testing.T) {
+		t.Run("Uninitialized", func(t *testing.T) {
+			err := (*Station)(nil).Scan(ctx)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, ErrStationNotInitialized))
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			err := NewStation(f).Scan(ctx)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, iwdbus.ErrDBusMethod))
+		})
+
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			require.NoError(t, NewStation(f).Scan(ctx))
+			require.True(t, f.scanCalled.Load())
+		})
+	})
+
+	t.Run("OrderedNetworks", func(t *testing.T) {
+		t.Run("Uninitialized", func(t *testing.T) {
+			_, err := (*Station)(nil).OrderedNetworks(ctx)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, ErrStationNotInitialized))
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewStation(f).OrderedNetworks(ctx)
+			require.Error(t, err)
+		})
+
+		t.Run("InvalidPathIsInvalidState", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			nets := []iwdbus.OrderedNetwork{{Network: "not/abs", SignalStrength: -6000}}
+			f.orderedNetworks.Store(&nets)
+			_, err := NewStation(f).OrderedNetworks(ctx)
+			require.Error(t, err)
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindInvalidState, ce.Kind)
+			require.Equal(t, ResourceStation, ce.Resource)
+		})
+
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			nets := []iwdbus.OrderedNetwork{
+				{Network: "/net/connman/iwd/phy0/wlan0/net0", SignalStrength: -6000},
+				{Network: "  /net/connman/iwd/phy0/wlan0/net1  ", SignalStrength: -7200},
+			}
+			f.orderedNetworks.Store(&nets)
+			got, err := NewStation(f).OrderedNetworks(ctx)
+			require.NoError(t, err)
+			require.Equal(t, []OrderedNetwork{
+				{Network: "/net/connman/iwd/phy0/wlan0/net0", SignalStrength: -6000},
+				{Network: "/net/connman/iwd/phy0/wlan0/net1", SignalStrength: -7200},
+			}, got)
+		})
+	})
+
+	t.Run("SetAffinities", func(t *testing.T) {
+		t.Run("Uninitialized", func(t *testing.T) {
+			err := (*Station)(nil).SetAffinities(ctx, []string{"/x"})
+			require.Error(t, err)
+			require.True(t, errors.Is(err, ErrStationNotInitialized))
+		})
+
+		t.Run("InvalidPathIsInvalidArgument", func(t *testing.T) {
+			tests := []string{"", "  ", "relative/path"}
+			for _, bad := range tests {
+				f := &fakeIwdbusStation{}
+				err := NewStation(f).SetAffinities(ctx, []string{bad})
+				require.Error(t, err)
+				var ce *Error
+				require.ErrorAs(t, err, &ce)
+				require.Equal(t, KindInvalidArgument, ce.Kind)
+				require.Equal(t, ResourceStation, ce.Resource)
+				require.Nil(t, f.setAffinitiesArg.Load(), "backend must not be called for invalid input")
+			}
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			f.setErr(iwdbus.ErrDBusProperty)
+			err := NewStation(f).SetAffinities(ctx, []string{"/net/connman/iwd/phy0/wlan0/aaa"})
+			require.Error(t, err)
+		})
+
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			paths := []string{"/net/connman/iwd/phy0/wlan0/aaa", "/net/connman/iwd/phy0/wlan0/bbb"}
+			require.NoError(t, NewStation(f).SetAffinities(ctx, paths))
+			require.Equal(t, paths, *f.setAffinitiesArg.Load())
+		})
+	})
+
 	t.Run("SubscribePropertiesChanged", func(t *testing.T) {
 		t.Run("Uninitialized", func(t *testing.T) {
 			_, err := (*Station)(nil).SubscribePropertiesChanged(ctx, func(StationPropertiesChanged) {})

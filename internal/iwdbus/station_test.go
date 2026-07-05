@@ -46,6 +46,20 @@ func TestStation_Iwdbus(t *testing.T) {
 		t.Run("Station_GetProperties_NoIntro", testStation_GetProperties_NoIntro)
 	})
 
+	t.Run("Operations", func(t *testing.T) {
+		t.Parallel()
+		t.Run("Station_Scan", testStation_Scan)
+		t.Run("Station_Scan_Err", testStation_Scan_Err)
+		t.Run("Station_Scan_NoIntro", testStation_Scan_NoIntro)
+		t.Run("Station_GetOrderedNetworks", testStation_GetOrderedNetworks)
+		t.Run("Station_GetOrderedNetworks_Empty", testStation_GetOrderedNetworks_Empty)
+		t.Run("Station_GetOrderedNetworks_Err", testStation_GetOrderedNetworks_Err)
+		t.Run("Station_GetOrderedNetworks_NoIntro", testStation_GetOrderedNetworks_NoIntro)
+		t.Run("Station_SetAffinities", testStation_SetAffinities)
+		t.Run("Station_SetAffinities_Err", testStation_SetAffinities_Err)
+		t.Run("Station_SetAffinities_NoIntro", testStation_SetAffinities_NoIntro)
+	})
+
 	t.Run("Subscribe", func(t *testing.T) {
 		t.Parallel()
 		t.Run("Station_SubscribePropertiesChanged", testStation_SubscribePropertiesChanged)
@@ -474,6 +488,153 @@ func testStation_GetProperties_NoIntro(t *testing.T) {
 	s := &Station{call: nil}
 
 	_, err := s.GetProperties(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "station is not initialized")
+}
+
+func testStation_Scan(t *testing.T) {
+	t.Parallel()
+
+	var called bool
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			called = true
+			require.Equal(t, IwdStationIface, iface)
+			require.Equal(t, "Scan", method)
+			return nil, nil
+		},
+	}}
+
+	require.NoError(t, s.Scan(context.Background()))
+	require.True(t, called)
+}
+
+func testStation_Scan_Err(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			return nil, fmt.Errorf("dbus failure")
+		},
+	}}
+
+	err := s.Scan(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "dbus failure")
+}
+
+func testStation_Scan_NoIntro(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: nil}
+
+	err := s.Scan(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "station is not initialized")
+}
+
+func testStation_GetOrderedNetworks(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			require.Equal(t, IwdStationIface, iface)
+			require.Equal(t, "GetOrderedNetworks", method)
+			// a(on): array of (object path, int16 signal). godbus decodes each
+			// (on) struct to a []interface{}.
+			return []interface{}{
+				[][]interface{}{
+					{dbus.ObjectPath("/net/connman/iwd/phy0/wlan0/net0"), int16(-6000)},
+					{dbus.ObjectPath("/net/connman/iwd/phy0/wlan0/net1"), int16(-7200)},
+				},
+			}, nil
+		},
+	}}
+
+	got, err := s.GetOrderedNetworks(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, []OrderedNetwork{
+		{Network: "/net/connman/iwd/phy0/wlan0/net0", SignalStrength: -6000},
+		{Network: "/net/connman/iwd/phy0/wlan0/net1", SignalStrength: -7200},
+	}, got)
+}
+
+func testStation_GetOrderedNetworks_Empty(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			return []interface{}{[][]interface{}{}}, nil
+		},
+	}}
+
+	got, err := s.GetOrderedNetworks(context.Background())
+	require.NoError(t, err)
+	require.Empty(t, got)
+}
+
+func testStation_GetOrderedNetworks_Err(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			return nil, fmt.Errorf("dbus failure")
+		},
+	}}
+
+	_, err := s.GetOrderedNetworks(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "dbus failure")
+}
+
+func testStation_GetOrderedNetworks_NoIntro(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: nil}
+
+	_, err := s.GetOrderedNetworks(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "station is not initialized")
+}
+
+func testStation_SetAffinities(t *testing.T) {
+	t.Parallel()
+
+	var got interface{}
+	s := &Station{call: &fakeCaller{
+		setPropFn: func(ctx context.Context, iface, prop string, value interface{}) error {
+			require.Equal(t, IwdStationIface, iface)
+			require.Equal(t, "Affinities", prop)
+			got = value
+			return nil
+		},
+	}}
+
+	err := s.SetAffinities(context.Background(), []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"})
+	require.NoError(t, err)
+	require.Equal(t, []dbus.ObjectPath{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"}, got)
+}
+
+func testStation_SetAffinities_Err(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		setPropFn: func(ctx context.Context, iface, prop string, value interface{}) error {
+			return fmt.Errorf("dbus failure")
+		},
+	}}
+
+	err := s.SetAffinities(context.Background(), []string{"/x"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "dbus failure")
+}
+
+func testStation_SetAffinities_NoIntro(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: nil}
+
+	err := s.SetAffinities(context.Background(), []string{"/x"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "station is not initialized")
 }

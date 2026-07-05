@@ -19,7 +19,11 @@ type fakeCoreStation struct {
 	connectedNetwork     atomic.Pointer[string]
 	connectedAccessPoint atomic.Pointer[string]
 	affinities           atomic.Pointer[[]string]
+	orderedNetworks      atomic.Pointer[[]core.OrderedNetwork]
 	subPropsEvent        atomic.Value // core.StationPropertiesChanged
+
+	scanCalled       atomic.Bool
+	setAffinitiesArg atomic.Pointer[[]string]
 
 	err atomic.Pointer[fakeCoreStationError]
 }
@@ -83,6 +87,30 @@ func (f *fakeCoreStation) Properties(ctx context.Context) (*core.StationProperti
 		props.Affinities = *v
 	}
 	return props, nil
+}
+
+func (f *fakeCoreStation) Scan(context.Context) error {
+	f.scanCalled.Store(true)
+	return f.loadErr()
+}
+
+func (f *fakeCoreStation) OrderedNetworks(context.Context) ([]core.OrderedNetwork, error) {
+	if err := f.loadErr(); err != nil {
+		return nil, err
+	}
+	if v := f.orderedNetworks.Load(); v != nil {
+		return *v, nil
+	}
+	return nil, nil
+}
+
+func (f *fakeCoreStation) SetAffinities(_ context.Context, paths []string) error {
+	if err := f.loadErr(); err != nil {
+		return err
+	}
+	cp := append([]string(nil), paths...)
+	f.setAffinitiesArg.Store(&cp)
+	return nil
 }
 
 func (f *fakeCoreStation) SubscribePropertiesChanged(ctx context.Context, fn func(core.StationPropertiesChanged)) (core.UnsubscribeFunc, error) {
