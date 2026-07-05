@@ -43,7 +43,7 @@ const testNetworkPath = dbus.ObjectPath("/net/connman/iwd/phy0/wlan0/secure")
 func testAgentManager_RegisterAgent(t *testing.T) {
 	t.Parallel()
 	var called bool
-	m := &AgentManager{intro: &fakeCaller{callFn: func(_ context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+	m := &AgentManager{intro: &fakeCaller{callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
 		called = true
 		require.Equal(t, IwdAgentManagerIface, iface)
 		require.Equal(t, "RegisterAgent", method)
@@ -58,7 +58,7 @@ func testAgentManager_RegisterAgent(t *testing.T) {
 func testAgentManager_UnregisterAgent(t *testing.T) {
 	t.Parallel()
 	var called bool
-	m := &AgentManager{intro: &fakeCaller{callFn: func(_ context.Context, iface, method string, _ ...interface{}) ([]interface{}, error) {
+	m := &AgentManager{intro: &fakeCaller{callFn: func(ctx context.Context, iface, method string, _ ...interface{}) ([]interface{}, error) {
 		called = true
 		require.Equal(t, IwdAgentManagerIface, iface)
 		require.Equal(t, "UnregisterAgent", method)
@@ -70,7 +70,7 @@ func testAgentManager_UnregisterAgent(t *testing.T) {
 
 func testAgentManager_RegisterAgent_ErrorMapping(t *testing.T) {
 	t.Parallel()
-	m := &AgentManager{intro: &fakeCaller{callFn: func(_ context.Context, _, _ string, _ ...interface{}) ([]interface{}, error) {
+	m := &AgentManager{intro: &fakeCaller{callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
 		return nil, dbus.Error{Name: IwdErrorBusy, Body: []interface{}{"busy"}}
 	}}}
 	err := m.RegisterAgent(context.Background(), "/spiderw/agent")
@@ -98,7 +98,7 @@ func testAgentManager_UnregisterAgent_Uninitialized(t *testing.T) {
 func testAgentObject_RequestPassphrase(t *testing.T) {
 	t.Parallel()
 	a := &agentObject{handler: AgentHandler{
-		RequestPassphrase: func(_ context.Context, network dbus.ObjectPath) (string, error) {
+		RequestPassphrase: func(ctx context.Context, network dbus.ObjectPath) (string, error) {
 			require.Equal(t, testNetworkPath, network)
 			return "hunter2", nil
 		},
@@ -120,7 +120,7 @@ func testAgentObject_RequestPassphrase_NilDeclines(t *testing.T) {
 func testAgentObject_RequestPassphrase_ErrorDeclines(t *testing.T) {
 	t.Parallel()
 	a := &agentObject{handler: AgentHandler{
-		RequestPassphrase: func(_ context.Context, _ dbus.ObjectPath) (string, error) {
+		RequestPassphrase: func(ctx context.Context, network dbus.ObjectPath) (string, error) {
 			return "", errors.New("user dismissed prompt")
 		},
 	}}
@@ -133,7 +133,7 @@ func testAgentObject_RequestPassphrase_ErrorDeclines(t *testing.T) {
 func testAgentObject_RequestPrivateKeyPassphrase(t *testing.T) {
 	t.Parallel()
 	a := &agentObject{handler: AgentHandler{
-		RequestPrivateKeyPassphrase: func(_ context.Context, _ dbus.ObjectPath) (string, error) {
+		RequestPrivateKeyPassphrase: func(ctx context.Context, network dbus.ObjectPath) (string, error) {
 			return "keypass", nil
 		},
 	}}
@@ -145,7 +145,7 @@ func testAgentObject_RequestPrivateKeyPassphrase(t *testing.T) {
 func testAgentObject_RequestUserNameAndPassword(t *testing.T) {
 	t.Parallel()
 	a := &agentObject{handler: AgentHandler{
-		RequestUserNameAndPassword: func(_ context.Context, _ dbus.ObjectPath) (string, string, error) {
+		RequestUserNameAndPassword: func(ctx context.Context, network dbus.ObjectPath) (string, string, error) {
 			return "alice", "s3cret", nil
 		},
 	}}
@@ -168,7 +168,7 @@ func testAgentObject_RequestUserNameAndPassword_NilDeclines(t *testing.T) {
 func testAgentObject_RequestUserPassword(t *testing.T) {
 	t.Parallel()
 	a := &agentObject{handler: AgentHandler{
-		RequestUserPassword: func(_ context.Context, _ dbus.ObjectPath, user string) (string, error) {
+		RequestUserPassword: func(ctx context.Context, network dbus.ObjectPath, user string) (string, error) {
 			require.Equal(t, "bob", user)
 			return "pw", nil
 		},

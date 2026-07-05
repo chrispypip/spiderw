@@ -374,7 +374,7 @@ func ExampleClient_RegisterAgent() {
 	// network that is not already known). networkPath identifies the network;
 	// resolve it with client.Network if you need its details.
 	agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
-		Passphrase: func(_ context.Context, networkPath string) (string, error) {
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) {
 			return lookupPassphraseFor(networkPath), nil
 		},
 	})

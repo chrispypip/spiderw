@@ -92,7 +92,7 @@ func TestExampleFlows(t *testing.T) {
 	t.Run("Station_ConnectHiddenNetwork", func(t *testing.T) {
 		client := newMockClient(t, ctx)
 		agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
-			Passphrase: func(context.Context, string) (string, error) { return mockSecuredPassphrase, nil },
+			Passphrase: func(ctx context.Context, networkPath string) (string, error) { return mockSecuredPassphrase, nil },
 		})
 		require.NoError(t, err)
 		defer func() { _ = agent.Unregister(ctx) }()
@@ -155,7 +155,7 @@ func TestExampleFlows(t *testing.T) {
 	t.Run("Client_RegisterAgent", func(t *testing.T) {
 		client := newMockClient(t, ctx)
 		agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
-			Passphrase: func(context.Context, string) (string, error) {
+			Passphrase: func(ctx context.Context, networkPath string) (string, error) {
 				return mockSecuredPassphrase, nil
 			},
 		})

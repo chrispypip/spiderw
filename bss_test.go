@@ -19,11 +19,11 @@ type fakeCoreBSS struct {
 	err     error
 }
 
-func (f *fakeCoreBSS) Address(context.Context) (string, error) {
+func (f *fakeCoreBSS) Address(ctx context.Context) (string, error) {
 	return f.address, f.err
 }
 
-func (f *fakeCoreBSS) Properties(context.Context) (*core.BasicServiceSetProperties, error) {
+func (f *fakeCoreBSS) Properties(ctx context.Context) (*core.BasicServiceSetProperties, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -82,7 +82,7 @@ func TestClientAllBasicServiceSets(t *testing.T) {
 			fakeDaemon.setErr(daemonErr)
 		}
 		if factory == nil {
-			factory = func(_ context.Context, path string) (core.BasicServiceSetIface, error) {
+			factory = func(ctx context.Context, path string) (core.BasicServiceSetIface, error) {
 				return &fakeCoreBSS{address: path}, nil
 			}
 		}

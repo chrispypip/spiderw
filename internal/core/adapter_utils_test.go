@@ -58,28 +58,28 @@ func (f *fakeIwdbusAdapter) SetPowered(ctx context.Context, powered bool) error 
 	return f.loadErr()
 }
 
-func (f *fakeIwdbusAdapter) GetName(context.Context) (string, error) {
+func (f *fakeIwdbusAdapter) GetName(ctx context.Context) (string, error) {
 	if v := f.name.Load(); v != nil {
 		return v.(string), f.loadErr()
 	}
 	return "", f.loadErr()
 }
 
-func (f *fakeIwdbusAdapter) GetModel(context.Context) (*string, error) {
+func (f *fakeIwdbusAdapter) GetModel(ctx context.Context) (*string, error) {
 	if v := f.model.Load(); v != nil {
 		return v.(*string), f.loadErr()
 	}
 	return nil, f.loadErr()
 }
 
-func (f *fakeIwdbusAdapter) GetVendor(context.Context) (*string, error) {
+func (f *fakeIwdbusAdapter) GetVendor(ctx context.Context) (*string, error) {
 	if v := f.vendor.Load(); v != nil {
 		return v.(*string), f.loadErr()
 	}
 	return nil, f.loadErr()
 }
 
-func (f *fakeIwdbusAdapter) GetSupportedModes(context.Context) ([]iwdbus.Mode, error) {
+func (f *fakeIwdbusAdapter) GetSupportedModes(ctx context.Context) ([]iwdbus.Mode, error) {
 	if v := f.modes.Load(); v != nil {
 		in := v.([]iwdbus.Mode)
 		out := make([]iwdbus.Mode, len(in))
@@ -89,7 +89,7 @@ func (f *fakeIwdbusAdapter) GetSupportedModes(context.Context) ([]iwdbus.Mode, e
 	return nil, f.loadErr()
 }
 
-func (f *fakeIwdbusAdapter) GetProperties(context.Context) (*iwdbus.AdapterProperties, error) {
+func (f *fakeIwdbusAdapter) GetProperties(ctx context.Context) (*iwdbus.AdapterProperties, error) {
 	if err := f.loadErr(); err != nil {
 		return nil, err
 	}

@@ -151,6 +151,20 @@ verifies the D-Bus session environment and iwd mock tooling.
 
 - Use `go fmt`, `gofumpt`, or editor-integrated formatting
 - Write idiomatic, readable Go
+- Name **every** parameter, even when unused — never use a blank identifier
+  (`_`) for a parameter
+  - A named parameter documents intent and appears in godoc and editor
+    signatures; leaving it unused is fine (Go does not require parameters to be
+    used)
+  - This applies to functions, methods, interface methods, and declared
+    func-type signatures, for example
+    `type clientFactory func(ctx context.Context, bus spiderw.Bus)`
+  - If a parameter is genuinely ignored, still name it; where the reason is
+    non-obvious, add a short comment (see the request wrappers in
+    `internal/core/agent.go`, which intentionally do not propagate the dispatch
+    context)
+  - `golangci-lint` does not enforce this. Do not enable `unparam` or `revive`'s
+    `unused-parameter`, which push the opposite convention
 - Keep packages focused and cohesive
 - All new functionality **must include tests**
 - Public APIs must be **strongly typed**

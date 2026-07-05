@@ -143,7 +143,7 @@ func TestAdapter_GetVendor_AbsentOptionalCollapsesToNil(t *testing.T) {
 func TestAdapter_GetProperties_OptionalsAbsent(t *testing.T) {
 	t.Parallel()
 
-	a := newGetAllAdapter(func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+	a := newGetAllAdapter(func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 		return map[string]dbus.Variant{
 			"Powered":        dbus.MakeVariant(false),
 			"Name":           dbus.MakeVariant("phy1"),
@@ -239,7 +239,7 @@ func TestAdapter_GetProperties_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			a := newGetAllAdapter(func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+			a := newGetAllAdapter(func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 				if tc.callErr != nil {
 					return nil, tc.callErr
 				}

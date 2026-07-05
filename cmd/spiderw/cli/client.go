@@ -8,7 +8,7 @@ import (
 	"github.com/chrispypip/spiderw"
 )
 
-type clientFactory func(context.Context, spiderw.Bus) (clientAPI, error)
+type clientFactory func(ctx context.Context, bus spiderw.Bus) (clientAPI, error)
 
 // App holds per-invocation CLI state.
 type App struct {

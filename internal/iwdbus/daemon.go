@@ -387,7 +387,7 @@ func (d *Daemon) GetStations(ctx context.Context) ([]StationRef, error) {
 		return nil, WrapConnection("Daemon.GetStations", ErrDaemonUninitialized)
 	}
 	return getRefs(ctx, d.conn, "Daemon.GetStations", IwdStationIface,
-		func(path dbus.ObjectPath, _ map[string]dbus.Variant) (StationRef, error) {
+		func(path dbus.ObjectPath, props map[string]dbus.Variant) (StationRef, error) {
 			if !path.IsValid() || !strings.HasPrefix(string(path), "/") {
 				return StationRef{}, WrapVariant("Path", fmt.Errorf("invalid station path %q", path))
 			}

@@ -20,7 +20,7 @@ type fakeCoreAgent struct {
 	unregisterErr   error
 }
 
-func (f *fakeCoreAgent) Unregister(context.Context) error {
+func (f *fakeCoreAgent) Unregister(ctx context.Context) error {
 	f.unregisterCalls.Add(1)
 	return f.unregisterErr
 }
@@ -29,7 +29,7 @@ func (f *fakeCoreAgent) calls() int { return int(f.unregisterCalls.Load()) }
 
 // newAgentTestClient returns a Client whose wiring delegates agent registration
 // to factory.
-func newAgentTestClient(t *testing.T, factory func(context.Context, core.CredentialCallbacks) (core.AgentIface, error)) *Client {
+func newAgentTestClient(t *testing.T, factory func(ctx context.Context, cc core.CredentialCallbacks) (core.AgentIface, error)) *Client {
 	t.Helper()
 
 	wire := &connect.Wiring{
@@ -46,6 +46,6 @@ func newAgentTestClient(t *testing.T, factory func(context.Context, core.Credent
 // validAgentConfig returns an AgentConfig with a single passphrase callback.
 func validAgentConfig() AgentConfig {
 	return AgentConfig{
-		Passphrase: func(context.Context, string) (string, error) { return "hunter2", nil },
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) { return "hunter2", nil },
 	}
 }

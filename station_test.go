@@ -317,7 +317,7 @@ func TestClientStation(t *testing.T) {
 
 	newStationClient := func(factory func(ctx context.Context, path string) (core.StationIface, error)) *Client {
 		if factory == nil {
-			factory = func(_ context.Context, path string) (core.StationIface, error) {
+			factory = func(ctx context.Context, path string) (core.StationIface, error) {
 				fs := &fakeCoreStation{}
 				fs.state.Store(core.StationStateConnected)
 				return fs, nil
@@ -342,7 +342,7 @@ func TestClientStation(t *testing.T) {
 
 	t.Run("WiringErrorMapsToPublicError", func(t *testing.T) {
 		base := errors.New("station unavailable")
-		c := newStationClient(func(_ context.Context, _ string) (core.StationIface, error) {
+		c := newStationClient(func(ctx context.Context, path string) (core.StationIface, error) {
 			return nil, base
 		})
 		s, err := c.Station(ctx, "/net/connman/iwd/phy0/wlan0")
@@ -384,7 +384,7 @@ func TestClientAllStations(t *testing.T) {
 			fakeDaemon.setErr(daemonErr)
 		}
 		if factory == nil {
-			factory = func(_ context.Context, path string) (core.StationIface, error) {
+			factory = func(ctx context.Context, path string) (core.StationIface, error) {
 				fs := &fakeCoreStation{}
 				fs.state.Store(core.StationStateConnected)
 				return fs, nil

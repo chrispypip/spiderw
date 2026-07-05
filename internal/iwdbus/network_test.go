@@ -56,7 +56,7 @@ func TestNetwork_Iwdbus(t *testing.T) {
 
 func testNetwork_GetName(t *testing.T) {
 	t.Parallel()
-	n := &Network{call: &fakeCaller{getPropFn: func(_ context.Context, iface, prop string) (interface{}, error) {
+	n := &Network{call: &fakeCaller{getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
 		require.Equal(t, IwdNetworkIface, iface)
 		require.Equal(t, "Name", prop)
 		return "OpenNet", nil
@@ -68,7 +68,7 @@ func testNetwork_GetName(t *testing.T) {
 
 func testNetwork_GetConnected(t *testing.T) {
 	t.Parallel()
-	n := &Network{call: &fakeCaller{getPropFn: func(_ context.Context, _, prop string) (interface{}, error) {
+	n := &Network{call: &fakeCaller{getPropFn: func(ctx context.Context, _, prop string) (interface{}, error) {
 		require.Equal(t, "Connected", prop)
 		return true, nil
 	}}}
@@ -79,7 +79,7 @@ func testNetwork_GetConnected(t *testing.T) {
 
 func testNetwork_GetDevice(t *testing.T) {
 	t.Parallel()
-	n := &Network{call: &fakeCaller{getPropFn: func(_ context.Context, _, prop string) (interface{}, error) {
+	n := &Network{call: &fakeCaller{getPropFn: func(ctx context.Context, _, prop string) (interface{}, error) {
 		require.Equal(t, "Device", prop)
 		return dbus.ObjectPath("/net/connman/iwd/phy0/wlan0"), nil
 	}}}
@@ -90,7 +90,7 @@ func testNetwork_GetDevice(t *testing.T) {
 
 func testNetwork_GetType(t *testing.T) {
 	t.Parallel()
-	n := &Network{call: &fakeCaller{getPropFn: func(_ context.Context, _, prop string) (interface{}, error) {
+	n := &Network{call: &fakeCaller{getPropFn: func(ctx context.Context, _, prop string) (interface{}, error) {
 		require.Equal(t, "Type", prop)
 		return "psk", nil
 	}}}
@@ -101,7 +101,7 @@ func testNetwork_GetType(t *testing.T) {
 
 func testNetwork_GetType_Invalid(t *testing.T) {
 	t.Parallel()
-	n := &Network{call: &fakeCaller{getPropFn: func(_ context.Context, _, _ string) (interface{}, error) {
+	n := &Network{call: &fakeCaller{getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
 		return "wpa3", nil
 	}}}
 	_, err := n.GetType(context.Background())
@@ -111,7 +111,7 @@ func testNetwork_GetType_Invalid(t *testing.T) {
 
 func testNetwork_GetKnownNetwork(t *testing.T) {
 	t.Parallel()
-	n := &Network{call: &fakeCaller{getPropFn: func(_ context.Context, _, prop string) (interface{}, error) {
+	n := &Network{call: &fakeCaller{getPropFn: func(ctx context.Context, _, prop string) (interface{}, error) {
 		require.Equal(t, "KnownNetwork", prop)
 		return dbus.ObjectPath("/net/connman/iwd/known_networks/1"), nil
 	}}}
@@ -125,7 +125,7 @@ func testNetwork_GetKnownNetwork_Absent(t *testing.T) {
 	t.Parallel()
 	// iwd declines optional properties with a "Getting property value failed"
 	// style reply; the wrapper collapses that to nil.
-	n := &Network{call: &fakeCaller{getPropFn: func(_ context.Context, _, _ string) (interface{}, error) {
+	n := &Network{call: &fakeCaller{getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
 		return nil, fmt.Errorf("Getting property value failed")
 	}}}
 	known, err := n.GetKnownNetwork(context.Background())
@@ -135,7 +135,7 @@ func testNetwork_GetKnownNetwork_Absent(t *testing.T) {
 
 func testNetwork_GetExtendedServiceSet(t *testing.T) {
 	t.Parallel()
-	n := &Network{call: &fakeCaller{getPropFn: func(_ context.Context, _, prop string) (interface{}, error) {
+	n := &Network{call: &fakeCaller{getPropFn: func(ctx context.Context, _, prop string) (interface{}, error) {
 		require.Equal(t, "ExtendedServiceSet", prop)
 		return []dbus.ObjectPath{
 			"/net/connman/iwd/phy0/wlan0/aabbccddeeff",
@@ -161,7 +161,7 @@ func testNetwork_GetName_NoIntro(t *testing.T) {
 func testNetwork_Connect(t *testing.T) {
 	t.Parallel()
 	var called bool
-	n := &Network{call: &fakeCaller{callFn: func(_ context.Context, iface, method string, _ ...interface{}) ([]interface{}, error) {
+	n := &Network{call: &fakeCaller{callFn: func(ctx context.Context, iface, method string, _ ...interface{}) ([]interface{}, error) {
 		called = true
 		require.Equal(t, IwdNetworkIface, iface)
 		require.Equal(t, "Connect", method)
@@ -173,7 +173,7 @@ func testNetwork_Connect(t *testing.T) {
 
 func testNetwork_Connect_NoAgent(t *testing.T) {
 	t.Parallel()
-	n := &Network{call: &fakeCaller{callFn: func(_ context.Context, _, _ string, _ ...interface{}) ([]interface{}, error) {
+	n := &Network{call: &fakeCaller{callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
 		return nil, dbus.Error{Name: IwdErrorNoAgent, Body: []interface{}{"No agent registered"}}
 	}}}
 	err := n.Connect(context.Background())
@@ -185,7 +185,7 @@ func testNetwork_Connect_OtherError(t *testing.T) {
 	t.Parallel()
 	// An unrecognized iwd error name falls back to a generic method error with no
 	// specific sentinel.
-	n := &Network{call: &fakeCaller{callFn: func(_ context.Context, _, _ string, _ ...interface{}) ([]interface{}, error) {
+	n := &Network{call: &fakeCaller{callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
 		return nil, dbus.Error{Name: "net.connman.iwd.SomethingNew", Body: []interface{}{"boom"}}
 	}}}
 	err := n.Connect(context.Background())
@@ -216,7 +216,7 @@ func fullNetworkProps() map[string]dbus.Variant {
 
 func testNetwork_GetProperties(t *testing.T) {
 	t.Parallel()
-	n := &Network{call: &fakeCaller{getAllFn: func(_ context.Context, iface string) (map[string]dbus.Variant, error) {
+	n := &Network{call: &fakeCaller{getAllFn: func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 		require.Equal(t, IwdNetworkIface, iface)
 		return fullNetworkProps(), nil
 	}}}
@@ -233,7 +233,7 @@ func testNetwork_GetProperties(t *testing.T) {
 
 func testNetwork_GetProperties_NoKnownNetwork(t *testing.T) {
 	t.Parallel()
-	n := &Network{call: &fakeCaller{getAllFn: func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+	n := &Network{call: &fakeCaller{getAllFn: func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 		m := fullNetworkProps()
 		delete(m, "KnownNetwork")
 		return m, nil
@@ -274,7 +274,7 @@ func testNetwork_GetProperties_Errors(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			n := &Network{call: &fakeCaller{getAllFn: func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+			n := &Network{call: &fakeCaller{getAllFn: func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 				return tc.props, nil
 			}}}
 			_, err := n.GetProperties(context.Background())

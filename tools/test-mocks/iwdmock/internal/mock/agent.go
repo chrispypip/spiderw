@@ -48,7 +48,7 @@ func (r *agentRegistry) register(sender dbus.Sender, path dbus.ObjectPath) *dbus
 
 // unregister clears the registered agent, mirroring iwd's NotFound rejection
 // when the path was never registered.
-func (r *agentRegistry) unregister(_ dbus.Sender, path dbus.ObjectPath) *dbus.Error {
+func (r *agentRegistry) unregister(sender dbus.Sender, path dbus.ObjectPath) *dbus.Error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.set || r.path != path {

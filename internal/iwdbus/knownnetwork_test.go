@@ -55,7 +55,7 @@ func TestKnownNetwork_Iwdbus(t *testing.T) {
 
 func testKnownNetwork_GetName(t *testing.T) {
 	t.Parallel()
-	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(_ context.Context, iface, prop string) (interface{}, error) {
+	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
 		require.Equal(t, IwdKnownNetworkIface, iface)
 		require.Equal(t, "Name", prop)
 		return "HomeNet", nil
@@ -67,7 +67,7 @@ func testKnownNetwork_GetName(t *testing.T) {
 
 func testKnownNetwork_GetType(t *testing.T) {
 	t.Parallel()
-	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(_ context.Context, _, prop string) (interface{}, error) {
+	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(ctx context.Context, _, prop string) (interface{}, error) {
 		require.Equal(t, "Type", prop)
 		return "psk", nil
 	}}}
@@ -78,7 +78,7 @@ func testKnownNetwork_GetType(t *testing.T) {
 
 func testKnownNetwork_GetType_Hotspot(t *testing.T) {
 	t.Parallel()
-	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(_ context.Context, _, _ string) (interface{}, error) {
+	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
 		return "hotspot", nil
 	}}}
 	secType, err := k.GetType(context.Background())
@@ -88,7 +88,7 @@ func testKnownNetwork_GetType_Hotspot(t *testing.T) {
 
 func testKnownNetwork_GetHidden(t *testing.T) {
 	t.Parallel()
-	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(_ context.Context, _, prop string) (interface{}, error) {
+	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(ctx context.Context, _, prop string) (interface{}, error) {
 		require.Equal(t, "Hidden", prop)
 		return true, nil
 	}}}
@@ -99,7 +99,7 @@ func testKnownNetwork_GetHidden(t *testing.T) {
 
 func testKnownNetwork_GetLastConnectedTime(t *testing.T) {
 	t.Parallel()
-	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(_ context.Context, _, prop string) (interface{}, error) {
+	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(ctx context.Context, _, prop string) (interface{}, error) {
 		require.Equal(t, "LastConnectedTime", prop)
 		return "2024-01-02T03:04:05Z", nil
 	}}}
@@ -113,7 +113,7 @@ func testKnownNetwork_GetLastConnectedTime_Absent(t *testing.T) {
 	t.Parallel()
 	// iwd omits LastConnectedTime when the network was never connected; the getter
 	// collapses the "no value" reply to nil.
-	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(_ context.Context, _, _ string) (interface{}, error) {
+	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
 		return nil, fmt.Errorf("Getting property value failed")
 	}}}
 	lt, err := k.GetLastConnectedTime(context.Background())
@@ -123,7 +123,7 @@ func testKnownNetwork_GetLastConnectedTime_Absent(t *testing.T) {
 
 func testKnownNetwork_GetAutoConnect(t *testing.T) {
 	t.Parallel()
-	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(_ context.Context, _, prop string) (interface{}, error) {
+	k := &KnownNetwork{call: &fakeCaller{getPropFn: func(ctx context.Context, _, prop string) (interface{}, error) {
 		require.Equal(t, "AutoConnect", prop)
 		return true, nil
 	}}}
@@ -143,7 +143,7 @@ func testKnownNetwork_GetName_NoIntro(t *testing.T) {
 func testKnownNetwork_SetAutoConnect(t *testing.T) {
 	t.Parallel()
 	var called bool
-	k := &KnownNetwork{call: &fakeCaller{setPropFn: func(_ context.Context, iface, prop string, val interface{}) error {
+	k := &KnownNetwork{call: &fakeCaller{setPropFn: func(ctx context.Context, iface, prop string, val interface{}) error {
 		called = true
 		require.Equal(t, IwdKnownNetworkIface, iface)
 		require.Equal(t, "AutoConnect", prop)
@@ -156,7 +156,7 @@ func testKnownNetwork_SetAutoConnect(t *testing.T) {
 
 func testKnownNetwork_SetAutoConnect_Err(t *testing.T) {
 	t.Parallel()
-	k := &KnownNetwork{call: &fakeCaller{setPropFn: func(_ context.Context, _, _ string, _ interface{}) error {
+	k := &KnownNetwork{call: &fakeCaller{setPropFn: func(ctx context.Context, iface, prop string, value interface{}) error {
 		return fmt.Errorf("dbus failure")
 	}}}
 	err := k.SetAutoConnect(context.Background(), true)
@@ -175,7 +175,7 @@ func testKnownNetwork_SetAutoConnect_NoIntro(t *testing.T) {
 func testKnownNetwork_Forget(t *testing.T) {
 	t.Parallel()
 	var called bool
-	k := &KnownNetwork{call: &fakeCaller{callFn: func(_ context.Context, iface, method string, _ ...interface{}) ([]interface{}, error) {
+	k := &KnownNetwork{call: &fakeCaller{callFn: func(ctx context.Context, iface, method string, _ ...interface{}) ([]interface{}, error) {
 		called = true
 		require.Equal(t, IwdKnownNetworkIface, iface)
 		require.Equal(t, "Forget", method)
@@ -189,7 +189,7 @@ func testKnownNetwork_Forget_ErrorMapping(t *testing.T) {
 	t.Parallel()
 	// A named iwd error from Forget maps to its sentinel via the shared method
 	// error wrapper.
-	k := &KnownNetwork{call: &fakeCaller{callFn: func(_ context.Context, _, _ string, _ ...interface{}) ([]interface{}, error) {
+	k := &KnownNetwork{call: &fakeCaller{callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
 		return nil, dbus.Error{Name: IwdErrorBusy, Body: []interface{}{"busy"}}
 	}}}
 	err := k.Forget(context.Background())
@@ -218,7 +218,7 @@ func fullKnownNetworkProps() map[string]dbus.Variant {
 
 func testKnownNetwork_GetProperties(t *testing.T) {
 	t.Parallel()
-	k := &KnownNetwork{call: &fakeCaller{getAllFn: func(_ context.Context, iface string) (map[string]dbus.Variant, error) {
+	k := &KnownNetwork{call: &fakeCaller{getAllFn: func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 		require.Equal(t, IwdKnownNetworkIface, iface)
 		return fullKnownNetworkProps(), nil
 	}}}
@@ -234,7 +234,7 @@ func testKnownNetwork_GetProperties(t *testing.T) {
 
 func testKnownNetwork_GetProperties_NoLastConnectedTime(t *testing.T) {
 	t.Parallel()
-	k := &KnownNetwork{call: &fakeCaller{getAllFn: func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+	k := &KnownNetwork{call: &fakeCaller{getAllFn: func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 		m := fullKnownNetworkProps()
 		delete(m, "LastConnectedTime")
 		return m, nil
@@ -274,7 +274,7 @@ func testKnownNetwork_GetProperties_Errors(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			k := &KnownNetwork{call: &fakeCaller{getAllFn: func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+			k := &KnownNetwork{call: &fakeCaller{getAllFn: func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 				return tc.props, nil
 			}}}
 			_, err := k.GetProperties(context.Background())

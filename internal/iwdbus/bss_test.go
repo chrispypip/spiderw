@@ -81,7 +81,7 @@ func testBSS_GetProperties(t *testing.T) {
 	t.Parallel()
 
 	b := &BasicServiceSet{call: &fakeCaller{
-		getAllFn: func(_ context.Context, iface string) (map[string]dbus.Variant, error) {
+		getAllFn: func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 			require.Equal(t, IwdBasicServiceSetIface, iface)
 			return map[string]dbus.Variant{
 				"Address": dbus.MakeVariant("11:22:33:44:55:66"),
@@ -113,7 +113,7 @@ func testBSS_GetProperties_Errors(t *testing.T) {
 			t.Parallel()
 
 			b := &BasicServiceSet{call: &fakeCaller{
-				getAllFn: func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+				getAllFn: func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 					if tc.callErr != nil {
 						return nil, tc.callErr
 					}

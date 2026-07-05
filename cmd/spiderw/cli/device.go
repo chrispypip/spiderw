@@ -215,7 +215,7 @@ func deviceByRef(ctx context.Context, client clientAPI, ref string) (deviceAPI, 
 	return client.Device(ctx, matches[0].Path)
 }
 
-func withDevice(app *App, ctx context.Context, deviceRef string, fn func(context.Context, deviceAPI) error) error {
+func withDevice(app *App, ctx context.Context, deviceRef string, fn func(ctx context.Context, d deviceAPI) error) error {
 	return app.withClient(ctx, func(client clientAPI) error {
 		d, err := deviceByRef(ctx, client, deviceRef)
 		if err != nil {
@@ -326,7 +326,7 @@ func runDeviceMode(app *App, ctx context.Context, deviceRef string, args []strin
 	})
 }
 
-func runDeviceString(app *App, ctx context.Context, deviceRef string, args []string, usage string, op func(context.Context, deviceAPI) (string, error)) error {
+func runDeviceString(app *App, ctx context.Context, deviceRef string, args []string, usage string, op func(ctx context.Context, d deviceAPI) (string, error)) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: %s", usage)
 	}

@@ -60,26 +60,26 @@ func (f *fakeIwdbusNetwork) loadProps() iwdbus.NetworkProperties {
 	return iwdbus.NetworkProperties{}
 }
 
-func (f *fakeIwdbusNetwork) GetName(context.Context) (string, error) {
+func (f *fakeIwdbusNetwork) GetName(ctx context.Context) (string, error) {
 	return f.loadProps().Name, f.loadErr()
 }
-func (f *fakeIwdbusNetwork) GetConnected(context.Context) (bool, error) {
+func (f *fakeIwdbusNetwork) GetConnected(ctx context.Context) (bool, error) {
 	return f.loadProps().Connected, f.loadErr()
 }
-func (f *fakeIwdbusNetwork) GetDevice(context.Context) (dbus.ObjectPath, error) {
+func (f *fakeIwdbusNetwork) GetDevice(ctx context.Context) (dbus.ObjectPath, error) {
 	return f.loadProps().Device, f.loadErr()
 }
-func (f *fakeIwdbusNetwork) GetType(context.Context) (iwdbus.NetworkType, error) {
+func (f *fakeIwdbusNetwork) GetType(ctx context.Context) (iwdbus.NetworkType, error) {
 	return f.loadProps().Type, f.loadErr()
 }
-func (f *fakeIwdbusNetwork) GetKnownNetwork(context.Context) (*string, error) {
+func (f *fakeIwdbusNetwork) GetKnownNetwork(ctx context.Context) (*string, error) {
 	return f.loadProps().KnownNetwork, f.loadErr()
 }
-func (f *fakeIwdbusNetwork) GetExtendedServiceSet(context.Context) ([]string, error) {
+func (f *fakeIwdbusNetwork) GetExtendedServiceSet(ctx context.Context) ([]string, error) {
 	return f.loadProps().ExtendedServiceSet, f.loadErr()
 }
 
-func (f *fakeIwdbusNetwork) GetProperties(context.Context) (*iwdbus.NetworkProperties, error) {
+func (f *fakeIwdbusNetwork) GetProperties(ctx context.Context) (*iwdbus.NetworkProperties, error) {
 	if err := f.loadErr(); err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (f *fakeIwdbusNetwork) GetProperties(context.Context) (*iwdbus.NetworkPrope
 	return &p, nil
 }
 
-func (f *fakeIwdbusNetwork) Connect(context.Context) error {
+func (f *fakeIwdbusNetwork) Connect(ctx context.Context) error {
 	if box := f.connectErr.Load(); box != nil {
 		return box.err
 	}
@@ -97,7 +97,7 @@ func (f *fakeIwdbusNetwork) Connect(context.Context) error {
 	return nil
 }
 
-func (f *fakeIwdbusNetwork) SubscribePropertiesChanged(_ context.Context, fn func(iwdbus.NetworkPropertiesChanged)) (iwdbus.UnsubscribeFunc, error) {
+func (f *fakeIwdbusNetwork) SubscribePropertiesChanged(ctx context.Context, fn func(iwdbus.NetworkPropertiesChanged)) (iwdbus.UnsubscribeFunc, error) {
 	if fn == nil {
 		return nil, f.loadErr()
 	}
@@ -107,7 +107,7 @@ func (f *fakeIwdbusNetwork) SubscribePropertiesChanged(_ context.Context, fn fun
 	return func() error { return nil }, f.loadErr()
 }
 
-func (f *fakeIwdbusNetwork) SubscribeConnectedChanged(_ context.Context, fn func(bool)) (iwdbus.UnsubscribeFunc, error) {
+func (f *fakeIwdbusNetwork) SubscribeConnectedChanged(ctx context.Context, fn func(bool)) (iwdbus.UnsubscribeFunc, error) {
 	if fn == nil {
 		return nil, f.loadErr()
 	}

@@ -20,14 +20,14 @@ type fakeAgentManager struct {
 	unregisterErr   error
 }
 
-func (f *fakeAgentManager) RegisterAgent(_ context.Context, path dbus.ObjectPath) error {
+func (f *fakeAgentManager) RegisterAgent(ctx context.Context, path dbus.ObjectPath) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.registerCalls = append(f.registerCalls, path)
 	return f.registerErr
 }
 
-func (f *fakeAgentManager) UnregisterAgent(_ context.Context, path dbus.ObjectPath) error {
+func (f *fakeAgentManager) UnregisterAgent(ctx context.Context, path dbus.ObjectPath) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.unregisterCalls = append(f.unregisterCalls, path)

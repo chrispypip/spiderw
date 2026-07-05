@@ -45,7 +45,7 @@ func TestIwdErrorMapping(t *testing.T) {
 			t.Parallel()
 
 			dbusErr := dbus.Error{Name: tc.name, Body: []interface{}{"detail text"}}
-			n := &Network{call: &fakeCaller{callFn: func(_ context.Context, _, _ string, _ ...interface{}) ([]interface{}, error) {
+			n := &Network{call: &fakeCaller{callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
 				return nil, dbusErr
 			}}}
 

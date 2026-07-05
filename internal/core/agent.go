@@ -170,38 +170,44 @@ func (a *Agent) beginRequest() (context.Context, func()) {
 	}
 }
 
-func (a *Agent) wrapSecret(fn func(context.Context, string) (string, error)) func(context.Context, dbus.ObjectPath) (string, error) {
+func (a *Agent) wrapSecret(fn func(ctx context.Context, networkPath string) (string, error)) func(ctx context.Context, network dbus.ObjectPath) (string, error) {
 	if fn == nil {
 		return nil
 	}
-	return func(_ context.Context, network dbus.ObjectPath) (string, error) {
-		ctx, done := a.beginRequest()
+	return func(ctx context.Context, network dbus.ObjectPath) (string, error) {
+		// The dispatch ctx is intentionally not propagated; beginRequest derives a
+		// fresh cancelable context so Cancel/Unregister can abort the request.
+		reqCtx, done := a.beginRequest()
 		defer done()
-		return fn(ctx, string(network))
+		return fn(reqCtx, string(network))
 	}
 }
 
-func (a *Agent) wrapUserNameAndPassword() func(context.Context, dbus.ObjectPath) (string, string, error) {
+func (a *Agent) wrapUserNameAndPassword() func(ctx context.Context, network dbus.ObjectPath) (string, string, error) {
 	fn := a.callbacks.UserNameAndPassword
 	if fn == nil {
 		return nil
 	}
-	return func(_ context.Context, network dbus.ObjectPath) (string, string, error) {
-		ctx, done := a.beginRequest()
+	return func(ctx context.Context, network dbus.ObjectPath) (string, string, error) {
+		// The dispatch ctx is intentionally not propagated; beginRequest derives a
+		// fresh cancelable context so Cancel/Unregister can abort the request.
+		reqCtx, done := a.beginRequest()
 		defer done()
-		return fn(ctx, string(network))
+		return fn(reqCtx, string(network))
 	}
 }
 
-func (a *Agent) wrapUserPassword() func(context.Context, dbus.ObjectPath, string) (string, error) {
+func (a *Agent) wrapUserPassword() func(ctx context.Context, network dbus.ObjectPath, user string) (string, error) {
 	fn := a.callbacks.UserPassword
 	if fn == nil {
 		return nil
 	}
-	return func(_ context.Context, network dbus.ObjectPath, user string) (string, error) {
-		ctx, done := a.beginRequest()
+	return func(ctx context.Context, network dbus.ObjectPath, user string) (string, error) {
+		// The dispatch ctx is intentionally not propagated; beginRequest derives a
+		// fresh cancelable context so Cancel/Unregister can abort the request.
+		reqCtx, done := a.beginRequest()
 		defer done()
-		return fn(ctx, string(network), user)
+		return fn(reqCtx, string(network), user)
 	}
 }
 

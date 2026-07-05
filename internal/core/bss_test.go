@@ -17,11 +17,11 @@ type fakeIwdbusBSS struct {
 	err     error
 }
 
-func (f *fakeIwdbusBSS) GetAddress(context.Context) (string, error) {
+func (f *fakeIwdbusBSS) GetAddress(ctx context.Context) (string, error) {
 	return f.address, f.err
 }
 
-func (f *fakeIwdbusBSS) GetProperties(context.Context) (*iwdbus.BasicServiceSetProperties, error) {
+func (f *fakeIwdbusBSS) GetProperties(ctx context.Context) (*iwdbus.BasicServiceSetProperties, error) {
 	if f.err != nil {
 		return nil, f.err
 	}

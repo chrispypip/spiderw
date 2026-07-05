@@ -15,9 +15,9 @@ import (
 // while Cancel reads and invokes it.
 func TestRace_Core_Agent_RequestsConcurrentWithCancel(t *testing.T) {
 	a, h := NewAgent(CredentialCallbacks{
-		Passphrase:          func(context.Context, string) (string, error) { return "p", nil },
-		UserNameAndPassword: func(context.Context, string) (string, string, error) { return "u", "p", nil },
-		UserPassword:        func(context.Context, string, string) (string, error) { return "p", nil },
+		Passphrase:          func(ctx context.Context, networkPath string) (string, error) { return "p", nil },
+		UserNameAndPassword: func(ctx context.Context, networkPath string) (string, string, error) { return "u", "p", nil },
+		UserPassword:        func(ctx context.Context, networkPath, user string) (string, error) { return "p", nil },
 		OnCancel:            func(string) {},
 		OnRelease:           func() {},
 	})

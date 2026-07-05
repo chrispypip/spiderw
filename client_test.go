@@ -22,20 +22,20 @@ func TestClient(t *testing.T) {
 		type busCase struct {
 			name string
 			arg  Bus
-			set  func(fn func(context.Context) (*connect.Wiring, error))
+			set  func(fn func(ctx context.Context) (*connect.Wiring, error))
 		}
 		buses := []busCase{
 			{
 				name: "SystemBus",
 				arg:  SystemBus,
-				set: func(fn func(context.Context) (*connect.Wiring, error)) {
+				set: func(fn func(ctx context.Context) (*connect.Wiring, error)) {
 					systemConnectFn = fn
 				},
 			},
 			{
 				name: "SessionBus",
 				arg:  SessionBus,
-				set: func(fn func(context.Context) (*connect.Wiring, error)) {
+				set: func(fn func(ctx context.Context) (*connect.Wiring, error)) {
 					sessionConnectFn = fn
 				},
 			},
@@ -275,7 +275,7 @@ func TestClientAllAdapters(t *testing.T) {
 			fakeDaemon.setErr(daemonErr)
 		}
 		if factory == nil {
-			factory = func(_ context.Context, path string) (core.AdapterIface, error) {
+			factory = func(ctx context.Context, path string) (core.AdapterIface, error) {
 				fa := &fakeCoreAdapter{}
 				fa.name.Store(path)
 				return fa, nil
@@ -346,7 +346,7 @@ func TestClientAllAdapters(t *testing.T) {
 		}
 		base := errors.New("adapter unavailable")
 		var constructed []string
-		factory := func(_ context.Context, path string) (core.AdapterIface, error) {
+		factory := func(ctx context.Context, path string) (core.AdapterIface, error) {
 			constructed = append(constructed, path)
 			if path == refs[1].Path {
 				return nil, base
@@ -405,7 +405,7 @@ func TestClientDevice(t *testing.T) {
 
 	newDeviceClient := func(factory func(ctx context.Context, path string) (core.DeviceIface, error)) *Client {
 		if factory == nil {
-			factory = func(_ context.Context, path string) (core.DeviceIface, error) {
+			factory = func(ctx context.Context, path string) (core.DeviceIface, error) {
 				fd := &fakeCoreDevice{}
 				fd.name.Store(path)
 				return fd, nil
@@ -430,7 +430,7 @@ func TestClientDevice(t *testing.T) {
 
 	t.Run("WiringErrorMapsToPublicError", func(t *testing.T) {
 		base := errors.New("device unavailable")
-		c := newDeviceClient(func(_ context.Context, _ string) (core.DeviceIface, error) {
+		c := newDeviceClient(func(ctx context.Context, path string) (core.DeviceIface, error) {
 			return nil, base
 		})
 		d, err := c.Device(ctx, "/net/connman/iwd/phy0/wlan0")
@@ -483,7 +483,7 @@ func TestClientAllDevices(t *testing.T) {
 			fakeDaemon.setErr(daemonErr)
 		}
 		if factory == nil {
-			factory = func(_ context.Context, path string) (core.DeviceIface, error) {
+			factory = func(ctx context.Context, path string) (core.DeviceIface, error) {
 				fd := &fakeCoreDevice{}
 				fd.name.Store(path)
 				return fd, nil
@@ -552,7 +552,7 @@ func TestClientAllDevices(t *testing.T) {
 		}
 		base := errors.New("device unavailable")
 		var constructed []string
-		factory := func(_ context.Context, path string) (core.DeviceIface, error) {
+		factory := func(ctx context.Context, path string) (core.DeviceIface, error) {
 			constructed = append(constructed, path)
 			if path == refs[1].Path {
 				return nil, base

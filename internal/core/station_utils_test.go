@@ -51,33 +51,33 @@ func (f *fakeIwdbusStation) loadErr() error {
 	return box.err
 }
 
-func (f *fakeIwdbusStation) GetState(context.Context) (iwdbus.StationState, error) {
+func (f *fakeIwdbusStation) GetState(ctx context.Context) (iwdbus.StationState, error) {
 	if v := f.state.Load(); v != nil {
 		return v.(iwdbus.StationState), f.loadErr()
 	}
 	return iwdbus.StationStateUnknown, f.loadErr()
 }
 
-func (f *fakeIwdbusStation) GetScanning(context.Context) (bool, error) {
+func (f *fakeIwdbusStation) GetScanning(ctx context.Context) (bool, error) {
 	return f.scanning.Load(), f.loadErr()
 }
 
-func (f *fakeIwdbusStation) GetConnectedNetwork(context.Context) (*string, error) {
+func (f *fakeIwdbusStation) GetConnectedNetwork(ctx context.Context) (*string, error) {
 	return f.connectedNetwork.Load(), f.loadErr()
 }
 
-func (f *fakeIwdbusStation) GetConnectedAccessPoint(context.Context) (*string, error) {
+func (f *fakeIwdbusStation) GetConnectedAccessPoint(ctx context.Context) (*string, error) {
 	return f.connectedAccessPoint.Load(), f.loadErr()
 }
 
-func (f *fakeIwdbusStation) GetAffinities(context.Context) ([]string, error) {
+func (f *fakeIwdbusStation) GetAffinities(ctx context.Context) ([]string, error) {
 	if v := f.affinities.Load(); v != nil {
 		return *v, f.loadErr()
 	}
 	return nil, f.loadErr()
 }
 
-func (f *fakeIwdbusStation) GetProperties(context.Context) (*iwdbus.StationProperties, error) {
+func (f *fakeIwdbusStation) GetProperties(ctx context.Context) (*iwdbus.StationProperties, error) {
 	if err := f.loadErr(); err != nil {
 		return nil, err
 	}
@@ -96,12 +96,12 @@ func (f *fakeIwdbusStation) GetProperties(context.Context) (*iwdbus.StationPrope
 	return props, nil
 }
 
-func (f *fakeIwdbusStation) Scan(context.Context) error {
+func (f *fakeIwdbusStation) Scan(ctx context.Context) error {
 	f.scanCalled.Store(true)
 	return f.loadErr()
 }
 
-func (f *fakeIwdbusStation) GetOrderedNetworks(context.Context) ([]iwdbus.OrderedNetwork, error) {
+func (f *fakeIwdbusStation) GetOrderedNetworks(ctx context.Context) ([]iwdbus.OrderedNetwork, error) {
 	if err := f.loadErr(); err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (f *fakeIwdbusStation) GetOrderedNetworks(context.Context) ([]iwdbus.Ordere
 	return nil, nil
 }
 
-func (f *fakeIwdbusStation) SetAffinities(_ context.Context, paths []string) error {
+func (f *fakeIwdbusStation) SetAffinities(ctx context.Context, paths []string) error {
 	if err := f.loadErr(); err != nil {
 		return err
 	}
@@ -120,12 +120,12 @@ func (f *fakeIwdbusStation) SetAffinities(_ context.Context, paths []string) err
 	return nil
 }
 
-func (f *fakeIwdbusStation) Disconnect(context.Context) error {
+func (f *fakeIwdbusStation) Disconnect(ctx context.Context) error {
 	f.disconnectCalled.Store(true)
 	return f.loadErr()
 }
 
-func (f *fakeIwdbusStation) ConnectHiddenNetwork(_ context.Context, name string) error {
+func (f *fakeIwdbusStation) ConnectHiddenNetwork(ctx context.Context, name string) error {
 	if err := f.loadErr(); err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func (f *fakeIwdbusStation) ConnectHiddenNetwork(_ context.Context, name string)
 	return nil
 }
 
-func (f *fakeIwdbusStation) GetHiddenAccessPoints(context.Context) ([]iwdbus.HiddenAccessPoint, error) {
+func (f *fakeIwdbusStation) GetHiddenAccessPoints(ctx context.Context) ([]iwdbus.HiddenAccessPoint, error) {
 	if err := f.loadErr(); err != nil {
 		return nil, err
 	}

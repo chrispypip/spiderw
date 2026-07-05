@@ -61,26 +61,26 @@ func (f *fakeCoreNetwork) loadProps() core.NetworkProperties {
 	return core.NetworkProperties{}
 }
 
-func (f *fakeCoreNetwork) Name(context.Context) (string, error) {
+func (f *fakeCoreNetwork) Name(ctx context.Context) (string, error) {
 	return f.loadProps().Name, f.loadErr()
 }
-func (f *fakeCoreNetwork) Connected(context.Context) (bool, error) {
+func (f *fakeCoreNetwork) Connected(ctx context.Context) (bool, error) {
 	return f.loadProps().Connected, f.loadErr()
 }
-func (f *fakeCoreNetwork) Device(context.Context) (string, error) {
+func (f *fakeCoreNetwork) Device(ctx context.Context) (string, error) {
 	return f.loadProps().Device, f.loadErr()
 }
-func (f *fakeCoreNetwork) Type(context.Context) (core.NetworkType, error) {
+func (f *fakeCoreNetwork) Type(ctx context.Context) (core.NetworkType, error) {
 	return f.loadProps().Type, f.loadErr()
 }
-func (f *fakeCoreNetwork) KnownNetwork(context.Context) (*string, error) {
+func (f *fakeCoreNetwork) KnownNetwork(ctx context.Context) (*string, error) {
 	return f.loadProps().KnownNetwork, f.loadErr()
 }
-func (f *fakeCoreNetwork) ExtendedServiceSet(context.Context) ([]string, error) {
+func (f *fakeCoreNetwork) ExtendedServiceSet(ctx context.Context) ([]string, error) {
 	return f.loadProps().ExtendedServiceSet, f.loadErr()
 }
 
-func (f *fakeCoreNetwork) Properties(context.Context) (*core.NetworkProperties, error) {
+func (f *fakeCoreNetwork) Properties(ctx context.Context) (*core.NetworkProperties, error) {
 	if err := f.loadErr(); err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (f *fakeCoreNetwork) Properties(context.Context) (*core.NetworkProperties, 
 	return &p, nil
 }
 
-func (f *fakeCoreNetwork) Connect(context.Context) error {
+func (f *fakeCoreNetwork) Connect(ctx context.Context) error {
 	if box := f.connectErr.Load(); box != nil {
 		return box.err
 	}
@@ -98,7 +98,7 @@ func (f *fakeCoreNetwork) Connect(context.Context) error {
 	return nil
 }
 
-func (f *fakeCoreNetwork) SubscribePropertiesChanged(_ context.Context, fn func(core.NetworkPropertiesChanged)) (core.UnsubscribeFunc, error) {
+func (f *fakeCoreNetwork) SubscribePropertiesChanged(ctx context.Context, fn func(core.NetworkPropertiesChanged)) (core.UnsubscribeFunc, error) {
 	if fn == nil {
 		return nil, f.loadErr()
 	}
@@ -108,7 +108,7 @@ func (f *fakeCoreNetwork) SubscribePropertiesChanged(_ context.Context, fn func(
 	return func() error { return nil }, f.loadErr()
 }
 
-func (f *fakeCoreNetwork) SubscribeConnectedChanged(_ context.Context, fn func(bool)) (core.UnsubscribeFunc, error) {
+func (f *fakeCoreNetwork) SubscribeConnectedChanged(ctx context.Context, fn func(bool)) (core.UnsubscribeFunc, error) {
 	if fn == nil {
 		return nil, f.loadErr()
 	}
@@ -148,7 +148,7 @@ func newTestNetworkClient(t *testing.T) *Client {
 		Conn:    &dbus.Conn{},
 		Daemon:  fakeDaemon,
 		Cleanup: func() error { return nil },
-		NetworkFactory: func(_ context.Context, _ string) (core.NetworkIface, error) {
+		NetworkFactory: func(ctx context.Context, path string) (core.NetworkIface, error) {
 			return (&fakeCoreNetwork{}).setProps(validCoreNetworkProps()), nil
 		},
 	}

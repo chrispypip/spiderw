@@ -209,7 +209,7 @@ func stationByRef(ctx context.Context, client clientAPI, ref string) (stationAPI
 	return nil, fmt.Errorf("station %q not found", ref)
 }
 
-func withStation(app *App, ctx context.Context, stationRef string, fn func(context.Context, stationAPI) error) error {
+func withStation(app *App, ctx context.Context, stationRef string, fn func(ctx context.Context, s stationAPI) error) error {
 	return app.withClient(ctx, func(client clientAPI) error {
 		s, err := stationByRef(ctx, client, stationRef)
 		if err != nil {
@@ -430,7 +430,7 @@ func runStationConnectHidden(app *App, ctx context.Context, stationRef string, a
 		// agent whose passphrase callback resolves the secret lazily: iwd invokes it
 		// only for a secured hidden network, so open ones never prompt.
 		agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
-			Passphrase: func(context.Context, string) (string, error) {
+			Passphrase: func(ctx context.Context, networkPath string) (string, error) {
 				return resolveConnectPassphrase(app, ssid, passphraseSet, *passphrase, *passStdin)
 			},
 		})

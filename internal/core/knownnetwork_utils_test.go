@@ -69,23 +69,23 @@ func (f *fakeIwdbusKnownNetwork) loadProps() iwdbus.KnownNetworkProperties {
 	return iwdbus.KnownNetworkProperties{}
 }
 
-func (f *fakeIwdbusKnownNetwork) GetName(context.Context) (string, error) {
+func (f *fakeIwdbusKnownNetwork) GetName(ctx context.Context) (string, error) {
 	return f.loadProps().Name, f.loadErr()
 }
-func (f *fakeIwdbusKnownNetwork) GetType(context.Context) (iwdbus.NetworkType, error) {
+func (f *fakeIwdbusKnownNetwork) GetType(ctx context.Context) (iwdbus.NetworkType, error) {
 	return f.loadProps().Type, f.loadErr()
 }
-func (f *fakeIwdbusKnownNetwork) GetHidden(context.Context) (bool, error) {
+func (f *fakeIwdbusKnownNetwork) GetHidden(ctx context.Context) (bool, error) {
 	return f.loadProps().Hidden, f.loadErr()
 }
-func (f *fakeIwdbusKnownNetwork) GetLastConnectedTime(context.Context) (*string, error) {
+func (f *fakeIwdbusKnownNetwork) GetLastConnectedTime(ctx context.Context) (*string, error) {
 	return f.loadProps().LastConnectedTime, f.loadErr()
 }
-func (f *fakeIwdbusKnownNetwork) GetAutoConnect(context.Context) (bool, error) {
+func (f *fakeIwdbusKnownNetwork) GetAutoConnect(ctx context.Context) (bool, error) {
 	return f.loadProps().AutoConnect, f.loadErr()
 }
 
-func (f *fakeIwdbusKnownNetwork) SetAutoConnect(_ context.Context, autoConnect bool) error {
+func (f *fakeIwdbusKnownNetwork) SetAutoConnect(ctx context.Context, autoConnect bool) error {
 	if err := f.loadErr(); err != nil {
 		return err
 	}
@@ -95,14 +95,14 @@ func (f *fakeIwdbusKnownNetwork) SetAutoConnect(_ context.Context, autoConnect b
 	return nil
 }
 
-func (f *fakeIwdbusKnownNetwork) Forget(context.Context) error {
+func (f *fakeIwdbusKnownNetwork) Forget(ctx context.Context) error {
 	if box := f.forgetErr.Load(); box != nil {
 		return box.err
 	}
 	return nil
 }
 
-func (f *fakeIwdbusKnownNetwork) GetProperties(context.Context) (*iwdbus.KnownNetworkProperties, error) {
+func (f *fakeIwdbusKnownNetwork) GetProperties(ctx context.Context) (*iwdbus.KnownNetworkProperties, error) {
 	if err := f.loadErr(); err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (f *fakeIwdbusKnownNetwork) GetProperties(context.Context) (*iwdbus.KnownNe
 	return &p, nil
 }
 
-func (f *fakeIwdbusKnownNetwork) SubscribePropertiesChanged(_ context.Context, fn func(iwdbus.KnownNetworkPropertiesChanged)) (iwdbus.UnsubscribeFunc, error) {
+func (f *fakeIwdbusKnownNetwork) SubscribePropertiesChanged(ctx context.Context, fn func(iwdbus.KnownNetworkPropertiesChanged)) (iwdbus.UnsubscribeFunc, error) {
 	if fn == nil {
 		return nil, f.loadErr()
 	}
@@ -120,7 +120,7 @@ func (f *fakeIwdbusKnownNetwork) SubscribePropertiesChanged(_ context.Context, f
 	return func() error { return nil }, f.loadErr()
 }
 
-func (f *fakeIwdbusKnownNetwork) SubscribeAutoConnectChanged(_ context.Context, fn func(bool)) (iwdbus.UnsubscribeFunc, error) {
+func (f *fakeIwdbusKnownNetwork) SubscribeAutoConnectChanged(ctx context.Context, fn func(bool)) (iwdbus.UnsubscribeFunc, error) {
 	if fn == nil {
 		return nil, f.loadErr()
 	}

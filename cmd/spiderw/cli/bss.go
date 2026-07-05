@@ -193,7 +193,7 @@ func bssByRef(ctx context.Context, client clientAPI, ref string) (bssAPI, error)
 	return client.BasicServiceSet(ctx, matches[0].Path)
 }
 
-func withBSS(app *App, ctx context.Context, bssRef string, fn func(context.Context, bssAPI) error) error {
+func withBSS(app *App, ctx context.Context, bssRef string, fn func(ctx context.Context, b bssAPI) error) error {
 	return app.withClient(ctx, func(client clientAPI) error {
 		b, err := bssByRef(ctx, client, bssRef)
 		if err != nil {

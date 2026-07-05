@@ -111,7 +111,7 @@ func waitForBusNameNoT(name string, timeout time.Duration) error {
 // startMock spawns a fresh mock process from the shared, pre-built binary. The
 // dir parameter is retained for API compatibility but no longer used: the binary
 // is built once by ensureMockBinary rather than per call.
-func startMock(_ string, args []string) (*runningMock, error) {
+func startMock(dir string, args []string) (*runningMock, error) {
 	binPath, err := ensureMockBinary()
 	if err != nil {
 		return nil, err

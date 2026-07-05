@@ -436,7 +436,7 @@ func testDevice_SetMode_NoIntro(t *testing.T) {
 func testDevice_GetProperties(t *testing.T) {
 	t.Parallel()
 
-	d := newGetAllDevice(func(_ context.Context, iface string) (map[string]dbus.Variant, error) {
+	d := newGetAllDevice(func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 		require.Equal(t, IwdDeviceIface, iface)
 		return map[string]dbus.Variant{
 			"Name":    dbus.MakeVariant("wlan0"),
@@ -504,7 +504,7 @@ func testDevice_GetProperties_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			d := newGetAllDevice(func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+			d := newGetAllDevice(func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 				if tc.callErr != nil {
 					return nil, tc.callErr
 				}

@@ -21,8 +21,8 @@ import (
 func delegate[B any, T any](
 	ctx context.Context,
 	op string,
-	resolve func(context.Context, string) (B, error),
-	fn func(context.Context, B) (T, error),
+	resolve func(ctx context.Context, op string) (B, error),
+	fn func(ctx context.Context, backend B) (T, error),
 ) (T, error) {
 	var zero T
 	log := logging.FromContext(ctx)
@@ -49,8 +49,8 @@ func delegate[B any, T any](
 func do[B any](
 	ctx context.Context,
 	op string,
-	resolve func(context.Context, string) (B, error),
-	fn func(context.Context, B) error,
+	resolve func(ctx context.Context, op string) (B, error),
+	fn func(ctx context.Context, backend B) error,
 ) error {
 	_, err := delegate(ctx, op, resolve, func(ctx context.Context, b B) (struct{}, error) {
 		return struct{}{}, fn(ctx, b)

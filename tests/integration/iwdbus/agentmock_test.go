@@ -33,7 +33,7 @@ func TestAgentMock_SecuredConnect(t *testing.T) {
 	var calls atomic.Int32
 	var gotPath atomic.Value
 	agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
-		Passphrase: func(_ context.Context, networkPath string) (string, error) {
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) {
 			calls.Add(1)
 			gotPath.Store(networkPath)
 			return mockSecuredPassphrase, nil
@@ -65,7 +65,7 @@ func TestAgentMock_WrongPassphrase(t *testing.T) {
 	client := newMockClient(t, ctx)
 
 	_, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
-		Passphrase: func(context.Context, string) (string, error) { return "wrong", nil },
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) { return "wrong", nil },
 	})
 	require.NoError(t, err)
 
@@ -83,7 +83,7 @@ func TestAgentMock_Decline(t *testing.T) {
 	client := newMockClient(t, ctx)
 
 	_, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
-		Passphrase: func(context.Context, string) (string, error) {
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) {
 			return "", context.Canceled
 		},
 	})
@@ -118,7 +118,7 @@ func TestAgentMock_DoubleRegisterRejected(t *testing.T) {
 	client := newMockClient(t, ctx)
 
 	cfg := spiderw.AgentConfig{
-		Passphrase: func(context.Context, string) (string, error) { return mockSecuredPassphrase, nil },
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) { return mockSecuredPassphrase, nil },
 	}
 	agent, err := client.RegisterAgent(ctx, cfg)
 	require.NoError(t, err)
@@ -142,7 +142,7 @@ func TestAgentMock_AlreadyExistsAcrossClients(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := spiderw.AgentConfig{
-		Passphrase: func(context.Context, string) (string, error) { return mockSecuredPassphrase, nil },
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) { return mockSecuredPassphrase, nil },
 	}
 
 	clientA := newMockClient(t, ctx)
@@ -164,7 +164,7 @@ func TestAgentMock_ManagerUnavailable(t *testing.T) {
 	client := newMockClient(t, ctx)
 
 	_, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
-		Passphrase: func(context.Context, string) (string, error) { return mockSecuredPassphrase, nil },
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) { return mockSecuredPassphrase, nil },
 	})
 	require.Error(t, err)
 	require.ErrorIs(t, err, spiderw.ErrUnavailable)

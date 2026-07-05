@@ -14,7 +14,7 @@ import (
 // agent-slot clearing interplay: concurrent RegisterAgent, Unregister, and Close
 // must not race on c.agent.
 func TestRace_Public_Agent_RegisterUnregisterClose(t *testing.T) {
-	c := newAgentTestClient(t, func(context.Context, core.CredentialCallbacks) (core.AgentIface, error) {
+	c := newAgentTestClient(t, func(ctx context.Context, cc core.CredentialCallbacks) (core.AgentIface, error) {
 		return &fakeCoreAgent{}, nil
 	})
 

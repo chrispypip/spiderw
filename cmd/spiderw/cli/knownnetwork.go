@@ -232,7 +232,7 @@ func knownNetworkByRef(ctx context.Context, client clientAPI, ref string) (known
 	return client.KnownNetwork(ctx, matches[0].Path)
 }
 
-func withKnownNetwork(app *App, ctx context.Context, ref string, fn func(context.Context, knownNetworkAPI) error) error {
+func withKnownNetwork(app *App, ctx context.Context, ref string, fn func(ctx context.Context, k knownNetworkAPI) error) error {
 	return app.withClient(ctx, func(client clientAPI) error {
 		k, err := knownNetworkByRef(ctx, client, ref)
 		if err != nil {
@@ -349,7 +349,7 @@ func runKnownNetworkLastConnected(app *App, ctx context.Context, ref string, arg
 	})
 }
 
-func runKnownNetworkString(app *App, ctx context.Context, ref string, args []string, usage string, op func(context.Context, knownNetworkAPI) (string, error)) error {
+func runKnownNetworkString(app *App, ctx context.Context, ref string, args []string, usage string, op func(ctx context.Context, k knownNetworkAPI) (string, error)) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: %s", usage)
 	}

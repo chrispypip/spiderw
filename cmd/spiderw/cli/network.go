@@ -230,7 +230,7 @@ func networkByRef(ctx context.Context, client clientAPI, ref string) (networkAPI
 	return client.Network(ctx, matches[0].Path)
 }
 
-func withNetwork(app *App, ctx context.Context, networkRef string, fn func(context.Context, networkAPI) error) error {
+func withNetwork(app *App, ctx context.Context, networkRef string, fn func(ctx context.Context, n networkAPI) error) error {
 	return app.withClient(ctx, func(client clientAPI) error {
 		n, err := networkByRef(ctx, client, networkRef)
 		if err != nil {
@@ -316,7 +316,7 @@ func runNetworkConnect(app *App, ctx context.Context, networkRef string, args []
 			}
 
 			agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
-				Passphrase: func(context.Context, string) (string, error) {
+				Passphrase: func(ctx context.Context, networkPath string) (string, error) {
 					return secret, nil
 				},
 			})
@@ -395,7 +395,7 @@ func runNetworkConnected(app *App, ctx context.Context, networkRef string, args 
 	})
 }
 
-func runNetworkString(app *App, ctx context.Context, networkRef string, args []string, usage string, op func(context.Context, networkAPI) (string, error)) error {
+func runNetworkString(app *App, ctx context.Context, networkRef string, args []string, usage string, op func(ctx context.Context, n networkAPI) (string, error)) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: %s", usage)
 	}

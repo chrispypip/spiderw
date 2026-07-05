@@ -37,8 +37,8 @@ func TestAgent_Public(t *testing.T) {
 	})
 }
 
-func factoryReturning(fake core.AgentIface) func(context.Context, core.CredentialCallbacks) (core.AgentIface, error) {
-	return func(context.Context, core.CredentialCallbacks) (core.AgentIface, error) {
+func factoryReturning(fake core.AgentIface) func(ctx context.Context, cc core.CredentialCallbacks) (core.AgentIface, error) {
+	return func(ctx context.Context, cc core.CredentialCallbacks) (core.AgentIface, error) {
 		return fake, nil
 	}
 }
@@ -97,7 +97,7 @@ func testAgentPublic_Register_Closed(t *testing.T) {
 func testAgentPublic_Register_FactoryError(t *testing.T) {
 	t.Parallel()
 	wantErr := core.WrapAgentUnavailable("NewAgent", "boom", core.ErrCore)
-	c := newAgentTestClient(t, func(context.Context, core.CredentialCallbacks) (core.AgentIface, error) {
+	c := newAgentTestClient(t, func(ctx context.Context, cc core.CredentialCallbacks) (core.AgentIface, error) {
 		return nil, wantErr
 	})
 	defer func() { _ = c.Close() }()

@@ -51,7 +51,7 @@ func testAgentCore_Validate_NoCallbacks(t *testing.T) {
 
 func testAgentCore_Validate_OneCallback(t *testing.T) {
 	t.Parallel()
-	cc := CredentialCallbacks{Passphrase: func(context.Context, string) (string, error) { return "", nil }}
+	cc := CredentialCallbacks{Passphrase: func(ctx context.Context, networkPath string) (string, error) { return "", nil }}
 	require.NoError(t, cc.Validate("op"))
 }
 
@@ -59,7 +59,7 @@ func testAgentCore_Handler_Passphrase(t *testing.T) {
 	t.Parallel()
 	var gotPath string
 	_, h := NewAgent(CredentialCallbacks{
-		Passphrase: func(_ context.Context, networkPath string) (string, error) {
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) {
 			gotPath = networkPath
 			return "hunter2", nil
 		},
@@ -76,7 +76,7 @@ func testAgentCore_Handler_NilCallbackYieldsNilFunc(t *testing.T) {
 	// Only Passphrase is set; the unset request callbacks must surface as nil
 	// handler funcs so the iwdbus layer declines them.
 	_, h := NewAgent(CredentialCallbacks{
-		Passphrase: func(context.Context, string) (string, error) { return "x", nil },
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) { return "x", nil },
 	})
 	require.NotNil(t, h.RequestPassphrase)
 	require.Nil(t, h.RequestPrivateKeyPassphrase)
@@ -87,7 +87,7 @@ func testAgentCore_Handler_NilCallbackYieldsNilFunc(t *testing.T) {
 func testAgentCore_Handler_UserNameAndPassword(t *testing.T) {
 	t.Parallel()
 	_, h := NewAgent(CredentialCallbacks{
-		UserNameAndPassword: func(_ context.Context, networkPath string) (string, string, error) {
+		UserNameAndPassword: func(ctx context.Context, networkPath string) (string, string, error) {
 			require.Equal(t, testAgentNetworkPath, networkPath)
 			return "alice", "s3cret", nil
 		},
@@ -102,7 +102,7 @@ func testAgentCore_Handler_UserNameAndPassword(t *testing.T) {
 func testAgentCore_Handler_UserPassword(t *testing.T) {
 	t.Parallel()
 	_, h := NewAgent(CredentialCallbacks{
-		UserPassword: func(_ context.Context, networkPath, user string) (string, error) {
+		UserPassword: func(ctx context.Context, networkPath, user string) (string, error) {
 			require.Equal(t, testAgentNetworkPath, networkPath)
 			require.Equal(t, "bob", user)
 			return "pw", nil
@@ -121,7 +121,7 @@ func testAgentCore_Handler_CancelAbortsInFlight(t *testing.T) {
 	var ctxErr error
 
 	_, h := NewAgent(CredentialCallbacks{
-		Passphrase: func(ctx context.Context, _ string) (string, error) {
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) {
 			close(started)
 			<-ctx.Done()
 			ctxErr = ctx.Err()
@@ -148,7 +148,7 @@ func testAgentCore_Handler_Release(t *testing.T) {
 	t.Parallel()
 	released := make(chan struct{}, 1)
 	_, h := NewAgent(CredentialCallbacks{
-		Passphrase: func(context.Context, string) (string, error) { return "", nil },
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) { return "", nil },
 		OnRelease:  func() { released <- struct{}{} },
 	})
 	h.Release()
@@ -163,7 +163,7 @@ func testAgentCore_Unregister(t *testing.T) {
 	t.Parallel()
 	mgr := &fakeAgentManager{}
 	var unexported bool
-	a, _ := NewAgent(CredentialCallbacks{Passphrase: func(context.Context, string) (string, error) { return "", nil }})
+	a, _ := NewAgent(CredentialCallbacks{Passphrase: func(ctx context.Context, networkPath string) (string, error) { return "", nil }})
 	a.Bind(mgr, "/spiderw/agent", func() error { unexported = true; return nil })
 
 	require.NoError(t, a.Unregister(context.Background()))
@@ -174,7 +174,7 @@ func testAgentCore_Unregister(t *testing.T) {
 func testAgentCore_UnregisterIdempotent(t *testing.T) {
 	t.Parallel()
 	mgr := &fakeAgentManager{}
-	a, _ := NewAgent(CredentialCallbacks{Passphrase: func(context.Context, string) (string, error) { return "", nil }})
+	a, _ := NewAgent(CredentialCallbacks{Passphrase: func(ctx context.Context, networkPath string) (string, error) { return "", nil }})
 	a.Bind(mgr, "/spiderw/agent", func() error { return nil })
 
 	require.NoError(t, a.Unregister(context.Background()))
@@ -186,7 +186,7 @@ func testAgentCore_UnregisterUnbound(t *testing.T) {
 	t.Parallel()
 	// An agent that was never bound (export/register failed) unregisters as a
 	// no-op rather than erroring.
-	a, _ := NewAgent(CredentialCallbacks{Passphrase: func(context.Context, string) (string, error) { return "", nil }})
+	a, _ := NewAgent(CredentialCallbacks{Passphrase: func(ctx context.Context, networkPath string) (string, error) { return "", nil }})
 	require.NoError(t, a.Unregister(context.Background()))
 }
 

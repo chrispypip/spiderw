@@ -393,7 +393,7 @@ func testStation_GetProperties(t *testing.T) {
 
 	const path = "/net/connman/iwd/phy0/wlan0/net0"
 	const ap = "/net/connman/iwd/phy0/wlan0/abc123"
-	s := newGetAllStation(func(_ context.Context, iface string) (map[string]dbus.Variant, error) {
+	s := newGetAllStation(func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 		require.Equal(t, IwdStationIface, iface)
 		return map[string]dbus.Variant{
 			"State":                dbus.MakeVariant("connected"),
@@ -420,7 +420,7 @@ func testStation_GetProperties_Disconnected(t *testing.T) {
 
 	// A disconnected station omits ConnectedNetwork entirely; that is not an
 	// error, it leaves ConnectedNetwork nil.
-	s := newGetAllStation(func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+	s := newGetAllStation(func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 		return map[string]dbus.Variant{
 			"State":    dbus.MakeVariant("disconnected"),
 			"Scanning": dbus.MakeVariant(false),
@@ -481,7 +481,7 @@ func testStation_GetProperties_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			s := newGetAllStation(func(_ context.Context, _ string) (map[string]dbus.Variant, error) {
+			s := newGetAllStation(func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
 				if tc.callErr != nil {
 					return nil, tc.callErr
 				}

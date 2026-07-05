@@ -92,12 +92,12 @@ func (f *fakeCoreStation) Properties(ctx context.Context) (*core.StationProperti
 	return props, nil
 }
 
-func (f *fakeCoreStation) Scan(context.Context) error {
+func (f *fakeCoreStation) Scan(ctx context.Context) error {
 	f.scanCalled.Store(true)
 	return f.loadErr()
 }
 
-func (f *fakeCoreStation) OrderedNetworks(context.Context) ([]core.OrderedNetwork, error) {
+func (f *fakeCoreStation) OrderedNetworks(ctx context.Context) ([]core.OrderedNetwork, error) {
 	if err := f.loadErr(); err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (f *fakeCoreStation) OrderedNetworks(context.Context) ([]core.OrderedNetwor
 	return nil, nil
 }
 
-func (f *fakeCoreStation) SetAffinities(_ context.Context, paths []string) error {
+func (f *fakeCoreStation) SetAffinities(ctx context.Context, paths []string) error {
 	if err := f.loadErr(); err != nil {
 		return err
 	}
@@ -116,12 +116,12 @@ func (f *fakeCoreStation) SetAffinities(_ context.Context, paths []string) error
 	return nil
 }
 
-func (f *fakeCoreStation) Disconnect(context.Context) error {
+func (f *fakeCoreStation) Disconnect(ctx context.Context) error {
 	f.disconnectCalled.Store(true)
 	return f.loadErr()
 }
 
-func (f *fakeCoreStation) ConnectHiddenNetwork(_ context.Context, name string) error {
+func (f *fakeCoreStation) ConnectHiddenNetwork(ctx context.Context, name string) error {
 	if err := f.loadErr(); err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (f *fakeCoreStation) ConnectHiddenNetwork(_ context.Context, name string) e
 	return nil
 }
 
-func (f *fakeCoreStation) HiddenAccessPoints(context.Context) ([]core.HiddenAccessPoint, error) {
+func (f *fakeCoreStation) HiddenAccessPoints(ctx context.Context) ([]core.HiddenAccessPoint, error) {
 	if err := f.loadErr(); err != nil {
 		return nil, err
 	}

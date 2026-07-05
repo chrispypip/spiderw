@@ -160,7 +160,7 @@ func parseModeArg(raw string) (spiderw.Mode, error) {
 	}
 }
 
-func withAdapter(app *App, ctx context.Context, adapterRef string, fn func(context.Context, adapterAPI) error) error {
+func withAdapter(app *App, ctx context.Context, adapterRef string, fn func(ctx context.Context, a adapterAPI) error) error {
 	return app.withClient(ctx, func(client clientAPI) error {
 		a, err := adapterByRef(ctx, client, adapterRef)
 		if err != nil {
@@ -171,7 +171,7 @@ func withAdapter(app *App, ctx context.Context, adapterRef string, fn func(conte
 	})
 }
 
-func getAdapterBool(app *App, ctx context.Context, adapterRef string, usage string, args []string, op func(context.Context, adapterAPI) (bool, error)) error {
+func getAdapterBool(app *App, ctx context.Context, adapterRef string, usage string, args []string, op func(ctx context.Context, a adapterAPI) (bool, error)) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: %s", usage)
 	}
@@ -414,7 +414,7 @@ func runAdapterPowered(app *App, ctx context.Context, adapterRef string, args []
 	})
 }
 
-func runAdapterString(app *App, ctx context.Context, adapterRef string, args []string, usage string, op func(context.Context, adapterAPI) (string, error)) error {
+func runAdapterString(app *App, ctx context.Context, adapterRef string, args []string, usage string, op func(ctx context.Context, a adapterAPI) (string, error)) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: %s", usage)
 	}
@@ -429,7 +429,7 @@ func runAdapterString(app *App, ctx context.Context, adapterRef string, args []s
 	})
 }
 
-func runAdapterOptionalString(app *App, ctx context.Context, adapterRef string, args []string, usage string, op func(context.Context, adapterAPI) (*string, error)) error {
+func runAdapterOptionalString(app *App, ctx context.Context, adapterRef string, args []string, usage string, op func(ctx context.Context, a adapterAPI) (*string, error)) error {
 	if len(args) != 0 {
 		return fmt.Errorf("usage: %s", usage)
 	}

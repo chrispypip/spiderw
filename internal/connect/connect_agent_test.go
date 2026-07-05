@@ -19,11 +19,11 @@ import (
 
 type fakeConnectAgent struct{}
 
-func (*fakeConnectAgent) Unregister(context.Context) error { return nil }
+func (*fakeConnectAgent) Unregister(ctx context.Context) error { return nil }
 
 func validConnectCallbacks() core.CredentialCallbacks {
 	return core.CredentialCallbacks{
-		Passphrase: func(context.Context, string) (string, error) { return "p", nil },
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) { return "p", nil },
 	}
 }
 
@@ -48,7 +48,7 @@ func TestWiring_NewAgent_GuardsInputs(t *testing.T) {
 func TestWiring_NewAgent_UsesFactoryWhenPresent(t *testing.T) {
 	want := &fakeConnectAgent{}
 	w := &Wiring{
-		AgentFactory: func(_ context.Context, cc core.CredentialCallbacks) (core.AgentIface, error) {
+		AgentFactory: func(ctx context.Context, cc core.CredentialCallbacks) (core.AgentIface, error) {
 			require.NotNil(t, cc.Passphrase)
 			return want, nil
 		},
@@ -85,7 +85,7 @@ func TestWiring_NewAgent_FailurePaths(t *testing.T) {
 			return func() error { unexported = true; return nil }, nil
 		}
 		wantErr := errors.New("no agent manager")
-		newIwdAgentManagerFn = func(context.Context, *dbus.Conn) (*iwdbus.AgentManager, error) {
+		newIwdAgentManagerFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.AgentManager, error) {
 			return nil, wantErr
 		}
 

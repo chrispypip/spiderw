@@ -17,7 +17,7 @@ import (
 // them, exercising the cancelation plumbing under load.
 func TestStress_Core_Agent_CancelDuringBlockedRequests(t *testing.T) {
 	a, h := NewAgent(CredentialCallbacks{
-		Passphrase: func(ctx context.Context, _ string) (string, error) {
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) {
 			select {
 			case <-ctx.Done():
 				return "", ctx.Err()

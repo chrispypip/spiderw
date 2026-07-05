@@ -155,7 +155,7 @@ func canceledError(err error) *dbus.Error {
 
 // dispatchCredential runs a single-secret request callback, mapping a nil
 // callback or any returned error to the Canceled D-Bus error.
-func dispatchCredential(fn func(context.Context, dbus.ObjectPath) (string, error), network dbus.ObjectPath) (string, *dbus.Error) {
+func dispatchCredential(fn func(ctx context.Context, network dbus.ObjectPath) (string, error), network dbus.ObjectPath) (string, *dbus.Error) {
 	if fn == nil {
 		return "", canceledError(nil)
 	}

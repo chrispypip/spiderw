@@ -327,7 +327,7 @@ func TestStationMock_ConnectHidden(t *testing.T) {
 		client := newMockClient(t, ctx)
 
 		agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
-			Passphrase: func(context.Context, string) (string, error) {
+			Passphrase: func(ctx context.Context, networkPath string) (string, error) {
 				return mockSecuredPassphrase, nil
 			},
 		})

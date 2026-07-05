@@ -49,73 +49,73 @@ type fakeClient struct {
 
 func (f *fakeClient) Daemon() daemonAPI { return f.daemon }
 
-func (f *fakeClient) Adapter(_ context.Context, path string) (adapterAPI, error) {
+func (f *fakeClient) Adapter(ctx context.Context, path string) (adapterAPI, error) {
 	if f.adapterErr != nil {
 		return nil, f.adapterErr
 	}
 	return f.adapters[path], nil
 }
 
-func (f *fakeClient) Device(_ context.Context, path string) (deviceAPI, error) {
+func (f *fakeClient) Device(ctx context.Context, path string) (deviceAPI, error) {
 	if f.deviceErr != nil {
 		return nil, f.deviceErr
 	}
 	return f.devices[path], nil
 }
 
-func (f *fakeClient) Station(_ context.Context, path string) (stationAPI, error) {
+func (f *fakeClient) Station(ctx context.Context, path string) (stationAPI, error) {
 	if f.stationErr != nil {
 		return nil, f.stationErr
 	}
 	return f.stations[path], nil
 }
 
-func (f *fakeClient) BasicServiceSet(_ context.Context, path string) (bssAPI, error) {
+func (f *fakeClient) BasicServiceSet(ctx context.Context, path string) (bssAPI, error) {
 	if f.bssErr != nil {
 		return nil, f.bssErr
 	}
 	return f.bsses[path], nil
 }
 
-func (f *fakeClient) Network(_ context.Context, path string) (networkAPI, error) {
+func (f *fakeClient) Network(ctx context.Context, path string) (networkAPI, error) {
 	if f.networkErr != nil {
 		return nil, f.networkErr
 	}
 	return f.networks[path], nil
 }
 
-func (f *fakeClient) KnownNetwork(_ context.Context, path string) (knownNetworkAPI, error) {
+func (f *fakeClient) KnownNetwork(ctx context.Context, path string) (knownNetworkAPI, error) {
 	if f.knownNetErr != nil {
 		return nil, f.knownNetErr
 	}
 	return f.knownNetworks[path], nil
 }
 
-func (f *fakeClient) AllAdapters(context.Context) ([]adapterAPI, error) {
+func (f *fakeClient) AllAdapters(ctx context.Context) ([]adapterAPI, error) {
 	return f.allAdapters, f.allAdaptErr
 }
 
-func (f *fakeClient) AllDevices(context.Context) ([]deviceAPI, error) {
+func (f *fakeClient) AllDevices(ctx context.Context) ([]deviceAPI, error) {
 	return f.allDevices, f.allDeviceErr
 }
 
-func (f *fakeClient) AllStations(context.Context) ([]stationAPI, error) {
+func (f *fakeClient) AllStations(ctx context.Context) ([]stationAPI, error) {
 	return f.allStations, f.allStationErr
 }
 
-func (f *fakeClient) AllBasicServiceSets(context.Context) ([]bssAPI, error) {
+func (f *fakeClient) AllBasicServiceSets(ctx context.Context) ([]bssAPI, error) {
 	return f.allBSSes, f.allBSSErr
 }
 
-func (f *fakeClient) AllNetworks(context.Context) ([]networkAPI, error) {
+func (f *fakeClient) AllNetworks(ctx context.Context) ([]networkAPI, error) {
 	return f.allNetworks, f.allNetErr
 }
 
-func (f *fakeClient) AllKnownNetworks(context.Context) ([]knownNetworkAPI, error) {
+func (f *fakeClient) AllKnownNetworks(ctx context.Context) ([]knownNetworkAPI, error) {
 	return f.allKnownNets, f.allKnownErr
 }
 
-func (f *fakeClient) RegisterAgent(_ context.Context, cfg spiderw.AgentConfig) (agentAPI, error) {
+func (f *fakeClient) RegisterAgent(ctx context.Context, cfg spiderw.AgentConfig) (agentAPI, error) {
 	if f.registerErr != nil {
 		return nil, f.registerErr
 	}
@@ -137,7 +137,7 @@ type fakeAgent struct {
 	unregisterErr error
 }
 
-func (a *fakeAgent) Unregister(context.Context) error {
+func (a *fakeAgent) Unregister(ctx context.Context) error {
 	a.unregistered = true
 	return a.unregisterErr
 }
@@ -153,52 +153,52 @@ type fakeDaemon struct {
 	err           error
 }
 
-func (f *fakeDaemon) Info(context.Context) (*spiderw.DaemonInfo, error) {
+func (f *fakeDaemon) Info(ctx context.Context) (*spiderw.DaemonInfo, error) {
 	return f.info, f.err
 }
 
-func (f *fakeDaemon) Version(context.Context) (string, error) {
+func (f *fakeDaemon) Version(ctx context.Context) (string, error) {
 	if f.err != nil || f.info == nil {
 		return "", f.err
 	}
 	return f.info.Version, nil
 }
 
-func (f *fakeDaemon) StateDirectory(context.Context) (string, error) {
+func (f *fakeDaemon) StateDirectory(ctx context.Context) (string, error) {
 	if f.err != nil || f.info == nil {
 		return "", f.err
 	}
 	return f.info.StateDirectory, nil
 }
 
-func (f *fakeDaemon) NetworkConfigurationEnabled(context.Context) (bool, error) {
+func (f *fakeDaemon) NetworkConfigurationEnabled(ctx context.Context) (bool, error) {
 	if f.err != nil || f.info == nil {
 		return false, f.err
 	}
 	return f.info.NetworkConfigurationEnabled, nil
 }
 
-func (f *fakeDaemon) Adapters(context.Context) ([]spiderw.AdapterRef, error) {
+func (f *fakeDaemon) Adapters(ctx context.Context) ([]spiderw.AdapterRef, error) {
 	return f.adapters, f.err
 }
 
-func (f *fakeDaemon) Devices(context.Context) ([]spiderw.DeviceRef, error) {
+func (f *fakeDaemon) Devices(ctx context.Context) ([]spiderw.DeviceRef, error) {
 	return f.devices, f.err
 }
 
-func (f *fakeDaemon) Stations(context.Context) ([]spiderw.StationRef, error) {
+func (f *fakeDaemon) Stations(ctx context.Context) ([]spiderw.StationRef, error) {
 	return f.stations, f.err
 }
 
-func (f *fakeDaemon) BasicServiceSets(context.Context) ([]spiderw.BasicServiceSetRef, error) {
+func (f *fakeDaemon) BasicServiceSets(ctx context.Context) ([]spiderw.BasicServiceSetRef, error) {
 	return f.bsses, f.err
 }
 
-func (f *fakeDaemon) Networks(context.Context) ([]spiderw.NetworkRef, error) {
+func (f *fakeDaemon) Networks(ctx context.Context) ([]spiderw.NetworkRef, error) {
 	return f.networks, f.err
 }
 
-func (f *fakeDaemon) KnownNetworks(context.Context) ([]spiderw.KnownNetworkRef, error) {
+func (f *fakeDaemon) KnownNetworks(ctx context.Context) ([]spiderw.KnownNetworkRef, error) {
 	return f.knownNetworks, f.err
 }
 
@@ -210,14 +210,14 @@ type fakeAdapter struct {
 
 func (f *fakeAdapter) Path() string { return f.path }
 
-func (f *fakeAdapter) Powered(context.Context) (bool, error) {
+func (f *fakeAdapter) Powered(ctx context.Context) (bool, error) {
 	if f.err != nil {
 		return false, f.err
 	}
 	return f.props.Powered, nil
 }
 
-func (f *fakeAdapter) SetPowered(_ context.Context, powered bool) error {
+func (f *fakeAdapter) SetPowered(ctx context.Context, powered bool) error {
 	if f.err != nil {
 		return f.err
 	}
@@ -225,28 +225,28 @@ func (f *fakeAdapter) SetPowered(_ context.Context, powered bool) error {
 	return nil
 }
 
-func (f *fakeAdapter) Name(context.Context) (string, error) {
+func (f *fakeAdapter) Name(ctx context.Context) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
 	return f.props.Name, nil
 }
 
-func (f *fakeAdapter) Model(context.Context) (*string, error) {
+func (f *fakeAdapter) Model(ctx context.Context) (*string, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.props.Model, nil
 }
 
-func (f *fakeAdapter) Vendor(context.Context) (*string, error) {
+func (f *fakeAdapter) Vendor(ctx context.Context) (*string, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.props.Vendor, nil
 }
 
-func (f *fakeAdapter) SupportedModes(context.Context) ([]spiderw.Mode, error) {
+func (f *fakeAdapter) SupportedModes(ctx context.Context) ([]spiderw.Mode, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -260,25 +260,27 @@ func (f *fakeAdapter) supports(mode spiderw.Mode) (bool, error) {
 	return slices.Contains(f.props.SupportedModes, mode), nil
 }
 
-func (f *fakeAdapter) SupportsMode(_ context.Context, mode spiderw.Mode) (bool, error) {
+func (f *fakeAdapter) SupportsMode(ctx context.Context, mode spiderw.Mode) (bool, error) {
 	return f.supports(mode)
 }
 
-func (f *fakeAdapter) SupportsStation(context.Context) (bool, error) {
+func (f *fakeAdapter) SupportsStation(ctx context.Context) (bool, error) {
 	return f.supports(spiderw.ModeStation)
 }
 
-func (f *fakeAdapter) SupportsAP(context.Context) (bool, error) { return f.supports(spiderw.ModeAP) }
+func (f *fakeAdapter) SupportsAP(ctx context.Context) (bool, error) {
+	return f.supports(spiderw.ModeAP)
+}
 
-func (f *fakeAdapter) SupportsAdHoc(context.Context) (bool, error) {
+func (f *fakeAdapter) SupportsAdHoc(ctx context.Context) (bool, error) {
 	return f.supports(spiderw.ModeAdHoc)
 }
 
-func (f *fakeAdapter) Properties(context.Context) (*spiderw.AdapterProperties, error) {
+func (f *fakeAdapter) Properties(ctx context.Context) (*spiderw.AdapterProperties, error) {
 	return f.props, f.err
 }
 
-func (f *fakeAdapter) SubscribePoweredChanged(context.Context, func(bool)) (spiderw.UnsubscribeFunc, error) {
+func (f *fakeAdapter) SubscribePoweredChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
 	return func() error { return nil }, f.err
 }
 
@@ -290,14 +292,14 @@ type fakeDevice struct {
 
 func (f *fakeDevice) Path() string { return f.path }
 
-func (f *fakeDevice) Powered(context.Context) (bool, error) {
+func (f *fakeDevice) Powered(ctx context.Context) (bool, error) {
 	if f.err != nil {
 		return false, f.err
 	}
 	return f.props.Powered, nil
 }
 
-func (f *fakeDevice) SetPowered(_ context.Context, powered bool) error {
+func (f *fakeDevice) SetPowered(ctx context.Context, powered bool) error {
 	if f.err != nil {
 		return f.err
 	}
@@ -305,28 +307,28 @@ func (f *fakeDevice) SetPowered(_ context.Context, powered bool) error {
 	return nil
 }
 
-func (f *fakeDevice) Name(context.Context) (string, error) {
+func (f *fakeDevice) Name(ctx context.Context) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
 	return f.props.Name, nil
 }
 
-func (f *fakeDevice) Address(context.Context) (string, error) {
+func (f *fakeDevice) Address(ctx context.Context) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
 	return f.props.Address, nil
 }
 
-func (f *fakeDevice) Mode(context.Context) (spiderw.Mode, error) {
+func (f *fakeDevice) Mode(ctx context.Context) (spiderw.Mode, error) {
 	if f.err != nil {
 		return spiderw.ModeUnknown, f.err
 	}
 	return f.props.Mode, nil
 }
 
-func (f *fakeDevice) SetMode(_ context.Context, mode spiderw.Mode) error {
+func (f *fakeDevice) SetMode(ctx context.Context, mode spiderw.Mode) error {
 	if f.err != nil {
 		return f.err
 	}
@@ -334,22 +336,22 @@ func (f *fakeDevice) SetMode(_ context.Context, mode spiderw.Mode) error {
 	return nil
 }
 
-func (f *fakeDevice) Adapter(context.Context) (string, error) {
+func (f *fakeDevice) Adapter(ctx context.Context) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
 	return f.props.Adapter, nil
 }
 
-func (f *fakeDevice) Properties(context.Context) (*spiderw.DeviceProperties, error) {
+func (f *fakeDevice) Properties(ctx context.Context) (*spiderw.DeviceProperties, error) {
 	return f.props, f.err
 }
 
-func (f *fakeDevice) SubscribePoweredChanged(context.Context, func(bool)) (spiderw.UnsubscribeFunc, error) {
+func (f *fakeDevice) SubscribePoweredChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
 	return func() error { return nil }, f.err
 }
 
-func (f *fakeDevice) SubscribeModeChanged(context.Context, func(spiderw.Mode)) (spiderw.UnsubscribeFunc, error) {
+func (f *fakeDevice) SubscribeModeChanged(ctx context.Context, fn func(spiderw.Mode)) (spiderw.UnsubscribeFunc, error) {
 	return func() error { return nil }, f.err
 }
 
@@ -371,11 +373,11 @@ type fakeStation struct {
 
 func (f *fakeStation) Path() string { return f.path }
 
-func (f *fakeStation) Properties(context.Context) (*spiderw.StationProperties, error) {
+func (f *fakeStation) Properties(ctx context.Context) (*spiderw.StationProperties, error) {
 	return f.props, f.err
 }
 
-func (f *fakeStation) Affinities(context.Context) ([]string, error) {
+func (f *fakeStation) Affinities(ctx context.Context) ([]string, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -385,16 +387,16 @@ func (f *fakeStation) Affinities(context.Context) ([]string, error) {
 	return f.props.Affinities, nil
 }
 
-func (f *fakeStation) Scan(context.Context) error {
+func (f *fakeStation) Scan(ctx context.Context) error {
 	f.scanCalled = true
 	return f.scanErr
 }
 
-func (f *fakeStation) OrderedNetworks(context.Context) ([]spiderw.OrderedNetwork, error) {
+func (f *fakeStation) OrderedNetworks(ctx context.Context) ([]spiderw.OrderedNetwork, error) {
 	return f.ordered, f.err
 }
 
-func (f *fakeStation) SetAffinities(_ context.Context, paths []string) error {
+func (f *fakeStation) SetAffinities(ctx context.Context, paths []string) error {
 	if f.setAffErr != nil {
 		return f.setAffErr
 	}
@@ -402,12 +404,12 @@ func (f *fakeStation) SetAffinities(_ context.Context, paths []string) error {
 	return nil
 }
 
-func (f *fakeStation) Disconnect(context.Context) error {
+func (f *fakeStation) Disconnect(ctx context.Context) error {
 	f.disconnectCalled = true
 	return f.disconnectErr
 }
 
-func (f *fakeStation) ConnectHiddenNetwork(_ context.Context, name string) error {
+func (f *fakeStation) ConnectHiddenNetwork(ctx context.Context, name string) error {
 	if f.connectHiddenErr != nil {
 		return f.connectHiddenErr
 	}
@@ -415,11 +417,11 @@ func (f *fakeStation) ConnectHiddenNetwork(_ context.Context, name string) error
 	return nil
 }
 
-func (f *fakeStation) HiddenAccessPoints(context.Context) ([]spiderw.HiddenAccessPoint, error) {
+func (f *fakeStation) HiddenAccessPoints(ctx context.Context) ([]spiderw.HiddenAccessPoint, error) {
 	return f.hiddenAPs, f.err
 }
 
-func (f *fakeStation) SubscribeScanningChanged(_ context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
+func (f *fakeStation) SubscribeScanningChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -440,14 +442,14 @@ type fakeBSS struct {
 
 func (f *fakeBSS) Path() string { return f.path }
 
-func (f *fakeBSS) Address(context.Context) (string, error) {
+func (f *fakeBSS) Address(ctx context.Context) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
 	return f.props.Address, nil
 }
 
-func (f *fakeBSS) Properties(context.Context) (*spiderw.BasicServiceSetProperties, error) {
+func (f *fakeBSS) Properties(ctx context.Context) (*spiderw.BasicServiceSetProperties, error) {
 	return f.props, f.err
 }
 
@@ -460,49 +462,49 @@ type fakeNetwork struct {
 
 func (f *fakeNetwork) Path() string { return f.path }
 
-func (f *fakeNetwork) Name(context.Context) (string, error) {
+func (f *fakeNetwork) Name(ctx context.Context) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
 	return f.props.Name, nil
 }
 
-func (f *fakeNetwork) Connected(context.Context) (bool, error) {
+func (f *fakeNetwork) Connected(ctx context.Context) (bool, error) {
 	if f.err != nil {
 		return false, f.err
 	}
 	return f.props.Connected, nil
 }
 
-func (f *fakeNetwork) Device(context.Context) (string, error) {
+func (f *fakeNetwork) Device(ctx context.Context) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
 	return f.props.Device, nil
 }
 
-func (f *fakeNetwork) Type(context.Context) (spiderw.NetworkType, error) {
+func (f *fakeNetwork) Type(ctx context.Context) (spiderw.NetworkType, error) {
 	if f.err != nil {
 		return spiderw.NetworkTypeUnknown, f.err
 	}
 	return f.props.Type, nil
 }
 
-func (f *fakeNetwork) KnownNetwork(context.Context) (*string, error) {
+func (f *fakeNetwork) KnownNetwork(ctx context.Context) (*string, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.props.KnownNetwork, nil
 }
 
-func (f *fakeNetwork) ExtendedServiceSet(context.Context) ([]string, error) {
+func (f *fakeNetwork) ExtendedServiceSet(ctx context.Context) ([]string, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.props.ExtendedServiceSet, nil
 }
 
-func (f *fakeNetwork) Connect(context.Context) error {
+func (f *fakeNetwork) Connect(ctx context.Context) error {
 	if f.connectErr != nil {
 		return f.connectErr
 	}
@@ -510,11 +512,11 @@ func (f *fakeNetwork) Connect(context.Context) error {
 	return nil
 }
 
-func (f *fakeNetwork) Properties(context.Context) (*spiderw.NetworkProperties, error) {
+func (f *fakeNetwork) Properties(ctx context.Context) (*spiderw.NetworkProperties, error) {
 	return f.props, f.err
 }
 
-func (f *fakeNetwork) SubscribeConnectedChanged(context.Context, func(bool)) (spiderw.UnsubscribeFunc, error) {
+func (f *fakeNetwork) SubscribeConnectedChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
 	return func() error { return nil }, f.err
 }
 
@@ -527,42 +529,42 @@ type fakeKnownNetwork struct {
 
 func (f *fakeKnownNetwork) Path() string { return f.path }
 
-func (f *fakeKnownNetwork) Name(context.Context) (string, error) {
+func (f *fakeKnownNetwork) Name(ctx context.Context) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
 	return f.props.Name, nil
 }
 
-func (f *fakeKnownNetwork) Type(context.Context) (spiderw.NetworkType, error) {
+func (f *fakeKnownNetwork) Type(ctx context.Context) (spiderw.NetworkType, error) {
 	if f.err != nil {
 		return spiderw.NetworkTypeUnknown, f.err
 	}
 	return f.props.Type, nil
 }
 
-func (f *fakeKnownNetwork) Hidden(context.Context) (bool, error) {
+func (f *fakeKnownNetwork) Hidden(ctx context.Context) (bool, error) {
 	if f.err != nil {
 		return false, f.err
 	}
 	return f.props.Hidden, nil
 }
 
-func (f *fakeKnownNetwork) LastConnectedTime(context.Context) (*string, error) {
+func (f *fakeKnownNetwork) LastConnectedTime(ctx context.Context) (*string, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.props.LastConnectedTime, nil
 }
 
-func (f *fakeKnownNetwork) AutoConnect(context.Context) (bool, error) {
+func (f *fakeKnownNetwork) AutoConnect(ctx context.Context) (bool, error) {
 	if f.err != nil {
 		return false, f.err
 	}
 	return f.props.AutoConnect, nil
 }
 
-func (f *fakeKnownNetwork) SetAutoConnect(_ context.Context, autoConnect bool) error {
+func (f *fakeKnownNetwork) SetAutoConnect(ctx context.Context, autoConnect bool) error {
 	if f.err != nil {
 		return f.err
 	}
@@ -570,15 +572,15 @@ func (f *fakeKnownNetwork) SetAutoConnect(_ context.Context, autoConnect bool) e
 	return nil
 }
 
-func (f *fakeKnownNetwork) Forget(context.Context) error {
+func (f *fakeKnownNetwork) Forget(ctx context.Context) error {
 	return f.forgetErr
 }
 
-func (f *fakeKnownNetwork) Properties(context.Context) (*spiderw.KnownNetworkProperties, error) {
+func (f *fakeKnownNetwork) Properties(ctx context.Context) (*spiderw.KnownNetworkProperties, error) {
 	return f.props, f.err
 }
 
-func (f *fakeKnownNetwork) SubscribeAutoConnectChanged(context.Context, func(bool)) (spiderw.UnsubscribeFunc, error) {
+func (f *fakeKnownNetwork) SubscribeAutoConnectChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
 	return func() error { return nil }, f.err
 }
 
@@ -591,7 +593,7 @@ func driveCLI(fake clientAPI, clientErr error, jsonOut bool, args ...string) (st
 		Stdout: &buf,
 		Stderr: &buf,
 		Output: outputConfig{JSON: jsonOut},
-		NewClient: func(context.Context, spiderw.Bus) (clientAPI, error) {
+		NewClient: func(ctx context.Context, bus spiderw.Bus) (clientAPI, error) {
 			if clientErr != nil {
 				return nil, clientErr
 			}
@@ -610,7 +612,7 @@ func driveConnect(fake clientAPI, stdin string, prompt func(string) (string, err
 	app := &App{
 		Stdout: &buf,
 		Stderr: &buf,
-		NewClient: func(context.Context, spiderw.Bus) (clientAPI, error) {
+		NewClient: func(ctx context.Context, bus spiderw.Bus) (clientAPI, error) {
 			return fake, nil
 		},
 		PromptPassphrase: prompt,

@@ -49,21 +49,21 @@ func (f *fakeIwdbusDevice) loadErr() error {
 	return box.err
 }
 
-func (f *fakeIwdbusDevice) GetName(context.Context) (string, error) {
+func (f *fakeIwdbusDevice) GetName(ctx context.Context) (string, error) {
 	if v := f.name.Load(); v != nil {
 		return v.(string), f.loadErr()
 	}
 	return "", f.loadErr()
 }
 
-func (f *fakeIwdbusDevice) GetAddress(context.Context) (string, error) {
+func (f *fakeIwdbusDevice) GetAddress(ctx context.Context) (string, error) {
 	if v := f.address.Load(); v != nil {
 		return v.(string), f.loadErr()
 	}
 	return "", f.loadErr()
 }
 
-func (f *fakeIwdbusDevice) GetPowered(context.Context) (bool, error) {
+func (f *fakeIwdbusDevice) GetPowered(ctx context.Context) (bool, error) {
 	return f.powered.Load(), f.loadErr()
 }
 
@@ -73,7 +73,7 @@ func (f *fakeIwdbusDevice) SetPowered(ctx context.Context, powered bool) error {
 	return f.loadErr()
 }
 
-func (f *fakeIwdbusDevice) GetMode(context.Context) (iwdbus.Mode, error) {
+func (f *fakeIwdbusDevice) GetMode(ctx context.Context) (iwdbus.Mode, error) {
 	if v := f.mode.Load(); v != nil {
 		return v.(iwdbus.Mode), f.loadErr()
 	}
@@ -86,14 +86,14 @@ func (f *fakeIwdbusDevice) SetMode(ctx context.Context, mode iwdbus.Mode) error 
 	return f.loadErr()
 }
 
-func (f *fakeIwdbusDevice) GetAdapter(context.Context) (dbus.ObjectPath, error) {
+func (f *fakeIwdbusDevice) GetAdapter(ctx context.Context) (dbus.ObjectPath, error) {
 	if v := f.adapter.Load(); v != nil {
 		return v.(dbus.ObjectPath), f.loadErr()
 	}
 	return "", f.loadErr()
 }
 
-func (f *fakeIwdbusDevice) GetProperties(context.Context) (*iwdbus.DeviceProperties, error) {
+func (f *fakeIwdbusDevice) GetProperties(ctx context.Context) (*iwdbus.DeviceProperties, error) {
 	if err := f.loadErr(); err != nil {
 		return nil, err
 	}

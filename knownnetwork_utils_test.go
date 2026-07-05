@@ -53,42 +53,42 @@ func (f *fakeCoreKnownNetwork) loadProps() core.KnownNetworkProperties {
 	return core.KnownNetworkProperties{}
 }
 
-func (f *fakeCoreKnownNetwork) Name(context.Context) (string, error) {
+func (f *fakeCoreKnownNetwork) Name(ctx context.Context) (string, error) {
 	return f.loadProps().Name, nil
 }
-func (f *fakeCoreKnownNetwork) Type(context.Context) (core.NetworkType, error) {
+func (f *fakeCoreKnownNetwork) Type(ctx context.Context) (core.NetworkType, error) {
 	return f.loadProps().Type, nil
 }
-func (f *fakeCoreKnownNetwork) Hidden(context.Context) (bool, error) {
+func (f *fakeCoreKnownNetwork) Hidden(ctx context.Context) (bool, error) {
 	return f.loadProps().Hidden, nil
 }
-func (f *fakeCoreKnownNetwork) LastConnectedTime(context.Context) (*string, error) {
+func (f *fakeCoreKnownNetwork) LastConnectedTime(ctx context.Context) (*string, error) {
 	return f.loadProps().LastConnectedTime, nil
 }
-func (f *fakeCoreKnownNetwork) AutoConnect(context.Context) (bool, error) {
+func (f *fakeCoreKnownNetwork) AutoConnect(ctx context.Context) (bool, error) {
 	return f.loadProps().AutoConnect, nil
 }
 
-func (f *fakeCoreKnownNetwork) SetAutoConnect(_ context.Context, autoConnect bool) error {
+func (f *fakeCoreKnownNetwork) SetAutoConnect(ctx context.Context, autoConnect bool) error {
 	p := f.loadProps()
 	p.AutoConnect = autoConnect
 	f.props.Store(&p)
 	return nil
 }
 
-func (f *fakeCoreKnownNetwork) Forget(context.Context) error {
+func (f *fakeCoreKnownNetwork) Forget(ctx context.Context) error {
 	if box := f.forgetErr.Load(); box != nil {
 		return box.err
 	}
 	return nil
 }
 
-func (f *fakeCoreKnownNetwork) Properties(context.Context) (*core.KnownNetworkProperties, error) {
+func (f *fakeCoreKnownNetwork) Properties(ctx context.Context) (*core.KnownNetworkProperties, error) {
 	p := f.loadProps()
 	return &p, nil
 }
 
-func (f *fakeCoreKnownNetwork) SubscribePropertiesChanged(_ context.Context, fn func(core.KnownNetworkPropertiesChanged)) (core.UnsubscribeFunc, error) {
+func (f *fakeCoreKnownNetwork) SubscribePropertiesChanged(ctx context.Context, fn func(core.KnownNetworkPropertiesChanged)) (core.UnsubscribeFunc, error) {
 	if fn == nil {
 		return nil, nil
 	}
@@ -98,7 +98,7 @@ func (f *fakeCoreKnownNetwork) SubscribePropertiesChanged(_ context.Context, fn 
 	return func() error { return nil }, nil
 }
 
-func (f *fakeCoreKnownNetwork) SubscribeAutoConnectChanged(_ context.Context, fn func(bool)) (core.UnsubscribeFunc, error) {
+func (f *fakeCoreKnownNetwork) SubscribeAutoConnectChanged(ctx context.Context, fn func(bool)) (core.UnsubscribeFunc, error) {
 	if fn == nil {
 		return nil, nil
 	}
@@ -140,7 +140,7 @@ func newTestKnownNetworkClient(t *testing.T) *Client {
 		Conn:    &dbus.Conn{},
 		Daemon:  fakeDaemon,
 		Cleanup: func() error { return nil },
-		KnownNetworkFactory: func(_ context.Context, _ string) (core.KnownNetworkIface, error) {
+		KnownNetworkFactory: func(ctx context.Context, path string) (core.KnownNetworkIface, error) {
 			return (&fakeCoreKnownNetwork{}).setProps(validCoreKnownNetworkProps()), nil
 		},
 	}

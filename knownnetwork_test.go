@@ -82,7 +82,7 @@ func TestClientAllKnownNetworks(t *testing.T) {
 		if daemonErr != nil {
 			fakeDaemon.setErr(daemonErr)
 		}
-		factory := func(_ context.Context, path string) (core.KnownNetworkIface, error) {
+		factory := func(ctx context.Context, path string) (core.KnownNetworkIface, error) {
 			return (&fakeCoreKnownNetwork{}).setProps(core.KnownNetworkProperties{Name: path}), nil
 		}
 		wire := &connect.Wiring{

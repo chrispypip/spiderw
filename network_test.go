@@ -88,7 +88,7 @@ func TestClientAllNetworks(t *testing.T) {
 		if daemonErr != nil {
 			fakeDaemon.setErr(daemonErr)
 		}
-		factory := func(_ context.Context, path string) (core.NetworkIface, error) {
+		factory := func(ctx context.Context, path string) (core.NetworkIface, error) {
 			return (&fakeCoreNetwork{}).setProps(core.NetworkProperties{Name: path}), nil
 		}
 		wire := &connect.Wiring{
