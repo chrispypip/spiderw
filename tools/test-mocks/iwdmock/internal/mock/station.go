@@ -16,8 +16,8 @@ import (
 // assert against these literals.
 const (
 	stationConnectedState           = "connected"
-	stationConnectedNetworkPath     = dbus.ObjectPath("/net/connman/iwd/phy0/wlan0/known_psk")
-	stationConnectedAccessPointPath = dbus.ObjectPath("/net/connman/iwd/phy0/wlan0/aabbccddeeff")
+	stationConnectedNetworkPath     = dbus.ObjectPath("/net/connman/iwd/0/3/4b6e6f776e4e6574_psk")
+	stationConnectedAccessPointPath = dbus.ObjectPath("/net/connman/iwd/0/3/4b6e6f776e4e6574_psk/deadbeefcafe")
 
 	// scanDuration is how long the mock keeps Scanning=true before completing, so
 	// subscribers observe the true->false transition without slowing tests.
@@ -34,9 +34,9 @@ type mockOrderedNetwork struct {
 // stationOrderedNetworks is the seeded scan result: the mock networks with
 // signal strengths in units of 100 * dBm, strongest first.
 var stationOrderedNetworks = []mockOrderedNetwork{
-	{Path: "/net/connman/iwd/phy0/wlan0/known_psk", Signal: -6000},
-	{Path: "/net/connman/iwd/phy0/wlan0/open", Signal: -7200},
-	{Path: "/net/connman/iwd/phy0/wlan0/secured_psk", Signal: -8000},
+	{Path: "/net/connman/iwd/0/3/4b6e6f776e4e6574_psk", Signal: -6000},
+	{Path: "/net/connman/iwd/0/3/4f70656e4e6574_open", Signal: -7200},
+	{Path: "/net/connman/iwd/0/3/536563757265644e6574_psk", Signal: -8000},
 }
 
 // stationExported reports whether the Station interface should be exported on
@@ -115,7 +115,7 @@ func (d *Device) emitStationPropertiesChanged(changed map[string]dbus.Variant) {
 
 // hiddenConnectedNetworkPath is the synthesized network path the mock reports as
 // ConnectedNetwork after a successful ConnectHiddenNetwork.
-const hiddenConnectedNetworkPath = dbus.ObjectPath("/net/connman/iwd/phy0/wlan0/hidden0")
+const hiddenConnectedNetworkPath = dbus.ObjectPath("/net/connman/iwd/0/3/hidden0")
 
 // hiddenNetworkTypes maps a connectable hidden SSID to its security type; a
 // secured one drives the credentials agent, an open one connects directly.

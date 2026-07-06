@@ -415,25 +415,27 @@ spiderw device wlan0 monitor mode
 ```
 
 Inspect, scan, and control stations (devices in station mode). `status` shows
-`State`, `Scanning`, `ConnectedNetwork`, and the experimental
-`ConnectedAccessPoint` / `Affinities`; `scan` triggers a scan (waiting for it to
-finish, then listing results, unless `--no-wait`); `networks` lists the last
-scan's results by signal; `disconnect` and `connect-hidden` control the
-connection (a secured hidden network prompts for, or takes, a passphrase);
-`hidden-aps` lists hidden access points. A station is referenced by its object
-path (shared with the device):
+`State`, `Scanning`, and the connected network/AP; `scan` triggers a scan
+(waiting for it to finish, then listing results, unless `--no-wait`; `--timeout`
+bounds the wait); `networks` lists the last scan's results by signal; `disconnect`
+and `connect-hidden` control the connection (a secured hidden network prompts
+for, or takes, a passphrase); `hidden-aps` lists hidden access points. Networks
+render as their SSID and access points as their MAC (object paths are still
+available with `--json`). A station is referenced by its device name (e.g.
+`wlan0`) or object path:
 
 ```bash
 spiderw station list
 spiderw station status
-spiderw station /net/connman/iwd/phy0/wlan0 status
-spiderw station /net/connman/iwd/phy0/wlan0 scan
-spiderw station /net/connman/iwd/phy0/wlan0 networks
-spiderw station /net/connman/iwd/phy0/wlan0 disconnect
-spiderw station /net/connman/iwd/phy0/wlan0 connect-hidden MyHidden --passphrase=secret
-spiderw station /net/connman/iwd/phy0/wlan0 hidden-aps
-spiderw station /net/connman/iwd/phy0/wlan0 affinities
-spiderw station /net/connman/iwd/phy0/wlan0 affinities set /net/connman/iwd/phy0/wlan0/aabbccddeeff
+spiderw station wlan0 status
+spiderw station wlan0 scan --timeout=30s
+spiderw station wlan0 networks
+spiderw station wlan0 disconnect
+spiderw station wlan0 connect-hidden MyHidden --passphrase=secret
+spiderw station wlan0 hidden-aps
+spiderw station wlan0 affinities
+spiderw station wlan0 affinities set de:ad:be:ef:ca:fe   # a BSS MAC or object path
+spiderw station wlan0 affinities clear
 ```
 
 List basic service sets (BSSes), or print a full snapshot for every BSS. A

@@ -17,12 +17,13 @@ import (
 
 // mockKnownNetworks is the set of known networks the mock exports, in the
 // daemon's path-sorted enumeration order.
+// Path-sorted: 4775... (GuestHotspot) precedes 4b6e... (KnownNet).
 var mockKnownNetworks = []spiderw.KnownNetworkRef{
-	{Path: "/net/connman/iwd/known_networks/1", Name: "KnownNet"},
-	{Path: "/net/connman/iwd/known_networks/2", Name: "GuestHotspot"},
+	{Path: "/net/connman/iwd/4775657374486f7473706f74_hotspot", Name: "GuestHotspot"},
+	{Path: "/net/connman/iwd/4b6e6f776e4e6574_psk", Name: "KnownNet"},
 }
 
-const knownNetworkPath = "/net/connman/iwd/known_networks/1"
+const knownNetworkPath = "/net/connman/iwd/4b6e6f776e4e6574_psk"
 
 func newRawMockKnownNetwork(t *testing.T, path string) *iwdbus.KnownNetwork {
 	t.Helper()

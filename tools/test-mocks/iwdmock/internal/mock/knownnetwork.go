@@ -23,14 +23,15 @@ var knownNetworkFixtures = []struct {
 	autoConnect       bool
 }{
 	{
-		path:              "/net/connman/iwd/known_networks/1",
+		// iwd exports a known network at /net/connman/iwd/<hex-SSID>_<security>.
+		path:              "/net/connman/iwd/4b6e6f776e4e6574_psk",
 		name:              "KnownNet",
 		secType:           "psk",
 		lastConnectedTime: "2024-01-02T03:04:05Z",
 		autoConnect:       true,
 	},
 	{
-		path:        "/net/connman/iwd/known_networks/2",
+		path:        "/net/connman/iwd/4775657374486f7473706f74_hotspot",
 		name:        "GuestHotspot",
 		secType:     "hotspot",
 		autoConnect: false,

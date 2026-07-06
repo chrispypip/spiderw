@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	securedNetworkPath = "/net/connman/iwd/phy0/wlan0/secured_psk"
+	securedNetworkPath = "/net/connman/iwd/0/3/536563757265644e6574_psk"
 	// mockSecuredPassphrase mirrors the literal the iwd mock expects for the
 	// secured, not-yet-known network (see tools/test-mocks/iwdmock).
 	mockSecuredPassphrase = "mock-secret-passphrase"

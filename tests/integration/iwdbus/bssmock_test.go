@@ -12,11 +12,12 @@ import (
 	"github.com/chrispypip/spiderw/tests/testutil/iwdmock"
 )
 
-// mockBSSes is the set of basic service sets the mock exports under the device,
-// in the daemon's path-sorted enumeration order.
+// mockBSSes is the set of basic service sets the mock exports (nested under their
+// networks), in the daemon's path-sorted enumeration order.
 var mockBSSes = []spiderw.BasicServiceSetRef{
-	{Path: "/net/connman/iwd/phy0/wlan0/aabbccddeeff", Address: "11:22:33:44:55:66"},
-	{Path: "/net/connman/iwd/phy0/wlan0/bbccddeeff00", Address: "77:88:99:aa:bb:cc"},
+	{Path: "/net/connman/iwd/0/3/4b6e6f776e4e6574_psk/deadbeefcafe", Address: "de:ad:be:ef:ca:fe"},
+	{Path: "/net/connman/iwd/0/3/4f70656e4e6574_open/112233445566", Address: "11:22:33:44:55:66"},
+	{Path: "/net/connman/iwd/0/3/4f70656e4e6574_open/778899aabbcc", Address: "77:88:99:aa:bb:cc"},
 }
 
 // newPublicMockBSS resolves a public BasicServiceSet handle for the mock BSS

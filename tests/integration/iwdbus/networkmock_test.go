@@ -15,7 +15,7 @@ import (
 	"github.com/chrispypip/spiderw/tests/testutil/iwdmock"
 )
 
-const openNetworkPath = "/net/connman/iwd/phy0/wlan0/open"
+const openNetworkPath = "/net/connman/iwd/0/3/4f70656e4e6574_open"
 
 // newRawMockNetwork builds a raw iwdbus.Network bound to a mock network path, for
 // signal-plumbing tests.
@@ -40,9 +40,9 @@ func runSpiderNetwork(t *testing.T, args ...string) (string, error) {
 // mockNetworks is the set of networks the mock exports under the device, in the
 // daemon's path-sorted enumeration order.
 var mockNetworks = []spiderw.NetworkRef{
-	{Path: "/net/connman/iwd/phy0/wlan0/known_psk", Name: "KnownNet"},
-	{Path: "/net/connman/iwd/phy0/wlan0/open", Name: "OpenNet"},
-	{Path: "/net/connman/iwd/phy0/wlan0/secured_psk", Name: "SecuredNet"},
+	{Path: "/net/connman/iwd/0/3/4b6e6f776e4e6574_psk", Name: "KnownNet"},
+	{Path: "/net/connman/iwd/0/3/4f70656e4e6574_open", Name: "OpenNet"},
+	{Path: "/net/connman/iwd/0/3/536563757265644e6574_psk", Name: "SecuredNet"},
 }
 
 func newPublicMockNetwork(t *testing.T, ctx context.Context, client *spiderw.Client, name string) *spiderw.Network {
@@ -91,7 +91,7 @@ func TestNetworkMock_Properties(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "OpenNet", props.Name)
 	require.Equal(t, spiderw.NetworkTypeOpen, props.Type)
-	require.Equal(t, "/net/connman/iwd/phy0/wlan0", props.Device.Path)
+	require.Equal(t, "/net/connman/iwd/0/3", props.Device.Path)
 	require.Nil(t, props.KnownNetwork)
 	require.Len(t, props.ExtendedServiceSet, 2)
 

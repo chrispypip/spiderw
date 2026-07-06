@@ -271,11 +271,19 @@ auto-connect on) at the path the mock network references via its `KnownNetwork`
 property — so that linkage resolves end to end — and one `hotspot` that has never
 been connected to (no `LastConnectedTime`) with auto-connect off.
 
-Two adapters (`phy0`, `phy1`) and two devices (`phy0/wlan0`, `phy1/wlan1`) are
+Two adapters (named `phy0`, `phy1`) and two devices (named `wlan0`, `wlan1`) are
 exported by default, since real systems can have several radios and a device per
-adapter. `phy0`/`wlan0` is the primary pair: the mock networks, BSSes, and known
+adapter. The `phy0`/`wlan0` pair is primary: the mock networks, BSSes, and known
 networks hang under it, and the firehose emitters target it. `phy1` supports a
 narrower mode set than `phy0`, and `wlan1` reports `phy1` as its owning adapter.
+
+Object paths mirror real iwd rather than using the friendly names: the adapter
+is `/net/connman/iwd/0`, the device `/net/connman/iwd/0/3`, a network
+`/net/connman/iwd/0/3/<hex-SSID>_<security>` (e.g. `4b6e6f776e4e6574_psk` is
+"KnownNet"), and a BSS is nested under its network with the MAC (colons stripped)
+as the path tail — e.g. `…/4b6e6f776e4e6574_psk/deadbeefcafe` for
+`de:ad:be:ef:ca:fe`. So a Name/Address never matches its path tail by accident,
+exercising the public API's path-to-identifier resolution against realistic data.
 
 ---
 

@@ -51,6 +51,12 @@ The following areas are currently implemented and tested end to end:
   network (`ConnectHiddenNetwork`, driving the credentials agent for secured
   hidden networks); and listing hidden APs (`GetHiddenAccessPoints`). Only the
   `SignalLevelAgent` remains as a planned follow-up.
+- Friendly-identifier resolution: `Properties` snapshots and `OrderedNetworks`
+  resolve object paths to their human identifiers (network SSID, BSS address,
+  device/adapter name) in one batched `GetManagedObjects`, while scalar accessors
+  stay raw paths. Stations carry their device `Name`; the CLI references objects
+  by name and accepts a BSS MAC for `affinities set` (with `affinities clear`),
+  and `scan` takes a `--timeout`.
 - Known-network discovery, construction, and properties (name, type, hidden,
   last-connected time, auto-connect), plus toggling auto-connect, forgetting, and
   auto-connect subscriptions.

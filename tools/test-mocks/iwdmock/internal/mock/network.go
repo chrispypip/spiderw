@@ -27,24 +27,28 @@ var networkFixtures = []struct {
 	ess          []dbus.ObjectPath
 }{
 	{
-		path:    "/net/connman/iwd/phy0/wlan0/known_psk",
+		// iwd encodes a network path as <hex-SSID>_<security>; 4b6e6f776e4e6574 is
+		// "KnownNet". BSSes are nested under their network with the MAC as the tail.
+		path:    "/net/connman/iwd/0/3/4b6e6f776e4e6574_psk",
 		name:    "KnownNet",
 		secType: "psk",
 		// Provisioned: iwd has stored credentials, so Connect needs no agent.
-		knownNetwork: "/net/connman/iwd/known_networks/1",
-		ess:          nil,
-	},
-	{
-		path:    "/net/connman/iwd/phy0/wlan0/open",
-		name:    "OpenNet",
-		secType: "open",
+		knownNetwork: "/net/connman/iwd/4b6e6f776e4e6574_psk",
 		ess: []dbus.ObjectPath{
-			"/net/connman/iwd/phy0/wlan0/aabbccddeeff",
-			"/net/connman/iwd/phy0/wlan0/bbccddeeff00",
+			"/net/connman/iwd/0/3/4b6e6f776e4e6574_psk/deadbeefcafe",
 		},
 	},
 	{
-		path:    "/net/connman/iwd/phy0/wlan0/secured_psk",
+		path:    "/net/connman/iwd/0/3/4f70656e4e6574_open",
+		name:    "OpenNet",
+		secType: "open",
+		ess: []dbus.ObjectPath{
+			"/net/connman/iwd/0/3/4f70656e4e6574_open/112233445566",
+			"/net/connman/iwd/0/3/4f70656e4e6574_open/778899aabbcc",
+		},
+	},
+	{
+		path:    "/net/connman/iwd/0/3/536563757265644e6574_psk",
 		name:    "SecuredNet",
 		secType: "psk",
 		// Not known and secured: Connect fails with NoAgent until an agent exists.

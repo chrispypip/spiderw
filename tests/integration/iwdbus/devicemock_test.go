@@ -15,7 +15,7 @@ import (
 	"github.com/chrispypip/spiderw/tests/testutil/iwdmock"
 )
 
-const devicePath = "/net/connman/iwd/phy0/wlan0"
+const devicePath = "/net/connman/iwd/0/3"
 
 // newTestDevice builds a raw iwdbus.Device bound to the mock device path.
 func newTestDevice(t *testing.T) (*iwdbus.Device, *dbus.Conn) {
@@ -86,7 +86,7 @@ func TestDeviceMock_Getters(t *testing.T) {
 
 	adapter, err := device.GetAdapter(ctx)
 	require.NoError(t, err)
-	require.Equal(t, dbus.ObjectPath("/net/connman/iwd/phy0"), adapter)
+	require.Equal(t, dbus.ObjectPath("/net/connman/iwd/0"), adapter)
 }
 
 func TestDeviceMock_GetProperties(t *testing.T) {
@@ -101,7 +101,7 @@ func TestDeviceMock_GetProperties(t *testing.T) {
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", props.Address)
 	require.True(t, props.Powered)
 	require.Equal(t, iwdbus.ModeStation, props.Mode)
-	require.Equal(t, dbus.ObjectPath("/net/connman/iwd/phy0"), props.Adapter)
+	require.Equal(t, dbus.ObjectPath("/net/connman/iwd/0"), props.Adapter)
 }
 
 func TestDeviceMock_SetPowered(t *testing.T) {
@@ -236,7 +236,7 @@ func TestDeviceMock_DaemonDevices(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []spiderw.DeviceRef{
 		{Path: devicePath, Name: "wlan0"},
-		{Path: "/net/connman/iwd/phy1/wlan1", Name: "wlan1"},
+		{Path: "/net/connman/iwd/1/4", Name: "wlan1"},
 	}, refs)
 }
 
@@ -257,7 +257,7 @@ func TestDeviceMock_Properties(t *testing.T) {
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", props.Address)
 	require.True(t, props.Powered)
 	require.Equal(t, spiderw.ModeStation, props.Mode)
-	require.Equal(t, "/net/connman/iwd/phy0", props.Adapter.Path)
+	require.Equal(t, "/net/connman/iwd/0", props.Adapter.Path)
 }
 
 func TestDeviceMock_AllDevices(t *testing.T) {
@@ -279,7 +279,7 @@ func TestDeviceMock_AllDevices(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "wlan0", name)
 
-	require.Equal(t, "/net/connman/iwd/phy1/wlan1", devices[1].Path())
+	require.Equal(t, "/net/connman/iwd/1/4", devices[1].Path())
 	name1, err := devices[1].Name(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "wlan1", name1)
@@ -320,7 +320,7 @@ func TestDeviceMock_SecondDeviceTopology(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "11:22:33:44:55:66", props.Address)
 	require.Equal(t, spiderw.ModeAP, props.Mode)
-	require.Equal(t, "/net/connman/iwd/phy1", props.Adapter.Path)
+	require.Equal(t, "/net/connman/iwd/1", props.Adapter.Path)
 
 	// The owning-adapter path resolves to the second adapter.
 	adapter, err := client.Adapter(ctx, props.Adapter.Path)
@@ -379,7 +379,7 @@ func TestDeviceMock_StatusJSON(t *testing.T) {
 	require.Equal(t, "station", jsonGetString(t, entry, "Mode"))
 	adapter, ok := entry["Adapter"].(map[string]any)
 	require.True(t, ok, "Adapter should be a resolved ref object")
-	require.Equal(t, "/net/connman/iwd/phy0", adapter["Path"])
+	require.Equal(t, "/net/connman/iwd/0", adapter["Path"])
 	require.Equal(t, "phy0", adapter["Name"])
 }
 
@@ -402,6 +402,6 @@ func TestDeviceMock_ScopedStatusJSON(t *testing.T) {
 	require.Equal(t, "station", jsonGetString(t, entry, "Mode"))
 	adapter, ok := entry["Adapter"].(map[string]any)
 	require.True(t, ok, "Adapter should be a resolved ref object")
-	require.Equal(t, "/net/connman/iwd/phy0", adapter["Path"])
+	require.Equal(t, "/net/connman/iwd/0", adapter["Path"])
 	require.Equal(t, "phy0", adapter["Name"])
 }

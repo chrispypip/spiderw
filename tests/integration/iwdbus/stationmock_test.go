@@ -16,8 +16,8 @@ import (
 const (
 	// These mirror the literals the iwd mock seeds for the station-mode device
 	// (see tools/test-mocks/iwdmock/internal/mock/station.go).
-	stationConnectedNetworkPath     = "/net/connman/iwd/phy0/wlan0/known_psk"
-	stationConnectedAccessPointPath = "/net/connman/iwd/phy0/wlan0/aabbccddeeff"
+	stationConnectedNetworkPath     = "/net/connman/iwd/0/3/4b6e6f776e4e6574_psk"
+	stationConnectedAccessPointPath = "/net/connman/iwd/0/3/4b6e6f776e4e6574_psk/deadbeefcafe"
 )
 
 // TestStationMock_Reads verifies every read-only Station property resolves over
@@ -65,6 +65,11 @@ func TestStationMock_Reads(t *testing.T) {
 	require.Equal(t, stationConnectedAccessPointPath, props.ConnectedAccessPoint.Path)
 	require.Len(t, props.Affinities, 1)
 	require.Equal(t, stationConnectedAccessPointPath, props.Affinities[0].Path)
+
+	// The bundle resolves each path to its friendly identifier.
+	require.Equal(t, "KnownNet", props.ConnectedNetwork.Name)
+	require.Equal(t, "de:ad:be:ef:ca:fe", props.ConnectedAccessPoint.Address)
+	require.Equal(t, "de:ad:be:ef:ca:fe", props.Affinities[0].Address)
 }
 
 // TestStationMock_AllStations verifies station enumeration via the real
@@ -149,7 +154,7 @@ func TestStationMock_CLIStatus(t *testing.T) {
 	require.Contains(t, out, "connected")
 	require.Contains(t, out, devicePath)
 	require.Contains(t, out, "KnownNet")          // resolved SSID
-	require.Contains(t, out, "11:22:33:44:55:66") // resolved BSS MAC
+	require.Contains(t, out, "de:ad:be:ef:ca:fe") // resolved BSS MAC
 }
 
 // TestStationMock_CLIList drives `station list` against the mock.
@@ -210,7 +215,27 @@ func TestStationMock_OrderedNetworks(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, nets, 3)
 	require.Equal(t, stationConnectedNetworkPath, nets[0].Path)
+	require.Equal(t, "KnownNet", nets[0].Name)      // resolved SSID
 	require.Equal(t, -60.0, nets[0].SignalStrength) // mock seeds -6000 (100*dBm)
+}
+
+// TestStationMock_CLIAffinitiesByMAC drives `affinities set <mac>`: the MAC
+// resolves device-wide to its BSS object path, and `affinities` then renders it.
+func TestStationMock_CLIAffinitiesByMAC(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	out, err := runSpider(t, "station", devicePath, "affinities", "set", "77:88:99:aa:bb:cc")
+	require.NoError(t, err, out)
+	require.Contains(t, out, "77:88:99:aa:bb:cc")
+
+	out, err = runSpider(t, "station", devicePath, "affinities")
+	require.NoError(t, err, out)
+	require.Contains(t, out, "77:88:99:aa:bb:cc")
+
+	out, err = runSpider(t, "station", devicePath, "affinities", "clear")
+	require.NoError(t, err, out)
+	require.Contains(t, out, "no affinities set")
 }
 
 // TestStationMock_SetAffinities round-trips: write affinities, then read them
@@ -226,8 +251,8 @@ func TestStationMock_SetAffinities(t *testing.T) {
 
 	// Set multiple affinities and read the full list back.
 	want := []string{
-		"/net/connman/iwd/phy0/wlan0/aabbccddeeff",
-		"/net/connman/iwd/phy0/wlan0/bbccddeeff00",
+		"/net/connman/iwd/0/3/4f70656e4e6574_open/112233445566",
+		"/net/connman/iwd/0/3/4f70656e4e6574_open/778899aabbcc",
 	}
 	require.NoError(t, station.SetAffinities(ctx, want))
 

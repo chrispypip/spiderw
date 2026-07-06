@@ -11,11 +11,11 @@ import (
 // adapterPath is the path of the primary mock adapter. It owns the device that
 // the mock networks/BSSes/known networks hang under, and the firehose emitters
 // target it.
-const adapterPath = dbus.ObjectPath("/net/connman/iwd/phy0")
+const adapterPath = dbus.ObjectPath("/net/connman/iwd/0")
 
 // adapter1Path is the path of a second mock adapter, exercising multi-adapter
 // enumeration.
-const adapter1Path = dbus.ObjectPath("/net/connman/iwd/phy1")
+const adapter1Path = dbus.ObjectPath("/net/connman/iwd/1")
 
 var exportedAdapters []*Adapter
 

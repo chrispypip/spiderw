@@ -45,7 +45,7 @@ func TestIntrospectMock_GetProperty(t *testing.T) {
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	require.NotNil(t, ctx)
@@ -65,7 +65,7 @@ func TestIntrospectMock_SetProperty(t *testing.T) {
 	iwdmock.StartMockNormal(t, tmpDir)
 
 	ctx := context.Background()
-	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	err := obj.SetProperty(ctx, "net.connman.iwd.Adapter", "Powered", false)
 	require.NoError(t, err)
@@ -83,7 +83,7 @@ func TestIntrospectMock_SignalHandling(t *testing.T) {
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	fired := make(chan struct{}, 1)
 	err := obj.RegisterSignalHandler("net.connman.iwd.Adapter", "PoweredChanged",
@@ -94,7 +94,7 @@ func TestIntrospectMock_SignalHandling(t *testing.T) {
 		})
 	require.NoError(t, err, "failed to register signal handler")
 
-	err = conn.Emit("/net/connman/iwd/phy0", "net.connman.iwd.Adapter.PoweredChanged", true)
+	err = conn.Emit("/net/connman/iwd/0", "net.connman.iwd.Adapter.PoweredChanged", true)
 	require.NoError(t, err, "Emit failed")
 
 	requireFired(t, fired)
@@ -105,7 +105,7 @@ func TestIntrospectMock_WildcardSignalHandling(t *testing.T) {
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	fired := make(chan struct{}, 1)
 	err := obj.RegisterSignalHandler("*", "PoweredChanged", func(sig *dbus.Signal) {
@@ -113,7 +113,7 @@ func TestIntrospectMock_WildcardSignalHandling(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = conn.Emit("/net/connman/iwd/phy0", "net.connman.iwd.Adapter.PoweredChanged", true)
+	err = conn.Emit("/net/connman/iwd/0", "net.connman.iwd.Adapter.PoweredChanged", true)
 	require.NoError(t, err)
 
 	requireFired(t, fired)
@@ -124,7 +124,7 @@ func TestIntrospectMock_CloseStopsSignals(t *testing.T) {
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	fired := make(chan struct{}, 1)
 	err := obj.RegisterSignalHandler("*", "PoweredChanged", func(sig *dbus.Signal) {
@@ -138,7 +138,7 @@ func TestIntrospectMock_CloseStopsSignals(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn2.Close() })
 
-	err = conn2.Emit("/net/connman/iwd/phy0", "net.connman.iwd.Adapter.PoweredChanged", true)
+	err = conn2.Emit("/net/connman/iwd/0", "net.connman.iwd.Adapter.PoweredChanged", true)
 	require.NoError(t, err)
 
 	requireNotFired(t, fired)
@@ -149,7 +149,7 @@ func TestIntrospectMock_MultipleExactHandlers(t *testing.T) {
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	h1 := make(chan struct{}, 1)
 	h2 := make(chan struct{}, 1)
@@ -164,7 +164,7 @@ func TestIntrospectMock_MultipleExactHandlers(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = conn.Emit("/net/connman/iwd/phy0", "net.connman.iwd.Adapter.PoweredChanged", true)
+	err = conn.Emit("/net/connman/iwd/0", "net.connman.iwd.Adapter.PoweredChanged", true)
 	require.NoError(t, err)
 
 	requireFired(t, h1)
@@ -176,7 +176,7 @@ func TestIntrospectMock_WildcardIgnoresOtherMembers(t *testing.T) {
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	fired := make(chan struct{}, 1)
 
@@ -185,7 +185,7 @@ func TestIntrospectMock_WildcardIgnoresOtherMembers(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = conn.Emit("/net/connman/iwd/phy0", "net.connman.iwd.Adapter.OtherSignal", true)
+	err = conn.Emit("/net/connman/iwd/0", "net.connman.iwd.Adapter.OtherSignal", true)
 	require.NoError(t, err)
 
 	requireNotFired(t, fired)
@@ -196,7 +196,7 @@ func TestIntrospectMock_SignalBodyContent(t *testing.T) {
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	fired := make(chan struct{}, 1)
 
@@ -206,7 +206,7 @@ func TestIntrospectMock_SignalBodyContent(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = conn.Emit("/net/connman/iwd/phy0", "net.connman.iwd.Adapter.PoweredChanged", true)
+	err = conn.Emit("/net/connman/iwd/0", "net.connman.iwd.Adapter.PoweredChanged", true)
 	require.NoError(t, err)
 
 	requireFired(t, fired)
@@ -217,7 +217,7 @@ func TestIntrospectMock_PathMismatchDoesNotFire(t *testing.T) {
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	fired := make(chan struct{}, 1)
 
@@ -241,7 +241,7 @@ func TestIntrospectMock_SignalStorm(t *testing.T) {
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	const N = 50
 	recv := make(chan struct{}, N)
@@ -252,7 +252,7 @@ func TestIntrospectMock_SignalStorm(t *testing.T) {
 	require.NoError(t, err)
 
 	for range N {
-		err := conn.Emit("/net/connman/iwd/phy0", "net.connman.iwd.Adapter.PoweredChanged", true)
+		err := conn.Emit("/net/connman/iwd/0", "net.connman.iwd.Adapter.PoweredChanged", true)
 		require.NoError(t, err)
 	}
 
@@ -268,7 +268,7 @@ func TestIntrospectMock_ConcurrentRegistration(t *testing.T) {
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	const N = 100
 	done := make(chan struct{})
@@ -290,7 +290,7 @@ func TestIntrospectMock_HandlerPanicDoesNotCrashDispatcher(t *testing.T) {
 
 	iwdmock.StartMockNormal(t, tmpDir)
 
-	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/phy0")
+	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
 	fired := make(chan struct{})
 
@@ -300,11 +300,11 @@ func TestIntrospectMock_HandlerPanicDoesNotCrashDispatcher(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_ = conn.Emit("/net/connman/iwd/phy0", "net.connman.iwd.Adapter.PoweredChanged", true)
+	_ = conn.Emit("/net/connman/iwd/0", "net.connman.iwd.Adapter.PoweredChanged", true)
 	requireFired(t, fired)
 
 	// If dispatcher is alive, this next emit won't crash
-	_ = conn.Emit("/net/connman/iwd/phy0", "net.connman.iwd.Adapter.PoweredChanged", true)
+	_ = conn.Emit("/net/connman/iwd/0", "net.connman.iwd.Adapter.PoweredChanged", true)
 }
 
 func newTestDBus(t *testing.T, busName string, path dbus.ObjectPath) (*dbus.Conn, *iwdbus.IntrospectedObject) {

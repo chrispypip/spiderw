@@ -68,7 +68,7 @@ func firehoseDeviceSignals() {
 
 func firehoseNetworkSignals() {
 	// Emit Connected toggles on the open network so subscribers see churn.
-	networkPath := dbus.ObjectPath("/net/connman/iwd/phy0/wlan0/open")
+	networkPath := dbus.ObjectPath("/net/connman/iwd/0/3/4f70656e4e6574_open")
 	for {
 		emitPropertiesChanged(
 			networkPath,
@@ -84,7 +84,7 @@ func firehoseNetworkSignals() {
 
 func firehoseKnownNetworkSignals() {
 	// Emit AutoConnect toggles on the first known network so subscribers see churn.
-	knownNetworkPath := dbus.ObjectPath("/net/connman/iwd/known_networks/1")
+	knownNetworkPath := dbus.ObjectPath("/net/connman/iwd/4b6e6f776e4e6574_psk")
 	for {
 		emitPropertiesChanged(
 			knownNetworkPath,

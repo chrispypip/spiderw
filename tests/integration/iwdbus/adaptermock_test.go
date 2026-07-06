@@ -33,7 +33,7 @@ func newTestAdapter(t *testing.T) (*iwdbus.Adapter, *dbus.Conn) {
 	adapter, err := iwdbus.NewAdapter(
 		context.Background(),
 		conn,
-		"/net/connman/iwd/phy0",
+		"/net/connman/iwd/0",
 	)
 	require.NoError(t, err)
 
@@ -328,7 +328,7 @@ func TestAdapterMock_Status(t *testing.T) {
 		"Name:",
 		"phy0",
 		"Path:",
-		"/net/connman/iwd/phy0",
+		"/net/connman/iwd/0",
 		"Powered:",
 		"true",
 		"Model:",
@@ -353,7 +353,7 @@ func TestAdapterMock_ScopedStatusJSON(t *testing.T) {
 	require.Len(t, list, 1, "output:\n%s", out)
 
 	entry := list[0]
-	require.Equal(t, "/net/connman/iwd/phy0", jsonGetString(t, entry, "Path"))
+	require.Equal(t, "/net/connman/iwd/0", jsonGetString(t, entry, "Path"))
 	require.Equal(t, "phy0", jsonGetString(t, entry, "Name"))
 	require.Equal(t, true, jsonGetBool(t, entry, "Powered"))
 	require.Equal(t, "MockModel", jsonGetString(t, entry, "Model"))

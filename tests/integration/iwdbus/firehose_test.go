@@ -31,7 +31,7 @@ func TestSignalFirehose_AdapterSurvives(t *testing.T) {
 		out, err := runSpiderAdapter(t, "list")
 		require.NoError(t, err, "adapter list failed under firehose load: %s", out)
 		require.Contains(t, out, "phy0")
-		require.Contains(t, out, "/net/connman/iwd/phy0")
+		require.Contains(t, out, "/net/connman/iwd/0")
 
 		out, err = runSpiderAdapter(t, "phy0", "powered")
 		require.NoError(t, err, "adapter powered failed under firehose load: %s", out)

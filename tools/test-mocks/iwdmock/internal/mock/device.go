@@ -12,11 +12,11 @@ import (
 // devicePath is the path of the primary mock device. The mock
 // networks/BSSes/known networks hang under it, and the firehose emitters target
 // it.
-const devicePath = dbus.ObjectPath("/net/connman/iwd/phy0/wlan0")
+const devicePath = dbus.ObjectPath("/net/connman/iwd/0/3")
 
 // device1Path is the path of a second mock device, on the second adapter,
 // exercising multi-device enumeration.
-const device1Path = dbus.ObjectPath("/net/connman/iwd/phy1/wlan1")
+const device1Path = dbus.ObjectPath("/net/connman/iwd/1/4")
 
 var exportedDevices []*Device
 
