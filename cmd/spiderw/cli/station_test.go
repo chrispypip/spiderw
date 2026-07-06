@@ -16,6 +16,7 @@ import (
 
 const (
 	testStationPath = "/net/connman/iwd/phy0/wlan0"
+	testStationName = "wlan0"
 	testStationNet  = "/net/connman/iwd/phy0/wlan0/known_psk"
 	testStationAP   = "/net/connman/iwd/phy0/wlan0/aabbccddeeff"
 )
@@ -23,6 +24,7 @@ const (
 func fakeWithStation() *fakeClient {
 	return stationClient(&fakeStation{
 		path: testStationPath,
+		name: testStationName,
 		props: &spiderw.StationProperties{
 			State:                spiderw.StationStateConnected,
 			Scanning:             false,
@@ -39,7 +41,7 @@ func fakeWithStation() *fakeClient {
 
 func stationClient(st *fakeStation) *fakeClient {
 	return &fakeClient{
-		daemon:      &fakeDaemon{stations: []spiderw.StationRef{{Path: st.path}}},
+		daemon:      &fakeDaemon{stations: []spiderw.StationRef{{Path: st.path, Name: st.name}}},
 		stations:    map[string]stationAPI{st.path: st},
 		allStations: []stationAPI{st},
 	}
@@ -51,6 +53,38 @@ func TestStationCmd_List_Human(t *testing.T) {
 	out, code := driveCLI(fakeWithStation(), nil, false, "station", "list")
 	require.Equal(t, 0, code, out)
 	require.Contains(t, out, testStationPath)
+	require.Contains(t, out, testStationName)
+}
+
+func TestStationCmd_Status_ShowsName(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithStation(), nil, true, "station", "status")
+	require.Equal(t, 0, code, out)
+	var list []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &list))
+	require.Len(t, list, 1)
+	require.Equal(t, testStationName, list[0]["Name"])
+}
+
+func TestStationCmd_ResolvesByName(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath, name: testStationName}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationName, "disconnect")
+	require.Equal(t, 0, code, out)
+	require.True(t, st.disconnectCalled)
+}
+
+func TestStationCmd_UnknownName(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath, name: testStationName}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", "nope", "disconnect")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, `station "nope" not found`)
 }
 
 func TestStationCmd_List_Empty(t *testing.T) {

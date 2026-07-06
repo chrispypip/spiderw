@@ -84,13 +84,20 @@ type StationProperties struct {
 type Station struct {
 	core core.StationIface
 	path string
+	name string
 }
 
-func newStation(c core.StationIface, path string) *Station {
+func newStation(c core.StationIface, path, name string) *Station {
 	if c == nil {
 		return nil
 	}
-	return &Station{core: c, path: path}
+	return &Station{core: c, path: path, name: name}
+}
+
+// wrapStation is the two-argument constructor used by the clientObject helper for
+// a single-station lookup; the name is resolved separately by the Client.
+func wrapStation(c core.StationIface, path string) *Station {
+	return newStation(c, path, "")
 }
 
 // Path returns the D-Bus object path the station was constructed from.
@@ -102,6 +109,18 @@ func (s *Station) Path() string {
 		return ""
 	}
 	return s.path
+}
+
+// Name returns the station's human-friendly name — the Name of the device it
+// shares an object with (e.g. "wlan0"). A station has no Name property of its
+// own, so this is resolved when the station is constructed (best-effort) and may
+// be "" if it could not be resolved or for a nil receiver. Like Path, it is
+// cached identity: no D-Bus round-trip and never fails.
+func (s *Station) Name() string {
+	if s == nil {
+		return ""
+	}
+	return s.name
 }
 
 func (s *Station) coreStation(ctx context.Context, op string) (core.StationIface, error) {

@@ -64,11 +64,14 @@ type KnownNetworkRef struct {
 }
 
 // StationRef is a lightweight reference to a station discovered by ObjectManager.
-// The Station interface exposes no Name property (it shares the device object),
-// so a station is identified solely by its path.
+// The Station interface exposes no Name property of its own, so Name is the Name
+// of the device the station shares its object with (e.g. "wlan0").
 type StationRef struct {
 	// Path is the canonical D-Bus object path for the station (a device path).
 	Path dbus.ObjectPath
+
+	// Name is the co-located device's Name (best-effort; empty if unavailable).
+	Name string
 }
 
 // Daemon provides typed access to the iwd daemon D-Bus interface.
@@ -235,7 +238,7 @@ func getRefs[T any](
 	ctx context.Context,
 	conn *dbus.Conn,
 	op, iface string,
-	makeRef func(path dbus.ObjectPath, props map[string]dbus.Variant) (T, error),
+	makeRef func(path dbus.ObjectPath, ifaces map[string]map[string]dbus.Variant) (T, error),
 ) ([]T, error) {
 	if conn == nil {
 		return nil, WrapConnection(op, ErrDaemonUninitialized)
@@ -252,11 +255,13 @@ func getRefs[T any](
 	}
 	entries := make([]entry, 0, len(objects))
 	for path, ifaces := range objects {
-		props, ok := ifaces[iface]
-		if !ok {
+		if _, ok := ifaces[iface]; !ok {
 			continue
 		}
-		ref, err := makeRef(path, props)
+		// makeRef receives every interface on the object (not just iface) so a
+		// ref can be enriched from a co-located interface -- e.g. a station reads
+		// its Name from the Device interface it shares an object with.
+		ref, err := makeRef(path, ifaces)
 		if err != nil {
 			return nil, err
 		}
@@ -281,8 +286,8 @@ func (d *Daemon) GetAdapters(ctx context.Context) ([]AdapterRef, error) {
 		return nil, WrapConnection("Daemon.GetAdapters", ErrDaemonUninitialized)
 	}
 	return getRefs(ctx, d.conn, "Daemon.GetAdapters", IwdAdapterIface,
-		func(path dbus.ObjectPath, props map[string]dbus.Variant) (AdapterRef, error) {
-			name, err := objectNameFromManagedObject("adapter", path, props)
+		func(path dbus.ObjectPath, ifaces map[string]map[string]dbus.Variant) (AdapterRef, error) {
+			name, err := objectNameFromManagedObject("adapter", path, ifaces[IwdAdapterIface])
 			if err != nil {
 				return AdapterRef{}, err
 			}
@@ -297,8 +302,8 @@ func (d *Daemon) GetDevices(ctx context.Context) ([]DeviceRef, error) {
 		return nil, WrapConnection("Daemon.GetDevices", ErrDaemonUninitialized)
 	}
 	return getRefs(ctx, d.conn, "Daemon.GetDevices", IwdDeviceIface,
-		func(path dbus.ObjectPath, props map[string]dbus.Variant) (DeviceRef, error) {
-			name, err := objectNameFromManagedObject("device", path, props)
+		func(path dbus.ObjectPath, ifaces map[string]map[string]dbus.Variant) (DeviceRef, error) {
+			name, err := objectNameFromManagedObject("device", path, ifaces[IwdDeviceIface])
 			if err != nil {
 				return DeviceRef{}, err
 			}
@@ -315,8 +320,8 @@ func (d *Daemon) GetBasicServiceSets(ctx context.Context) ([]BasicServiceSetRef,
 		return nil, WrapConnection("Daemon.GetBasicServiceSets", ErrDaemonUninitialized)
 	}
 	return getRefs(ctx, d.conn, "Daemon.GetBasicServiceSets", IwdBasicServiceSetIface,
-		func(path dbus.ObjectPath, props map[string]dbus.Variant) (BasicServiceSetRef, error) {
-			address, err := bssAddressFromManagedObject(path, props)
+		func(path dbus.ObjectPath, ifaces map[string]map[string]dbus.Variant) (BasicServiceSetRef, error) {
+			address, err := bssAddressFromManagedObject(path, ifaces[IwdBasicServiceSetIface])
 			if err != nil {
 				return BasicServiceSetRef{}, err
 			}
@@ -354,8 +359,8 @@ func (d *Daemon) GetNetworks(ctx context.Context) ([]NetworkRef, error) {
 		return nil, WrapConnection("Daemon.GetNetworks", ErrDaemonUninitialized)
 	}
 	return getRefs(ctx, d.conn, "Daemon.GetNetworks", IwdNetworkIface,
-		func(path dbus.ObjectPath, props map[string]dbus.Variant) (NetworkRef, error) {
-			name, err := objectNameFromManagedObject("network", path, props)
+		func(path dbus.ObjectPath, ifaces map[string]map[string]dbus.Variant) (NetworkRef, error) {
+			name, err := objectNameFromManagedObject("network", path, ifaces[IwdNetworkIface])
 			if err != nil {
 				return NetworkRef{}, err
 			}
@@ -370,8 +375,8 @@ func (d *Daemon) GetKnownNetworks(ctx context.Context) ([]KnownNetworkRef, error
 		return nil, WrapConnection("Daemon.GetKnownNetworks", ErrDaemonUninitialized)
 	}
 	return getRefs(ctx, d.conn, "Daemon.GetKnownNetworks", IwdKnownNetworkIface,
-		func(path dbus.ObjectPath, props map[string]dbus.Variant) (KnownNetworkRef, error) {
-			name, err := objectNameFromManagedObject("known network", path, props)
+		func(path dbus.ObjectPath, ifaces map[string]map[string]dbus.Variant) (KnownNetworkRef, error) {
+			name, err := objectNameFromManagedObject("known network", path, ifaces[IwdKnownNetworkIface])
 			if err != nil {
 				return KnownNetworkRef{}, err
 			}
@@ -379,20 +384,40 @@ func (d *Daemon) GetKnownNetworks(ctx context.Context) ([]KnownNetworkRef, error
 		})
 }
 
-// GetStations returns every object that implements net.connman.iwd.Station. The
-// Station interface has no Name property, so a station is identified by its path
-// alone (which is the owning device's path).
+// GetStations returns every object that implements net.connman.iwd.Station. A
+// station shares its object with a device, so it carries the co-located Device
+// Name (e.g. "wlan0") as its own Name; the Station interface itself has none.
 func (d *Daemon) GetStations(ctx context.Context) ([]StationRef, error) {
 	if d == nil {
 		return nil, WrapConnection("Daemon.GetStations", ErrDaemonUninitialized)
 	}
 	return getRefs(ctx, d.conn, "Daemon.GetStations", IwdStationIface,
-		func(path dbus.ObjectPath, props map[string]dbus.Variant) (StationRef, error) {
+		func(path dbus.ObjectPath, ifaces map[string]map[string]dbus.Variant) (StationRef, error) {
 			if !path.IsValid() || !strings.HasPrefix(string(path), "/") {
 				return StationRef{}, WrapVariant("Path", fmt.Errorf("invalid station path %q", path))
 			}
-			return StationRef{Path: path}, nil
+			// Best-effort: resolve the name from the shared Device interface. A
+			// missing/odd Name leaves it empty rather than failing enumeration.
+			return StationRef{Path: path, Name: stationNameFromDevice(ifaces)}, nil
 		})
+}
+
+// stationNameFromDevice extracts the Device Name co-located on a station's
+// object, returning "" when absent or not a non-empty string.
+func stationNameFromDevice(ifaces map[string]map[string]dbus.Variant) string {
+	dev, ok := ifaces[IwdDeviceIface]
+	if !ok {
+		return ""
+	}
+	v, ok := dev["Name"]
+	if !ok {
+		return ""
+	}
+	s, ok := v.Value().(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(s)
 }
 
 // objectNameFromManagedObject validates an object path and extracts its required

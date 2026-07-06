@@ -219,3 +219,15 @@ func TestDaemon_Public(t *testing.T) {
 		require.Equal(t, msg1, msg2)
 	})
 }
+
+func TestDaemon_StationsMapsName(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeCoreDaemon{}
+	f.setStations([]core.StationRef{{Path: "/net/connman/iwd/0/3", Name: "wlan0"}})
+
+	refs, err := (&Daemon{core: f}).Stations(ctx)
+	require.NoError(t, err)
+	require.Len(t, refs, 1)
+	require.Equal(t, "/net/connman/iwd/0/3", refs[0].Path)
+	require.Equal(t, "wlan0", refs[0].Name)
+}

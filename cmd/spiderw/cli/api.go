@@ -80,6 +80,7 @@ type deviceAPI interface {
 
 type stationAPI interface {
 	Path() string
+	Name() string
 	Properties(ctx context.Context) (*spiderw.StationProperties, error)
 	Affinities(ctx context.Context) ([]string, error)
 	Scan(ctx context.Context) error

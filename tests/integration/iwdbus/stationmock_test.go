@@ -258,6 +258,29 @@ func TestStationMock_CLINetworks(t *testing.T) {
 	require.Contains(t, out, "-60 dBm")
 }
 
+// TestStationMock_ResolvesName confirms a station carries the co-located device
+// Name ("wlan0"), both from enumeration and a single lookup, and that the CLI
+// renders it.
+func TestStationMock_ResolvesName(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	stations, err := client.AllStations(ctx)
+	require.NoError(t, err)
+	require.Len(t, stations, 1)
+	require.Equal(t, "wlan0", stations[0].Name())
+
+	st, err := client.Station(ctx, devicePath)
+	require.NoError(t, err)
+	require.Equal(t, "wlan0", st.Name())
+
+	out, err := runSpider(t, "station", "list")
+	require.NoError(t, err, out)
+	require.Contains(t, out, "wlan0")
+}
+
 // TestStationMock_DisconnectLiveTransition drives a real disconnect and observes
 // the State property transition connected->disconnected over live signals.
 func TestStationMock_DisconnectLiveTransition(t *testing.T) {

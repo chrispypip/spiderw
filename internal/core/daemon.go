@@ -62,6 +62,10 @@ type KnownNetworkRef struct {
 type StationRef struct {
 	// Path is the canonical D-Bus object path for the station.
 	Path string
+
+	// Name is the co-located device's Name (e.g. "wlan0"); best-effort, may be
+	// empty. A station has no Name of its own.
+	Name string
 }
 
 // DaemonIface defines the core daemon operations used by the public layer.
@@ -265,7 +269,7 @@ func (d *Daemon) Stations(ctx context.Context) ([]StationRef, error) {
 		if p == "" || !strings.HasPrefix(p, "/") {
 			return nil, WrapInvalidState(ResourceStation, op, "station returned invalid path", fmt.Errorf("invalid station path %q", p))
 		}
-		refs = append(refs, StationRef{Path: p})
+		refs = append(refs, StationRef{Path: p, Name: strings.TrimSpace(r.Name)})
 	}
 	return refs, nil
 }

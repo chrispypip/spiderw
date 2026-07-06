@@ -16,6 +16,7 @@ const scanWaitTimeout = 15 * time.Second
 
 type stationRefResult struct {
 	Path string `json:"Path"`
+	Name string `json:"Name"`
 }
 
 type stationListResult []stationRefResult
@@ -31,7 +32,11 @@ func (r stationListResult) String() string {
 		if i > 0 {
 			b.WriteByte('\n')
 		}
-		b.WriteString(ref.Path)
+		if ref.Name != "" {
+			fmt.Fprintf(&b, "%s\t%s", ref.Name, ref.Path)
+		} else {
+			b.WriteString(ref.Path)
+		}
 	}
 	return b.String()
 }
@@ -67,13 +72,14 @@ func runStationList(app *App, args []string) error {
 
 	out := make(stationListResult, 0, len(refs))
 	for _, ref := range refs {
-		out = append(out, stationRefResult{Path: ref.Path})
+		out = append(out, stationRefResult{Path: ref.Path, Name: ref.Name})
 	}
 	return app.printOutput(out)
 }
 
 type stationStatusEntry struct {
 	Path                 string   `json:"Path"`
+	Name                 string   `json:"Name"`
 	State                string   `json:"State"`
 	Scanning             bool     `json:"Scanning"`
 	ConnectedNetwork     string   `json:"ConnectedNetwork"`
@@ -109,6 +115,7 @@ func (r stationStatusResult) String() string {
 	for _, entry := range r {
 		lines := []string{
 			field("Path", entry.Path),
+			field("Name", value(entry.Name)),
 			field("State", value(entry.State)),
 			field("Scanning", fmt.Sprintf("%t", entry.Scanning)),
 			field("ConnectedNetwork", value(entry.ConnectedNetwork)),
@@ -129,6 +136,7 @@ func stationStatusEntryFromStation(ctx context.Context, s stationAPI) (stationSt
 
 	entry := stationStatusEntry{
 		Path:       s.Path(),
+		Name:       s.Name(),
 		State:      props.State.String(),
 		Scanning:   props.Scanning,
 		Affinities: props.Affinities,
@@ -191,8 +199,8 @@ func stationByRef(ctx context.Context, client clientAPI, ref string) (stationAPI
 		return nil, fmt.Errorf("station reference required")
 	}
 
-	// A station has no Name of its own (it shares the device object), so it is
-	// referenced by path only.
+	// A station has no Name of its own; it is referenced by path or by the name
+	// of the device it shares an object with (e.g. "wlan0").
 	refs, err := stationRefs(ctx, client)
 	if err != nil {
 		return nil, err
@@ -201,12 +209,19 @@ func stationByRef(ctx context.Context, client clientAPI, ref string) (stationAPI
 		return nil, fmt.Errorf("no stations available")
 	}
 
+	var matches []spiderw.StationRef
 	for _, candidate := range refs {
-		if candidate.Path == ref {
-			return client.Station(ctx, candidate.Path)
+		if candidate.Path == ref || candidate.Name == ref {
+			matches = append(matches, candidate)
 		}
 	}
-	return nil, fmt.Errorf("station %q not found", ref)
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("station %q not found", ref)
+	}
+	if len(matches) > 1 {
+		return nil, fmt.Errorf("station reference %q is ambiguous; use a station path", ref)
+	}
+	return client.Station(ctx, matches[0].Path)
 }
 
 func withStation(app *App, ctx context.Context, stationRef string, fn func(ctx context.Context, s stationAPI) error) error {

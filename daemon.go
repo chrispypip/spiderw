@@ -59,10 +59,14 @@ type KnownNetworkRef struct {
 
 // StationRef is a lightweight reference to a station discovered by the iwd
 // daemon. A station shares its object with a device and has no Name of its own,
-// so it is identified by its path alone. Resolve it with Client.Station.
+// so Name is the co-located device's Name (e.g. "wlan0"), resolved best-effort.
+// Resolve the handle with Client.Station.
 type StationRef struct {
 	// Path is the canonical D-Bus object path for the station (a device path).
 	Path string
+
+	// Name is the co-located device's Name (best-effort; empty if unavailable).
+	Name string
 }
 
 // DaemonInfo is the public API view of the iwd daemon metadata.
@@ -191,7 +195,7 @@ func (d *Daemon) Stations(ctx context.Context) ([]StationRef, error) {
 		}
 		out := make([]StationRef, 0, len(refs))
 		for _, r := range refs {
-			out = append(out, StationRef{Path: r.Path})
+			out = append(out, StationRef{Path: r.Path, Name: r.Name})
 		}
 		return out, nil
 	})

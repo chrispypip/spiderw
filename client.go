@@ -322,7 +322,33 @@ func (c *Client) Device(ctx context.Context, path string) (*Device, error) {
 // A station shares its object with a device (a device in station mode), so path
 // is a device object path. Use Daemon.Stations to discover valid station paths.
 func (c *Client) Station(ctx context.Context, path string) (*Station, error) {
-	return clientObject(c, ctx, "Client.Station", path, (*connect.Wiring).NewStation, newStation)
+	st, err := clientObject(c, ctx, "Client.Station", path, (*connect.Wiring).NewStation, wrapStation)
+	if err != nil {
+		return nil, err
+	}
+	// A station's name is its device's Name, which lives on a different interface;
+	// resolve it best-effort so a single-lookup station is named like an
+	// enumerated one. Failure leaves Name() == "".
+	st.name = c.resolveStationName(ctx, path)
+	return st, nil
+}
+
+// resolveStationName best-effort resolves a station's name (the co-located
+// device's Name) via one ObjectManager enumeration, returning "" on any failure.
+func (c *Client) resolveStationName(ctx context.Context, path string) string {
+	if c == nil || c.daemon == nil {
+		return ""
+	}
+	refs, err := c.daemon.Stations(ctx)
+	if err != nil {
+		return ""
+	}
+	for _, r := range refs {
+		if r.Path == path {
+			return r.Name
+		}
+	}
+	return ""
 }
 
 // AllDevices mints live Device handles for every device iwd currently exposes.
@@ -417,7 +443,7 @@ func (c *Client) AllStations(ctx context.Context) ([]*Station, error) {
 			log.Error(ctx, "station wiring failed", "op", op, "path", ref.Path, "err", err)
 			return nil, wrapPublicError(op, err)
 		}
-		pub := newStation(coreStation, ref.Path)
+		pub := newStation(coreStation, ref.Path, ref.Name)
 		if pub == nil {
 			log.Error(ctx, "station wrapper unexpectedly nil", "op", op, "path", ref.Path)
 			return nil, wrapPublicError(op, ErrInternal)

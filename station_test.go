@@ -21,7 +21,7 @@ func TestStation_Public(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			f := &fakeCoreStation{}
 			f.state.Store(core.StationStateConnected)
-			s := newStation(f, "/net/connman/iwd/phy0/wlan0")
+			s := newStation(f, "/net/connman/iwd/phy0/wlan0", "")
 
 			state, err := s.State(ctx)
 			require.NoError(t, err)
@@ -31,7 +31,7 @@ func TestStation_Public(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeCoreStation{}
 			f.setErr(errors.New("boom"))
-			_, err := newStation(f, "/p").State(ctx)
+			_, err := newStation(f, "/p", "").State(ctx)
 			require.Error(t, err)
 		})
 
@@ -45,9 +45,16 @@ func TestStation_Public(t *testing.T) {
 	t.Run("Scanning", func(t *testing.T) {
 		f := &fakeCoreStation{}
 		f.scanning.Store(true)
-		v, err := newStation(f, "/p").Scanning(ctx)
+		v, err := newStation(f, "/p", "").Scanning(ctx)
 		require.NoError(t, err)
 		require.True(t, v)
+	})
+
+	t.Run("Name", func(t *testing.T) {
+		require.Equal(t, "wlan0",
+			newStation(&fakeCoreStation{}, "/net/connman/iwd/phy0/wlan0", "wlan0").Name())
+		require.Empty(t, newStation(&fakeCoreStation{}, "/p", "").Name())
+		require.Empty(t, (*Station)(nil).Name())
 	})
 
 	t.Run("ConnectedNetwork", func(t *testing.T) {
@@ -56,7 +63,7 @@ func TestStation_Public(t *testing.T) {
 			path := "/net/connman/iwd/phy0/wlan0/net0"
 			f.connectedNetwork.Store(&path)
 
-			got, err := newStation(f, "/p").ConnectedNetwork(ctx)
+			got, err := newStation(f, "/p", "").ConnectedNetwork(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, got)
 			require.Equal(t, path, *got)
@@ -64,7 +71,7 @@ func TestStation_Public(t *testing.T) {
 
 		t.Run("Disconnected", func(t *testing.T) {
 			f := &fakeCoreStation{}
-			got, err := newStation(f, "/p").ConnectedNetwork(ctx)
+			got, err := newStation(f, "/p", "").ConnectedNetwork(ctx)
 			require.NoError(t, err)
 			require.Nil(t, got)
 		})
@@ -76,14 +83,14 @@ func TestStation_Public(t *testing.T) {
 			ap := "/net/connman/iwd/phy0/wlan0/abc123"
 			f.connectedAccessPoint.Store(&ap)
 
-			got, err := newStation(f, "/p").ConnectedAccessPoint(ctx)
+			got, err := newStation(f, "/p", "").ConnectedAccessPoint(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, got)
 			require.Equal(t, ap, *got)
 		})
 
 		t.Run("Absent", func(t *testing.T) {
-			got, err := newStation(&fakeCoreStation{}, "/p").ConnectedAccessPoint(ctx)
+			got, err := newStation(&fakeCoreStation{}, "/p", "").ConnectedAccessPoint(ctx)
 			require.NoError(t, err)
 			require.Nil(t, got)
 		})
@@ -95,13 +102,13 @@ func TestStation_Public(t *testing.T) {
 			affinities := []string{"/net/connman/iwd/phy0/wlan0/aaa"}
 			f.affinities.Store(&affinities)
 
-			got, err := newStation(f, "/p").Affinities(ctx)
+			got, err := newStation(f, "/p", "").Affinities(ctx)
 			require.NoError(t, err)
 			require.Equal(t, affinities, got)
 		})
 
 		t.Run("Absent", func(t *testing.T) {
-			got, err := newStation(&fakeCoreStation{}, "/p").Affinities(ctx)
+			got, err := newStation(&fakeCoreStation{}, "/p", "").Affinities(ctx)
 			require.NoError(t, err)
 			require.Nil(t, got)
 		})
@@ -118,7 +125,7 @@ func TestStation_Public(t *testing.T) {
 		affinities := []string{ap}
 		f.affinities.Store(&affinities)
 
-		props, err := newStation(f, "/p").Properties(ctx)
+		props, err := newStation(f, "/p", "").Properties(ctx)
 		require.NoError(t, err)
 		require.Equal(t, StationStateConnected, props.State)
 		require.False(t, props.Scanning)
@@ -132,14 +139,14 @@ func TestStation_Public(t *testing.T) {
 	t.Run("Scan", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			f := &fakeCoreStation{}
-			require.NoError(t, newStation(f, "/p").Scan(ctx))
+			require.NoError(t, newStation(f, "/p", "").Scan(ctx))
 			require.True(t, f.scanCalled.Load())
 		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeCoreStation{}
 			f.setErr(errors.New("boom"))
-			require.Error(t, newStation(f, "/p").Scan(ctx))
+			require.Error(t, newStation(f, "/p", "").Scan(ctx))
 		})
 
 		t.Run("NilReceiver", func(t *testing.T) {
@@ -156,7 +163,7 @@ func TestStation_Public(t *testing.T) {
 			}
 			f.orderedNetworks.Store(&nets)
 
-			got, err := newStation(f, "/p").OrderedNetworks(ctx)
+			got, err := newStation(f, "/p", "").OrderedNetworks(ctx)
 			require.NoError(t, err)
 			require.Equal(t, []OrderedNetwork{
 				{Network: "/net/connman/iwd/phy0/wlan0/net0", SignalStrength: -60},
@@ -165,7 +172,7 @@ func TestStation_Public(t *testing.T) {
 		})
 
 		t.Run("Empty", func(t *testing.T) {
-			got, err := newStation(&fakeCoreStation{}, "/p").OrderedNetworks(ctx)
+			got, err := newStation(&fakeCoreStation{}, "/p", "").OrderedNetworks(ctx)
 			require.NoError(t, err)
 			require.Empty(t, got)
 		})
@@ -173,7 +180,7 @@ func TestStation_Public(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeCoreStation{}
 			f.setErr(errors.New("boom"))
-			_, err := newStation(f, "/p").OrderedNetworks(ctx)
+			_, err := newStation(f, "/p", "").OrderedNetworks(ctx)
 			require.Error(t, err)
 		})
 	})
@@ -182,14 +189,14 @@ func TestStation_Public(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			f := &fakeCoreStation{}
 			paths := []string{"/net/connman/iwd/phy0/wlan0/aaa"}
-			require.NoError(t, newStation(f, "/p").SetAffinities(ctx, paths))
+			require.NoError(t, newStation(f, "/p", "").SetAffinities(ctx, paths))
 			require.Equal(t, paths, *f.setAffinitiesArg.Load())
 		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeCoreStation{}
 			f.setErr(errors.New("boom"))
-			require.Error(t, newStation(f, "/p").SetAffinities(ctx, []string{"/x"}))
+			require.Error(t, newStation(f, "/p", "").SetAffinities(ctx, []string{"/x"}))
 		})
 
 		t.Run("NotSupportedMatchable", func(t *testing.T) {
@@ -197,7 +204,7 @@ func TestStation_Public(t *testing.T) {
 			// ErrNotSupported through the public boundary.
 			f := &fakeCoreStation{}
 			f.setErr(core.ErrNotSupported)
-			err := newStation(f, "/p").SetAffinities(ctx, []string{"/net/connman/iwd/0/3/net/a0b1c2d3e4f5"})
+			err := newStation(f, "/p", "").SetAffinities(ctx, []string{"/net/connman/iwd/0/3/net/a0b1c2d3e4f5"})
 			require.Error(t, err)
 			require.ErrorIs(t, err, ErrNotSupported)
 		})
@@ -210,7 +217,7 @@ func TestStation_Public(t *testing.T) {
 	t.Run("Disconnect", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			f := &fakeCoreStation{}
-			require.NoError(t, newStation(f, "/p").Disconnect(ctx))
+			require.NoError(t, newStation(f, "/p", "").Disconnect(ctx))
 			require.True(t, f.disconnectCalled.Load())
 		})
 
@@ -222,14 +229,14 @@ func TestStation_Public(t *testing.T) {
 	t.Run("ConnectHiddenNetwork", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			f := &fakeCoreStation{}
-			require.NoError(t, newStation(f, "/p").ConnectHiddenNetwork(ctx, "HiddenNet"))
+			require.NoError(t, newStation(f, "/p", "").ConnectHiddenNetwork(ctx, "HiddenNet"))
 			require.Equal(t, "HiddenNet", *f.connectHiddenName.Load())
 		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeCoreStation{}
 			f.setErr(errors.New("boom"))
-			require.Error(t, newStation(f, "/p").ConnectHiddenNetwork(ctx, "HiddenNet"))
+			require.Error(t, newStation(f, "/p", "").ConnectHiddenNetwork(ctx, "HiddenNet"))
 		})
 
 		t.Run("NilReceiver", func(t *testing.T) {
@@ -246,7 +253,7 @@ func TestStation_Public(t *testing.T) {
 			}
 			f.hiddenAPs.Store(&aps)
 
-			got, err := newStation(f, "/p").HiddenAccessPoints(ctx)
+			got, err := newStation(f, "/p", "").HiddenAccessPoints(ctx)
 			require.NoError(t, err)
 			require.Equal(t, []HiddenAccessPoint{
 				{Address: "aa:bb:cc:dd:ee:ff", SignalStrength: -60, Type: NetworkTypePSK},
@@ -255,7 +262,7 @@ func TestStation_Public(t *testing.T) {
 		})
 
 		t.Run("Empty", func(t *testing.T) {
-			got, err := newStation(&fakeCoreStation{}, "/p").HiddenAccessPoints(ctx)
+			got, err := newStation(&fakeCoreStation{}, "/p", "").HiddenAccessPoints(ctx)
 			require.NoError(t, err)
 			require.Empty(t, got)
 		})
@@ -263,14 +270,14 @@ func TestStation_Public(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeCoreStation{}
 			f.setErr(errors.New("boom"))
-			_, err := newStation(f, "/p").HiddenAccessPoints(ctx)
+			_, err := newStation(f, "/p", "").HiddenAccessPoints(ctx)
 			require.Error(t, err)
 		})
 	})
 
 	t.Run("SubscribeStateChanged", func(t *testing.T) {
 		t.Run("NilCallback", func(t *testing.T) {
-			_, err := newStation(&fakeCoreStation{}, "/p").SubscribeStateChanged(ctx, nil)
+			_, err := newStation(&fakeCoreStation{}, "/p", "").SubscribeStateChanged(ctx, nil)
 			require.Error(t, err)
 			require.ErrorIs(t, err, ErrInvalidArgument)
 		})
@@ -282,7 +289,7 @@ func TestStation_Public(t *testing.T) {
 			})
 
 			var got StationState
-			_, err := newStation(f, "/p").SubscribeStateChanged(ctx, func(s StationState) {
+			_, err := newStation(f, "/p", "").SubscribeStateChanged(ctx, func(s StationState) {
 				got = s
 			})
 			require.NoError(t, err)
@@ -297,7 +304,7 @@ func TestStation_Public(t *testing.T) {
 		})
 
 		var got, fired = false, false
-		_, err := newStation(f, "/p").SubscribeScanningChanged(ctx, func(b bool) {
+		_, err := newStation(f, "/p", "").SubscribeScanningChanged(ctx, func(b bool) {
 			got = b
 			fired = true
 		})
@@ -308,7 +315,7 @@ func TestStation_Public(t *testing.T) {
 
 	t.Run("Path", func(t *testing.T) {
 		require.Equal(t, "", (*Station)(nil).Path())
-		require.Equal(t, "/p", newStation(&fakeCoreStation{}, "/p").Path())
+		require.Equal(t, "/p", newStation(&fakeCoreStation{}, "/p", "").Path())
 	})
 }
 

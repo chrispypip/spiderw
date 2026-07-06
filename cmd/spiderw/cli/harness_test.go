@@ -357,6 +357,7 @@ func (f *fakeDevice) SubscribeModeChanged(ctx context.Context, fn func(spiderw.M
 
 type fakeStation struct {
 	path               string
+	name               string
 	props              *spiderw.StationProperties
 	ordered            []spiderw.OrderedNetwork
 	hiddenAPs          []spiderw.HiddenAccessPoint
@@ -373,6 +374,7 @@ type fakeStation struct {
 }
 
 func (f *fakeStation) Path() string { return f.path }
+func (f *fakeStation) Name() string { return f.name }
 
 func (f *fakeStation) Properties(ctx context.Context) (*spiderw.StationProperties, error) {
 	return f.props, f.err
