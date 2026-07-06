@@ -340,7 +340,7 @@ func (f *fakeDevice) Adapter(ctx context.Context) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
-	return f.props.Adapter, nil
+	return f.props.Adapter.Path, nil
 }
 
 func (f *fakeDevice) Properties(ctx context.Context) (*spiderw.DeviceProperties, error) {
@@ -356,21 +356,22 @@ func (f *fakeDevice) SubscribeModeChanged(ctx context.Context, fn func(spiderw.M
 }
 
 type fakeStation struct {
-	path               string
-	name               string
-	props              *spiderw.StationProperties
-	ordered            []spiderw.OrderedNetwork
-	hiddenAPs          []spiderw.HiddenAccessPoint
-	scanErr            error
-	setAffErr          error
-	disconnectErr      error
-	connectHiddenErr   error
-	setAffinitiesTo    []string
-	connectHiddenName  string
-	scanCalled         bool
-	scanNeverCompletes bool
-	disconnectCalled   bool
-	err                error
+	path                string
+	name                string
+	props               *spiderw.StationProperties
+	ordered             []spiderw.OrderedNetwork
+	hiddenAPs           []spiderw.HiddenAccessPoint
+	scanErr             error
+	setAffErr           error
+	disconnectErr       error
+	connectHiddenErr    error
+	setAffinitiesTo     []string
+	setAffinitiesCalled bool
+	connectHiddenName   string
+	scanCalled          bool
+	scanNeverCompletes  bool
+	disconnectCalled    bool
+	err                 error
 }
 
 func (f *fakeStation) Path() string { return f.path }
@@ -387,7 +388,11 @@ func (f *fakeStation) Affinities(ctx context.Context) ([]string, error) {
 	if f.props == nil {
 		return nil, nil
 	}
-	return f.props.Affinities, nil
+	paths := make([]string, 0, len(f.props.Affinities))
+	for _, r := range f.props.Affinities {
+		paths = append(paths, r.Path)
+	}
+	return paths, nil
 }
 
 func (f *fakeStation) Scan(ctx context.Context) error {
@@ -403,6 +408,7 @@ func (f *fakeStation) SetAffinities(ctx context.Context, paths []string) error {
 	if f.setAffErr != nil {
 		return f.setAffErr
 	}
+	f.setAffinitiesCalled = true
 	f.setAffinitiesTo = paths
 	return nil
 }
@@ -485,7 +491,7 @@ func (f *fakeNetwork) Device(ctx context.Context) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
-	return f.props.Device, nil
+	return f.props.Device.Path, nil
 }
 
 func (f *fakeNetwork) Type(ctx context.Context) (spiderw.NetworkType, error) {
@@ -506,7 +512,11 @@ func (f *fakeNetwork) ExtendedServiceSet(ctx context.Context) ([]string, error) 
 	if f.err != nil {
 		return nil, f.err
 	}
-	return f.props.ExtendedServiceSet, nil
+	paths := make([]string, 0, len(f.props.ExtendedServiceSet))
+	for _, r := range f.props.ExtendedServiceSet {
+		paths = append(paths, r.Path)
+	}
+	return paths, nil
 }
 
 func (f *fakeNetwork) Connect(ctx context.Context) error {

@@ -79,13 +79,13 @@ func runNetworkList(app *App, args []string) error {
 }
 
 type networkStatusEntry struct {
-	Path               string   `json:"Path"`
-	Name               string   `json:"Name"`
-	Connected          bool     `json:"Connected"`
-	Type               string   `json:"Type"`
-	Device             string   `json:"Device"`
-	KnownNetwork       *string  `json:"KnownNetwork"`
-	ExtendedServiceSet []string `json:"ExtendedServiceSet"`
+	Path               string    `json:"Path"`
+	Name               string    `json:"Name"`
+	Connected          bool      `json:"Connected"`
+	Type               string    `json:"Type"`
+	Device             nameRef   `json:"Device"`
+	KnownNetwork       *string   `json:"KnownNetwork"`
+	ExtendedServiceSet []addrRef `json:"ExtendedServiceSet"`
 }
 
 type networkStatusResult []networkStatusEntry
@@ -118,19 +118,14 @@ func (r networkStatusResult) String() string {
 			known = *entry.KnownNetwork
 		}
 
-		ess := "-"
-		if len(entry.ExtendedServiceSet) > 0 {
-			ess = strings.Join(entry.ExtendedServiceSet, ", ")
-		}
-
 		lines := []string{
 			field("Name", name),
 			field("Path", entry.Path),
 			field("Connected", fmt.Sprintf("%t", entry.Connected)),
 			field("Type", value(entry.Type)),
-			field("Device", value(entry.Device)),
+			field("Device", entry.Device.readable()),
 			field("KnownNetwork", known),
-			field("BasicServiceSets", ess),
+			field("BasicServiceSets", readableAddrRefs(entry.ExtendedServiceSet)),
 		}
 		blocks = append(blocks, strings.Join(lines, "\n"))
 	}
@@ -144,15 +139,16 @@ func networkStatusEntryFromNetwork(ctx context.Context, n networkAPI) (networkSt
 		return networkStatusEntry{}, err
 	}
 
-	return networkStatusEntry{
+	entry := networkStatusEntry{
 		Path:               n.Path(),
 		Name:               props.Name,
 		Connected:          props.Connected,
 		Type:               props.Type.String(),
-		Device:             props.Device,
+		Device:             toNameRef(props.Device.Name, props.Device.Path),
 		KnownNetwork:       props.KnownNetwork,
-		ExtendedServiceSet: props.ExtendedServiceSet,
-	}, nil
+		ExtendedServiceSet: toAddrRefs(props.ExtendedServiceSet),
+	}
+	return entry, nil
 }
 
 func runNetworkStatus(app *App, args []string) error {

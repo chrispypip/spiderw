@@ -137,9 +137,10 @@ func newTestKnownNetworkClient(t *testing.T) *Client {
 		{Path: "/net/connman/iwd/abc", Name: "HomeNet"},
 	})
 	wire := &connect.Wiring{
-		Conn:    &dbus.Conn{},
-		Daemon:  fakeDaemon,
-		Cleanup: func() error { return nil },
+		Conn:             &dbus.Conn{},
+		ResolverOverride: connect.NoResolver{},
+		Daemon:           fakeDaemon,
+		Cleanup:          func() error { return nil },
 		KnownNetworkFactory: func(ctx context.Context, path string) (core.KnownNetworkIface, error) {
 			return (&fakeCoreKnownNetwork{}).setProps(validCoreKnownNetworkProps()), nil
 		},

@@ -314,7 +314,11 @@ func (c *Client) AllAdapters(ctx context.Context) ([]*Adapter, error) {
 //
 // Use Daemon.Devices to discover valid device paths.
 func (c *Client) Device(ctx context.Context, path string) (*Device, error) {
-	return clientObject(c, ctx, "Client.Device", path, (*connect.Wiring).NewDevice, newDevice)
+	d, err := clientObject(c, ctx, "Client.Device", path, (*connect.Wiring).NewDevice, newDevice)
+	if err != nil {
+		return nil, err
+	}
+	return d.withResolver(c.wire.Resolver()), nil
 }
 
 // Station creates a Station wrapper for a specific iwd station object path.
@@ -330,6 +334,7 @@ func (c *Client) Station(ctx context.Context, path string) (*Station, error) {
 	// resolve it best-effort so a single-lookup station is named like an
 	// enumerated one. Failure leaves Name() == "".
 	st.name = c.resolveStationName(ctx, path)
+	st.resolver = c.wire.Resolver()
 	return st, nil
 }
 
@@ -391,7 +396,7 @@ func (c *Client) AllDevices(ctx context.Context) ([]*Device, error) {
 			log.Error(ctx, "device wiring failed", "op", op, "path", ref.Path, "err", err)
 			return nil, wrapPublicError(op, err)
 		}
-		pub := newDevice(coreDevice, ref.Path)
+		pub := newDevice(coreDevice, ref.Path).withResolver(c.wire.Resolver())
 		if pub == nil {
 			log.Error(ctx, "device wrapper unexpectedly nil", "op", op, "path", ref.Path)
 			return nil, wrapPublicError(op, ErrInternal)
@@ -443,7 +448,7 @@ func (c *Client) AllStations(ctx context.Context) ([]*Station, error) {
 			log.Error(ctx, "station wiring failed", "op", op, "path", ref.Path, "err", err)
 			return nil, wrapPublicError(op, err)
 		}
-		pub := newStation(coreStation, ref.Path, ref.Name)
+		pub := newStation(coreStation, ref.Path, ref.Name).withResolver(c.wire.Resolver())
 		if pub == nil {
 			log.Error(ctx, "station wrapper unexpectedly nil", "op", op, "path", ref.Path)
 			return nil, wrapPublicError(op, ErrInternal)
@@ -518,7 +523,11 @@ func (c *Client) AllBasicServiceSets(ctx context.Context) ([]*BasicServiceSet, e
 //
 // Use Daemon.Networks to discover valid network paths.
 func (c *Client) Network(ctx context.Context, path string) (*Network, error) {
-	return clientObject(c, ctx, "Client.Network", path, (*connect.Wiring).NewNetwork, newNetwork)
+	n, err := clientObject(c, ctx, "Client.Network", path, (*connect.Wiring).NewNetwork, newNetwork)
+	if err != nil {
+		return nil, err
+	}
+	return n.withResolver(c.wire.Resolver()), nil
 }
 
 // AllNetworks mints live Network handles for every network iwd currently
@@ -562,7 +571,7 @@ func (c *Client) AllNetworks(ctx context.Context) ([]*Network, error) {
 			log.Error(ctx, "network wiring failed", "op", op, "path", ref.Path, "err", err)
 			return nil, wrapPublicError(op, err)
 		}
-		pub := newNetwork(coreNetwork, ref.Path)
+		pub := newNetwork(coreNetwork, ref.Path).withResolver(c.wire.Resolver())
 		if pub == nil {
 			log.Error(ctx, "network wrapper unexpectedly nil", "op", op, "path", ref.Path)
 			return nil, wrapPublicError(op, ErrInternal)

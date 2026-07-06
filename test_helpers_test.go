@@ -26,8 +26,9 @@ type fakeCore struct {
 // by production code.
 func newClientWithCore(fc *fakeCore) (*Client, error) {
 	w := &connect.Wiring{
-		Conn:   &dbus.Conn{},
-		Daemon: fc.daemon,
+		Conn:             &dbus.Conn{},
+		Daemon:           fc.daemon,
+		ResolverOverride: connect.NoResolver{},
 		Cleanup: func() error {
 			return nil
 		},

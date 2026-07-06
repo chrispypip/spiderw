@@ -97,7 +97,9 @@ func TestDevice_Public(t *testing.T) {
 		require.Equal(t, "aa:bb:cc:dd:ee:ff", props.Address)
 		require.True(t, props.Powered)
 		require.Equal(t, ModeStation, props.Mode)
-		require.Equal(t, "/net/connman/iwd/phy0", props.Adapter)
+		// Scalar Adapter() stays a raw path; the bundle field is a resolved ref
+		// (Name empty here with no resolver).
+		require.Equal(t, AdapterRef{Path: "/net/connman/iwd/phy0"}, props.Adapter)
 	})
 
 	t.Run("SetPowered", func(t *testing.T) {

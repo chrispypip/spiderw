@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/chrispypip/spiderw/internal/connect"
 	"github.com/chrispypip/spiderw/internal/core"
 	"github.com/chrispypip/spiderw/internal/iwdvalue"
 	"github.com/chrispypip/spiderw/internal/logging"
@@ -37,15 +38,15 @@ type DeviceProperties struct {
 	// Mode is the device's current operating mode.
 	Mode Mode
 
-	// Adapter is the object path of the adapter that owns this device. Resolve it
-	// to a handle with Client.Adapter.
-	Adapter string
+	// Adapter references the adapter that owns this device (Path + resolved Name).
+	Adapter AdapterRef
 }
 
 // Device provides high-level operations for a specific iwd device object.
 type Device struct {
-	core core.DeviceIface
-	path string
+	core     core.DeviceIface
+	path     string
+	resolver connect.Resolver
 }
 
 func newDevice(c core.DeviceIface, path string) *Device {
@@ -53,6 +54,16 @@ func newDevice(c core.DeviceIface, path string) *Device {
 		return nil
 	}
 	return &Device{core: c, path: path}
+}
+
+// withResolver attaches a resolver for enriching Properties path fields with
+// friendly identifiers. The Client sets it at construction; a nil resolver
+// leaves bundle refs path-only.
+func (d *Device) withResolver(r connect.Resolver) *Device {
+	if d != nil {
+		d.resolver = r
+	}
+	return d
 }
 
 // Path returns the D-Bus object path the device was constructed from.
@@ -149,12 +160,17 @@ func (d *Device) Properties(ctx context.Context) (*DeviceProperties, error) {
 			return nil, err
 		}
 
+		tree, err := resolveTree(ctx, d.resolver)
+		if err != nil {
+			return nil, err
+		}
+
 		return &DeviceProperties{
 			Name:    cp.Name,
 			Address: cp.Address,
 			Powered: cp.Powered,
 			Mode:    mode,
-			Adapter: cp.Adapter,
+			Adapter: adapterRefOf(tree, cp.Adapter),
 		}, nil
 	})
 }

@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/chrispypip/spiderw/internal/connect"
 	"github.com/chrispypip/spiderw/internal/core"
 	"github.com/chrispypip/spiderw/internal/iwdvalue"
 	"github.com/chrispypip/spiderw/internal/logging"
@@ -62,18 +63,19 @@ type StationProperties struct {
 	// Scanning reports whether the station is currently scanning.
 	Scanning bool
 
-	// ConnectedNetwork is the object path of the network the station is connected
-	// to, or nil when the station is not connected. Resolve it with Client.Network.
-	ConnectedNetwork *string
+	// ConnectedNetwork references the network the station is connected to (Path +
+	// resolved SSID Name), or nil when not connected.
+	ConnectedNetwork *NetworkRef
 
-	// ConnectedAccessPoint is the object path of the BSS the station is connected
-	// to, or nil when disconnected or unreported. Resolve it with
-	// Client.BasicServiceSet. iwd marks this property experimental.
-	ConnectedAccessPoint *string
+	// ConnectedAccessPoint references the BSS the station is connected to (Path +
+	// resolved Address), or nil when disconnected or unreported. iwd marks this
+	// property experimental.
+	ConnectedAccessPoint *BasicServiceSetRef
 
-	// Affinities is the object paths of the BSSes the station has a roaming
-	// affinity for, or nil when unreported. iwd marks this property experimental.
-	Affinities []string
+	// Affinities references the BSSes the station has a roaming affinity for (Path
+	// + resolved Address), or nil when unreported. iwd marks this property
+	// experimental.
+	Affinities []BasicServiceSetRef
 }
 
 // Station provides high-level operations for a specific iwd station object.
@@ -82,9 +84,10 @@ type StationProperties struct {
 // path with the Device. Station covers connection state and scanning; connecting
 // to a network is done through Network.Connect.
 type Station struct {
-	core core.StationIface
-	path string
-	name string
+	core     core.StationIface
+	path     string
+	name     string
+	resolver connect.Resolver
 }
 
 func newStation(c core.StationIface, path, name string) *Station {
@@ -94,8 +97,19 @@ func newStation(c core.StationIface, path, name string) *Station {
 	return &Station{core: c, path: path, name: name}
 }
 
+// withResolver attaches a resolver for enriching Properties path fields with
+// friendly identifiers. The Client sets it at construction; a nil resolver
+// leaves bundle refs path-only.
+func (s *Station) withResolver(r connect.Resolver) *Station {
+	if s != nil {
+		s.resolver = r
+	}
+	return s
+}
+
 // wrapStation is the two-argument constructor used by the clientObject helper for
-// a single-station lookup; the name is resolved separately by the Client.
+// a single-station lookup. The name and resolver are attached separately by the
+// Client (see Client.Station).
 func wrapStation(c core.StationIface, path string) *Station {
 	return newStation(c, path, "")
 }
@@ -193,21 +207,35 @@ func (s *Station) Properties(ctx context.Context) (*StationProperties, error) {
 			return nil, err
 		}
 
-		return &StationProperties{
-			State:                state,
-			Scanning:             cp.Scanning,
-			ConnectedNetwork:     cp.ConnectedNetwork,
-			ConnectedAccessPoint: cp.ConnectedAccessPoint,
-			Affinities:           cp.Affinities,
-		}, nil
+		tree, err := resolveTree(ctx, s.resolver)
+		if err != nil {
+			return nil, err
+		}
+
+		out := &StationProperties{State: state, Scanning: cp.Scanning}
+		if cp.ConnectedNetwork != nil {
+			ref := networkRefOf(tree, *cp.ConnectedNetwork)
+			out.ConnectedNetwork = &ref
+		}
+		if cp.ConnectedAccessPoint != nil {
+			ref := bssRefOf(tree, *cp.ConnectedAccessPoint)
+			out.ConnectedAccessPoint = &ref
+		}
+		if len(cp.Affinities) > 0 {
+			out.Affinities = make([]BasicServiceSetRef, 0, len(cp.Affinities))
+			for _, p := range cp.Affinities {
+				out.Affinities = append(out.Affinities, bssRefOf(tree, p))
+			}
+		}
+		return out, nil
 	})
 }
 
 // OrderedNetwork is one scanned network and its signal strength, as returned by
-// OrderedNetworks.
+// OrderedNetworks. It embeds NetworkRef, so Path is the network object path and
+// Name is its resolved SSID.
 type OrderedNetwork struct {
-	// Network is the object path of the network. Resolve it with Client.Network.
-	Network string
+	NetworkRef
 
 	// SignalStrength is the signal strength in dBm (e.g. -60.5). iwd reports it in
 	// units of 100 * dBm; spiderw exposes it as dBm here.
@@ -232,10 +260,14 @@ func (s *Station) OrderedNetworks(ctx context.Context) ([]OrderedNetwork, error)
 		if err != nil {
 			return nil, err
 		}
+		tree, err := resolveTree(ctx, s.resolver)
+		if err != nil {
+			return nil, err
+		}
 		out := make([]OrderedNetwork, 0, len(raw))
 		for _, n := range raw {
 			out = append(out, OrderedNetwork{
-				Network:        n.Network,
+				NetworkRef:     networkRefOf(tree, n.Network),
 				SignalStrength: float64(n.SignalStrength) / 100,
 			})
 		}
@@ -246,7 +278,7 @@ func (s *Station) OrderedNetworks(ctx context.Context) ([]OrderedNetwork, error)
 // SetAffinities sets the BSS object paths the station should stay affine to (an
 // experimental iwd property). Each path must be a non-empty absolute object path,
 // and should be a BSS of the currently connected network (see
-// Network.ExtendedServiceSet).
+// Network.ExtendedServiceSet). Passing an empty slice clears all affinities.
 //
 // Affinities depends on driver support: on hardware that cannot honor it, iwd
 // rejects the write and the returned error matches ErrNotSupported via

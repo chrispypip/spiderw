@@ -154,7 +154,7 @@ func ExampleClient_Station() {
 
 	connected := "<none>"
 	if props.ConnectedNetwork != nil {
-		connected = *props.ConnectedNetwork
+		connected = props.ConnectedNetwork.Name // resolved SSID
 	}
 	fmt.Printf("%s: state=%s scanning=%t connected=%s\n",
 		station.Path(), props.State, props.Scanning, connected)
@@ -190,7 +190,7 @@ func ExampleStation_Scan() {
 		log.Fatal(err)
 	}
 	for _, n := range networks {
-		fmt.Printf("%s: %.0f dBm\n", n.Network, n.SignalStrength)
+		fmt.Printf("%s: %.0f dBm\n", n.Name, n.SignalStrength) // n.Name is the SSID
 	}
 }
 

@@ -120,6 +120,11 @@ type Wiring struct {
 
 	// AgentFactory optionally overrides agent registration for tests.
 	AgentFactory func(ctx context.Context, cc core.CredentialCallbacks) (core.AgentIface, error)
+
+	// ResolverOverride optionally supplies the friendly-reference resolver,
+	// bypassing the Conn-backed one. Fake-backed tests set it (typically to
+	// NoResolver) so Properties resolution does not dial the placeholder Conn.
+	ResolverOverride Resolver
 }
 
 // agentObjectPath is the D-Bus object path the credentials agent is exported at.

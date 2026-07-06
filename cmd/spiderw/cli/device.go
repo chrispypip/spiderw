@@ -77,12 +77,12 @@ func runDeviceList(app *App, args []string) error {
 }
 
 type deviceStatusEntry struct {
-	Path    string `json:"Path"`
-	Name    string `json:"Name"`
-	Address string `json:"Address"`
-	Powered bool   `json:"Powered"`
-	Mode    string `json:"Mode"`
-	Adapter string `json:"Adapter"`
+	Path    string  `json:"Path"`
+	Name    string  `json:"Name"`
+	Address string  `json:"Address"`
+	Powered bool    `json:"Powered"`
+	Mode    string  `json:"Mode"`
+	Adapter nameRef `json:"Adapter"`
 }
 
 type deviceStatusResult []deviceStatusEntry
@@ -116,7 +116,7 @@ func (r deviceStatusResult) String() string {
 			field("Address", value(entry.Address)),
 			field("Powered", fmt.Sprintf("%t", entry.Powered)),
 			field("Mode", value(entry.Mode)),
-			field("Adapter", value(entry.Adapter)),
+			field("Adapter", entry.Adapter.readable()),
 		}
 		blocks = append(blocks, strings.Join(lines, "\n"))
 	}
@@ -136,7 +136,7 @@ func deviceStatusEntryFromDevice(ctx context.Context, d deviceAPI) (deviceStatus
 		Address: props.Address,
 		Powered: props.Powered,
 		Mode:    props.Mode.String(),
-		Adapter: props.Adapter,
+		Adapter: toNameRef(props.Adapter.Name, props.Adapter.Path),
 	}, nil
 }
 

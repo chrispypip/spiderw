@@ -19,6 +19,7 @@ const (
 	testStationName = "wlan0"
 	testStationNet  = "/net/connman/iwd/phy0/wlan0/known_psk"
 	testStationAP   = "/net/connman/iwd/phy0/wlan0/aabbccddeeff"
+	testStationMAC  = "aa:bb:cc:dd:ee:ff"
 )
 
 func fakeWithStation() *fakeClient {
@@ -28,13 +29,13 @@ func fakeWithStation() *fakeClient {
 		props: &spiderw.StationProperties{
 			State:                spiderw.StationStateConnected,
 			Scanning:             false,
-			ConnectedNetwork:     new(testStationNet),
-			ConnectedAccessPoint: new(testStationAP),
-			Affinities:           []string{testStationAP},
+			ConnectedNetwork:     &spiderw.NetworkRef{Path: testStationNet, Name: "KnownNet"},
+			ConnectedAccessPoint: &spiderw.BasicServiceSetRef{Path: testStationAP, Address: testStationMAC},
+			Affinities:           []spiderw.BasicServiceSetRef{{Path: testStationAP, Address: testStationMAC}},
 		},
 		ordered: []spiderw.OrderedNetwork{
-			{Network: testStationNet, SignalStrength: -60},
-			{Network: "/net/connman/iwd/phy0/wlan0/open", SignalStrength: -72.5},
+			{NetworkRef: spiderw.NetworkRef{Path: testStationNet, Name: "KnownNet"}, SignalStrength: -60},
+			{NetworkRef: spiderw.NetworkRef{Path: "/net/connman/iwd/phy0/wlan0/open", Name: "OpenNet"}, SignalStrength: -72.5},
 		},
 	})
 }
@@ -101,7 +102,8 @@ func TestStationCmd_Status_Human(t *testing.T) {
 
 	out, code := driveCLI(fakeWithStation(), nil, false, "station", "status")
 	require.Equal(t, 0, code, out)
-	for _, want := range []string{"connected", "Scanning", testStationPath, testStationNet, testStationAP} {
+	// Human output shows the resolved SSID and BSS MAC, not raw paths.
+	for _, want := range []string{"connected", "Scanning", testStationPath, "KnownNet", testStationMAC} {
 		require.Contains(t, out, want)
 	}
 }
@@ -119,9 +121,9 @@ func TestStationCmd_Status_JSON(t *testing.T) {
 	require.Equal(t, testStationPath, entry["Path"])
 	require.Equal(t, "connected", entry["State"])
 	require.Equal(t, false, entry["Scanning"])
-	require.Equal(t, testStationNet, entry["ConnectedNetwork"])
-	require.Equal(t, testStationAP, entry["ConnectedAccessPoint"])
-	require.Equal(t, []any{testStationAP}, entry["Affinities"])
+	require.Equal(t, map[string]any{"Name": "KnownNet", "Path": testStationNet}, entry["ConnectedNetwork"])
+	require.Equal(t, map[string]any{"Address": testStationMAC, "Path": testStationAP}, entry["ConnectedAccessPoint"])
+	require.Equal(t, []any{map[string]any{"Address": testStationMAC, "Path": testStationAP}}, entry["Affinities"])
 }
 
 func TestStationCmd_ScopedStatus_JSON(t *testing.T) {
@@ -205,15 +207,17 @@ func TestStationCmd_Scan_WaitsThenListsNetworks(t *testing.T) {
 	t.Parallel()
 
 	st := &fakeStation{
-		path:    testStationPath,
-		ordered: []spiderw.OrderedNetwork{{Network: testStationNet, SignalStrength: -60}},
+		path: testStationPath,
+		ordered: []spiderw.OrderedNetwork{
+			{NetworkRef: spiderw.NetworkRef{Path: testStationNet, Name: "KnownNet"}, SignalStrength: -60},
+		},
 	}
 	out, code := driveCLI(stationClient(st), nil, false, "station", testStationPath, "scan")
 	require.Equal(t, 0, code, out)
 	require.True(t, st.scanCalled)
 	// The fake's SubscribeScanningChanged fires true then false, so wait mode
-	// completes and prints the ordered networks.
-	require.Contains(t, out, testStationNet)
+	// completes and prints the ordered networks by resolved SSID.
+	require.Contains(t, out, "KnownNet")
 	require.Contains(t, out, "-60 dBm")
 }
 
@@ -297,7 +301,8 @@ func TestStationCmd_Networks_JSON(t *testing.T) {
 	var list []map[string]any
 	require.NoError(t, json.Unmarshal([]byte(out), &list))
 	require.Len(t, list, 2)
-	require.Equal(t, testStationNet, list[0]["Network"])
+	require.Equal(t, "KnownNet", list[0]["Name"])
+	require.Equal(t, testStationNet, list[0]["Path"])
 	require.Equal(t, -60.0, list[0]["SignalDBm"])
 	require.Equal(t, -72.5, list[1]["SignalDBm"])
 }
@@ -307,7 +312,60 @@ func TestStationCmd_Affinities_Get(t *testing.T) {
 
 	out, code := driveCLI(fakeWithStation(), nil, false, "station", testStationPath, "affinities")
 	require.Equal(t, 0, code, out)
-	require.Contains(t, out, testStationAP)
+	// Affinities render as resolved BSS MACs.
+	require.Contains(t, out, testStationMAC)
+}
+
+func TestStationCmd_Affinities_SetByMAC(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath, name: testStationName}
+	fc := stationClient(st)
+	fc.daemon = &fakeDaemon{
+		stations: []spiderw.StationRef{{Path: st.path, Name: st.name}},
+		bsses: []spiderw.BasicServiceSetRef{
+			{Path: "/net/connman/iwd/phy0/wlan0/aabbccddeeff", Address: "AA:BB:CC:DD:EE:FF"},
+		},
+	}
+	// A MAC (case-insensitive) resolves device-wide to its BSS object path.
+	out, code := driveCLI(fc, nil, false,
+		"station", testStationPath, "affinities", "set", "aa:bb:cc:dd:ee:ff")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"}, st.setAffinitiesTo)
+}
+
+func TestStationCmd_Affinities_Clear(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath, name: testStationName}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationPath, "affinities", "clear")
+	require.Equal(t, 0, code, out)
+	require.True(t, st.setAffinitiesCalled)
+	require.Empty(t, st.setAffinitiesTo, "clear sends an empty list")
+	require.Contains(t, out, "no affinities set")
+}
+
+func TestStationCmd_Affinities_ClearRejectsArgs(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath, name: testStationName}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationPath, "affinities", "clear", "extra")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "usage: spiderw station <station> affinities clear")
+	require.False(t, st.setAffinitiesCalled)
+}
+
+func TestStationCmd_Affinities_SetUnknownMAC(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath, name: testStationName}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationPath, "affinities", "set", "00:00:00:00:00:00")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "no basic service set found with address")
+	require.Nil(t, st.setAffinitiesTo)
 }
 
 func TestStationCmd_Affinities_Set(t *testing.T) {

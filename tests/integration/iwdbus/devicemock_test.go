@@ -257,7 +257,7 @@ func TestDeviceMock_Properties(t *testing.T) {
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", props.Address)
 	require.True(t, props.Powered)
 	require.Equal(t, spiderw.ModeStation, props.Mode)
-	require.Equal(t, "/net/connman/iwd/phy0", props.Adapter)
+	require.Equal(t, "/net/connman/iwd/phy0", props.Adapter.Path)
 }
 
 func TestDeviceMock_AllDevices(t *testing.T) {
@@ -320,10 +320,10 @@ func TestDeviceMock_SecondDeviceTopology(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "11:22:33:44:55:66", props.Address)
 	require.Equal(t, spiderw.ModeAP, props.Mode)
-	require.Equal(t, "/net/connman/iwd/phy1", props.Adapter)
+	require.Equal(t, "/net/connman/iwd/phy1", props.Adapter.Path)
 
 	// The owning-adapter path resolves to the second adapter.
-	adapter, err := client.Adapter(ctx, props.Adapter)
+	adapter, err := client.Adapter(ctx, props.Adapter.Path)
 	require.NoError(t, err)
 	name, err := adapter.Name(ctx)
 	require.NoError(t, err)
@@ -377,7 +377,10 @@ func TestDeviceMock_StatusJSON(t *testing.T) {
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", jsonGetString(t, entry, "Address"))
 	require.Equal(t, true, jsonGetBool(t, entry, "Powered"))
 	require.Equal(t, "station", jsonGetString(t, entry, "Mode"))
-	require.Equal(t, "/net/connman/iwd/phy0", jsonGetString(t, entry, "Adapter"))
+	adapter, ok := entry["Adapter"].(map[string]any)
+	require.True(t, ok, "Adapter should be a resolved ref object")
+	require.Equal(t, "/net/connman/iwd/phy0", adapter["Path"])
+	require.Equal(t, "phy0", adapter["Name"])
 }
 
 // TestDeviceMock_ScopedStatusJSON exercises `device <device> status --json`
@@ -397,5 +400,8 @@ func TestDeviceMock_ScopedStatusJSON(t *testing.T) {
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", jsonGetString(t, entry, "Address"))
 	require.Equal(t, true, jsonGetBool(t, entry, "Powered"))
 	require.Equal(t, "station", jsonGetString(t, entry, "Mode"))
-	require.Equal(t, "/net/connman/iwd/phy0", jsonGetString(t, entry, "Adapter"))
+	adapter, ok := entry["Adapter"].(map[string]any)
+	require.True(t, ok, "Adapter should be a resolved ref object")
+	require.Equal(t, "/net/connman/iwd/phy0", adapter["Path"])
+	require.Equal(t, "phy0", adapter["Name"])
 }

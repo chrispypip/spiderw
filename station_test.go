@@ -14,6 +14,23 @@ import (
 	"github.com/chrispypip/spiderw/internal/core"
 )
 
+// fakeTree/fakeResolver drive the friendly-ref resolution paths without a D-Bus
+// connection. fakeTree is keyed by object path; every lookup shares the map.
+type fakeTree map[string]string
+
+func (t fakeTree) NetworkName(p string) string      { return t[p] }
+func (t fakeTree) BSSAddress(p string) string       { return t[p] }
+func (t fakeTree) DeviceName(p string) string       { return t[p] }
+func (t fakeTree) AdapterName(p string) string      { return t[p] }
+func (t fakeTree) KnownNetworkName(p string) string { return t[p] }
+
+type fakeResolver struct {
+	tree connect.Tree
+	err  error
+}
+
+func (r fakeResolver) Resolve(context.Context) (connect.Tree, error) { return r.tree, r.err }
+
 func TestStation_Public(t *testing.T) {
 	ctx := context.Background()
 
@@ -125,15 +142,43 @@ func TestStation_Public(t *testing.T) {
 		affinities := []string{ap}
 		f.affinities.Store(&affinities)
 
+		// No resolver on this station: refs carry Path, with Name/Address empty.
 		props, err := newStation(f, "/p", "").Properties(ctx)
 		require.NoError(t, err)
 		require.Equal(t, StationStateConnected, props.State)
 		require.False(t, props.Scanning)
 		require.NotNil(t, props.ConnectedNetwork)
-		require.Equal(t, path, *props.ConnectedNetwork)
+		require.Equal(t, NetworkRef{Path: path}, *props.ConnectedNetwork)
 		require.NotNil(t, props.ConnectedAccessPoint)
-		require.Equal(t, ap, *props.ConnectedAccessPoint)
-		require.Equal(t, affinities, props.Affinities)
+		require.Equal(t, BasicServiceSetRef{Path: ap}, *props.ConnectedAccessPoint)
+		require.Equal(t, []BasicServiceSetRef{{Path: ap}}, props.Affinities)
+	})
+
+	t.Run("PropertiesResolvesNames", func(t *testing.T) {
+		f := &fakeCoreStation{}
+		f.state.Store(core.StationStateConnected)
+		netP := "/net/connman/iwd/0/3/ssid_psk"
+		f.connectedNetwork.Store(&netP)
+		apP := "/net/connman/iwd/0/3/ssid_psk/deadbeefcafe"
+		f.connectedAccessPoint.Store(&apP)
+		aff := []string{apP}
+		f.affinities.Store(&aff)
+
+		tree := fakeTree{netP: "ShadowGate", apP: "de:ad:be:ef:ca:fe"}
+		s := newStation(f, "/p", "").withResolver(fakeResolver{tree: tree})
+		props, err := s.Properties(ctx)
+		require.NoError(t, err)
+		require.Equal(t, NetworkRef{Path: netP, Name: "ShadowGate"}, *props.ConnectedNetwork)
+		require.Equal(t, BasicServiceSetRef{Path: apP, Address: "de:ad:be:ef:ca:fe"}, *props.ConnectedAccessPoint)
+		require.Equal(t, []BasicServiceSetRef{{Path: apP, Address: "de:ad:be:ef:ca:fe"}}, props.Affinities)
+	})
+
+	t.Run("PropertiesPropagatesResolverError", func(t *testing.T) {
+		f := &fakeCoreStation{}
+		f.state.Store(core.StationStateConnected)
+		s := newStation(f, "/p", "").withResolver(fakeResolver{err: errors.New("tree boom")})
+		_, err := s.Properties(ctx)
+		require.Error(t, err)
 	})
 
 	t.Run("Scan", func(t *testing.T) {
@@ -163,11 +208,12 @@ func TestStation_Public(t *testing.T) {
 			}
 			f.orderedNetworks.Store(&nets)
 
+			// No resolver on this station, so refs are path-only (Name "").
 			got, err := newStation(f, "/p", "").OrderedNetworks(ctx)
 			require.NoError(t, err)
 			require.Equal(t, []OrderedNetwork{
-				{Network: "/net/connman/iwd/phy0/wlan0/net0", SignalStrength: -60},
-				{Network: "/net/connman/iwd/phy0/wlan0/net1", SignalStrength: -72.5},
+				{NetworkRef: NetworkRef{Path: "/net/connman/iwd/phy0/wlan0/net0"}, SignalStrength: -60},
+				{NetworkRef: NetworkRef{Path: "/net/connman/iwd/phy0/wlan0/net1"}, SignalStrength: -72.5},
 			}, got)
 		})
 

@@ -49,7 +49,7 @@ func TestPrintOutput_JSON_DeviceStatusShape(t *testing.T) {
 			Address: "aa:bb:cc:dd:ee:ff",
 			Powered: true,
 			Mode:    "station",
-			Adapter: "/net/connman/iwd/phy0",
+			Adapter: nameRef{Path: "/net/connman/iwd/phy0", Name: "phy0"},
 		},
 	})
 	require.NoError(t, err)
@@ -65,7 +65,7 @@ func TestPrintOutput_JSON_DeviceStatusShape(t *testing.T) {
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", entry["Address"])
 	require.Equal(t, true, entry["Powered"])
 	require.Equal(t, "station", entry["Mode"])
-	require.Equal(t, "/net/connman/iwd/phy0", entry["Adapter"])
+	require.Equal(t, map[string]any{"Name": "phy0", "Path": "/net/connman/iwd/phy0"}, entry["Adapter"])
 }
 
 func TestPrintOutput_JSON_AdapterStatusNullOptionals(t *testing.T) {

@@ -21,17 +21,20 @@ func fakeWithNetwork() *fakeClient {
 	open := &fakeNetwork{
 		path: "/net/connman/iwd/phy0/wlan0/open",
 		props: &spiderw.NetworkProperties{
-			Name:               "OpenNet",
-			Device:             "/net/connman/iwd/phy0/wlan0",
-			Type:               spiderw.NetworkTypeOpen,
-			ExtendedServiceSet: []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff", "/net/connman/iwd/phy0/wlan0/bbccddeeff00"},
+			Name:   "OpenNet",
+			Device: spiderw.DeviceRef{Path: "/net/connman/iwd/phy0/wlan0", Name: "wlan0"},
+			Type:   spiderw.NetworkTypeOpen,
+			ExtendedServiceSet: []spiderw.BasicServiceSetRef{
+				{Path: "/net/connman/iwd/phy0/wlan0/aabbccddeeff", Address: "aa:bb:cc:dd:ee:ff"},
+				{Path: "/net/connman/iwd/phy0/wlan0/bbccddeeff00", Address: "bb:cc:dd:ee:ff:00"},
+			},
 		},
 	}
 	knownNet := &fakeNetwork{
 		path: "/net/connman/iwd/phy0/wlan0/known_psk",
 		props: &spiderw.NetworkProperties{
 			Name:         "KnownNet",
-			Device:       "/net/connman/iwd/phy0/wlan0",
+			Device:       spiderw.DeviceRef{Path: "/net/connman/iwd/phy0/wlan0", Name: "wlan0"},
 			Type:         spiderw.NetworkTypePSK,
 			KnownNetwork: new("/net/connman/iwd/known_networks/1"),
 		},
@@ -40,7 +43,7 @@ func fakeWithNetwork() *fakeClient {
 		path: "/net/connman/iwd/phy0/wlan0/secured_psk",
 		props: &spiderw.NetworkProperties{
 			Name:   "SecuredNet",
-			Device: "/net/connman/iwd/phy0/wlan0",
+			Device: spiderw.DeviceRef{Path: "/net/connman/iwd/phy0/wlan0", Name: "wlan0"},
 			Type:   spiderw.NetworkTypePSK,
 		},
 	}

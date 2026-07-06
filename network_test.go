@@ -34,11 +34,13 @@ func TestNetwork(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, NetworkTypeOpen, secType)
 
+		// No resolver: refs carry Path, with Name/Address empty.
 		props, err := n.Properties(ctx)
 		require.NoError(t, err)
 		require.Equal(t, "OpenNet", props.Name)
 		require.Equal(t, NetworkTypeOpen, props.Type)
-		require.Equal(t, []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"}, props.ExtendedServiceSet)
+		require.Equal(t, DeviceRef{Path: "/net/connman/iwd/phy0/wlan0"}, props.Device)
+		require.Equal(t, []BasicServiceSetRef{{Path: "/net/connman/iwd/phy0/wlan0/aabbccddeeff"}}, props.ExtendedServiceSet)
 	})
 
 	t.Run("ConnectErrorSentinels", func(t *testing.T) {

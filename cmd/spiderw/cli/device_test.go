@@ -21,7 +21,7 @@ func fakeWithDevice() *fakeClient {
 			Address: "aa:bb:cc:dd:ee:ff",
 			Powered: true,
 			Mode:    spiderw.ModeStation,
-			Adapter: "/net/connman/iwd/phy0",
+			Adapter: spiderw.AdapterRef{Path: "/net/connman/iwd/phy0", Name: "phy0"},
 		},
 	}
 	return &fakeClient{
@@ -53,7 +53,7 @@ func TestDeviceCmd_Status_JSON(t *testing.T) {
 	require.Equal(t, "wlan0", list[0]["Name"])
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", list[0]["Address"])
 	require.Equal(t, "station", list[0]["Mode"])
-	require.Equal(t, "/net/connman/iwd/phy0", list[0]["Adapter"])
+	require.Equal(t, map[string]any{"Name": "phy0", "Path": "/net/connman/iwd/phy0"}, list[0]["Adapter"])
 }
 
 func TestDeviceCmd_ScopedStatus_JSON(t *testing.T) {
@@ -72,7 +72,7 @@ func TestDeviceCmd_ScopedStatus_JSON(t *testing.T) {
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", entry["Address"])
 	require.Equal(t, true, entry["Powered"])
 	require.Equal(t, "station", entry["Mode"])
-	require.Equal(t, "/net/connman/iwd/phy0", entry["Adapter"])
+	require.Equal(t, map[string]any{"Name": "phy0", "Path": "/net/connman/iwd/phy0"}, entry["Adapter"])
 }
 
 func TestDeviceCmd_ScopedStatus_UsageError(t *testing.T) {
@@ -242,7 +242,7 @@ func TestDeviceStatusResult_String(t *testing.T) {
 			Address: "aa:bb:cc:dd:ee:ff",
 			Powered: true,
 			Mode:    "station",
-			Adapter: "/net/connman/iwd/phy0",
+			Adapter: nameRef{Path: "/net/connman/iwd/phy0", Name: "phy0"},
 		},
 	}.String()
 
@@ -277,7 +277,7 @@ func TestDeviceStatusResult_String_UnnamedAndEmptyFields(t *testing.T) {
 	t.Parallel()
 
 	out := deviceStatusResult{
-		{Path: "/p0/w0", Name: "", Address: "", Mode: "", Adapter: ""},
+		{Path: "/p0/w0", Name: "", Address: "", Mode: "", Adapter: nameRef{}},
 	}.String()
 
 	require.Contains(t, out, "(unnamed)")

@@ -145,9 +145,10 @@ func newTestNetworkClient(t *testing.T) *Client {
 		{Path: "/net/connman/iwd/phy0/wlan0/open", Name: "OpenNet"},
 	})
 	wire := &connect.Wiring{
-		Conn:    &dbus.Conn{},
-		Daemon:  fakeDaemon,
-		Cleanup: func() error { return nil },
+		Conn:             &dbus.Conn{},
+		ResolverOverride: connect.NoResolver{},
+		Daemon:           fakeDaemon,
+		Cleanup:          func() error { return nil },
 		NetworkFactory: func(ctx context.Context, path string) (core.NetworkIface, error) {
 			return (&fakeCoreNetwork{}).setProps(validCoreNetworkProps()), nil
 		},

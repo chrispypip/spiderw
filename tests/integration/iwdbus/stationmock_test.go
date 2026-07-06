@@ -60,10 +60,11 @@ func TestStationMock_Reads(t *testing.T) {
 	require.Equal(t, spiderw.StationStateConnected, props.State)
 	require.False(t, props.Scanning)
 	require.NotNil(t, props.ConnectedNetwork)
-	require.Equal(t, stationConnectedNetworkPath, *props.ConnectedNetwork)
+	require.Equal(t, stationConnectedNetworkPath, props.ConnectedNetwork.Path)
 	require.NotNil(t, props.ConnectedAccessPoint)
-	require.Equal(t, stationConnectedAccessPointPath, *props.ConnectedAccessPoint)
-	require.Equal(t, []string{stationConnectedAccessPointPath}, props.Affinities)
+	require.Equal(t, stationConnectedAccessPointPath, props.ConnectedAccessPoint.Path)
+	require.Len(t, props.Affinities, 1)
+	require.Equal(t, stationConnectedAccessPointPath, props.Affinities[0].Path)
 }
 
 // TestStationMock_AllStations verifies station enumeration via the real
@@ -147,8 +148,8 @@ func TestStationMock_CLIStatus(t *testing.T) {
 	require.NoError(t, err, out)
 	require.Contains(t, out, "connected")
 	require.Contains(t, out, devicePath)
-	require.Contains(t, out, stationConnectedNetworkPath)
-	require.Contains(t, out, stationConnectedAccessPointPath)
+	require.Contains(t, out, "KnownNet")          // resolved SSID
+	require.Contains(t, out, "11:22:33:44:55:66") // resolved BSS MAC
 }
 
 // TestStationMock_CLIList drives `station list` against the mock.
@@ -208,7 +209,7 @@ func TestStationMock_OrderedNetworks(t *testing.T) {
 	nets, err := station.OrderedNetworks(ctx)
 	require.NoError(t, err)
 	require.Len(t, nets, 3)
-	require.Equal(t, stationConnectedNetworkPath, nets[0].Network)
+	require.Equal(t, stationConnectedNetworkPath, nets[0].Path)
 	require.Equal(t, -60.0, nets[0].SignalStrength) // mock seeds -6000 (100*dBm)
 }
 
@@ -233,6 +234,12 @@ func TestStationMock_SetAffinities(t *testing.T) {
 	got, err := station.Affinities(ctx)
 	require.NoError(t, err)
 	require.Equal(t, want, got)
+
+	// An empty slice clears all affinities.
+	require.NoError(t, station.SetAffinities(ctx, nil))
+	got, err = station.Affinities(ctx)
+	require.NoError(t, err)
+	require.Empty(t, got)
 }
 
 // TestStationMock_CLIScan drives `station <path> scan` (wait mode) against the
@@ -243,7 +250,7 @@ func TestStationMock_CLIScan(t *testing.T) {
 
 	out, err := runSpider(t, "station", devicePath, "scan")
 	require.NoError(t, err, out)
-	require.Contains(t, out, stationConnectedNetworkPath)
+	require.Contains(t, out, "KnownNet") // resolved SSID
 	require.Contains(t, out, "dBm")
 }
 
@@ -254,7 +261,7 @@ func TestStationMock_CLINetworks(t *testing.T) {
 
 	out, err := runSpider(t, "station", devicePath, "networks")
 	require.NoError(t, err, out)
-	require.Contains(t, out, stationConnectedNetworkPath)
+	require.Contains(t, out, "KnownNet") // resolved SSID
 	require.Contains(t, out, "-60 dBm")
 }
 

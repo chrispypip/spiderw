@@ -91,7 +91,7 @@ func TestNetworkMock_Properties(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "OpenNet", props.Name)
 	require.Equal(t, spiderw.NetworkTypeOpen, props.Type)
-	require.Equal(t, "/net/connman/iwd/phy0/wlan0", props.Device)
+	require.Equal(t, "/net/connman/iwd/phy0/wlan0", props.Device.Path)
 	require.Nil(t, props.KnownNetwork)
 	require.Len(t, props.ExtendedServiceSet, 2)
 

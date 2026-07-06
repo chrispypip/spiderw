@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/chrispypip/spiderw/internal/connect"
 	"github.com/chrispypip/spiderw/internal/core"
 	"github.com/chrispypip/spiderw/internal/iwdvalue"
 	"github.com/chrispypip/spiderw/internal/logging"
@@ -61,21 +62,23 @@ type NetworkProperties struct {
 	// Connected reports whether the network is currently connected or connecting.
 	Connected bool
 
-	// Device is the object path of the device/station the network belongs to.
-	// Resolve it to a handle with Client.Device.
-	Device string
+	// Device references the device/station the network belongs to (Path + resolved
+	// Name).
+	Device DeviceRef
 
 	// Type is the network's network type.
 	Type NetworkType
 
 	// KnownNetwork is the object path of the network's known-network record, or
-	// nil when the network is not known/provisioned. Resolve it to a handle with
-	// Client.KnownNetwork.
+	// nil when the network is not known/provisioned. Unlike the other bundle
+	// cross-references this stays a bare path: a known network's Name is always
+	// this network's own SSID, so resolving it would be redundant. Resolve it to a
+	// handle with Client.KnownNetwork.
 	KnownNetwork *string
 
-	// ExtendedServiceSet is the object paths of the basic service sets (BSSes)
-	// that make up this network. Resolve each with Client.BasicServiceSet.
-	ExtendedServiceSet []string
+	// ExtendedServiceSet references the basic service sets (BSSes) that make up
+	// this network (Path + resolved Address).
+	ExtendedServiceSet []BasicServiceSetRef
 }
 
 // Network provides high-level operations for a specific iwd network object.
@@ -83,8 +86,9 @@ type NetworkProperties struct {
 // A network represents an SSID the owning device can see. Its
 // ExtendedServiceSet lists the basic service sets (access points) that serve it.
 type Network struct {
-	core core.NetworkIface
-	path string
+	core     core.NetworkIface
+	path     string
+	resolver connect.Resolver
 }
 
 func newNetwork(c core.NetworkIface, path string) *Network {
@@ -92,6 +96,16 @@ func newNetwork(c core.NetworkIface, path string) *Network {
 		return nil
 	}
 	return &Network{core: c, path: path}
+}
+
+// withResolver attaches a resolver for enriching Properties path fields with
+// friendly identifiers. The Client sets it at construction; a nil resolver
+// leaves bundle refs path-only.
+func (n *Network) withResolver(r connect.Resolver) *Network {
+	if n != nil {
+		n.resolver = r
+	}
+	return n
 }
 
 // Path returns the D-Bus object path the network was constructed from.
@@ -190,14 +204,25 @@ func (n *Network) Properties(ctx context.Context) (*NetworkProperties, error) {
 			return nil, err
 		}
 
-		return &NetworkProperties{
-			Name:               cp.Name,
-			Connected:          cp.Connected,
-			Device:             cp.Device,
-			Type:               secType,
-			KnownNetwork:       cp.KnownNetwork,
-			ExtendedServiceSet: cp.ExtendedServiceSet,
-		}, nil
+		tree, err := resolveTree(ctx, n.resolver)
+		if err != nil {
+			return nil, err
+		}
+
+		out := &NetworkProperties{
+			Name:         cp.Name,
+			Connected:    cp.Connected,
+			Device:       deviceRefOf(tree, cp.Device),
+			Type:         secType,
+			KnownNetwork: cp.KnownNetwork, // bare path (see field doc)
+		}
+		if len(cp.ExtendedServiceSet) > 0 {
+			out.ExtendedServiceSet = make([]BasicServiceSetRef, 0, len(cp.ExtendedServiceSet))
+			for _, p := range cp.ExtendedServiceSet {
+				out.ExtendedServiceSet = append(out.ExtendedServiceSet, bssRefOf(tree, p))
+			}
+		}
+		return out, nil
 	})
 }
 

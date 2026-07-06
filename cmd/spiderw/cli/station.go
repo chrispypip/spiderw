@@ -78,13 +78,13 @@ func runStationList(app *App, args []string) error {
 }
 
 type stationStatusEntry struct {
-	Path                 string   `json:"Path"`
-	Name                 string   `json:"Name"`
-	State                string   `json:"State"`
-	Scanning             bool     `json:"Scanning"`
-	ConnectedNetwork     string   `json:"ConnectedNetwork"`
-	ConnectedAccessPoint string   `json:"ConnectedAccessPoint"`
-	Affinities           []string `json:"Affinities"`
+	Path                 string    `json:"Path"`
+	Name                 string    `json:"Name"`
+	State                string    `json:"State"`
+	Scanning             bool      `json:"Scanning"`
+	ConnectedNetwork     *nameRef  `json:"ConnectedNetwork"`
+	ConnectedAccessPoint *addrRef  `json:"ConnectedAccessPoint"`
+	Affinities           []addrRef `json:"Affinities"`
 }
 
 type stationStatusResult []stationStatusEntry
@@ -101,11 +101,17 @@ func (r stationStatusResult) String() string {
 		}
 		return v
 	}
-	list := func(v []string) string {
-		if len(v) == 0 {
+	optNameRef := func(r *nameRef) string {
+		if r == nil {
 			return "-"
 		}
-		return strings.Join(v, ", ")
+		return r.readable()
+	}
+	optAddrRef := func(r *addrRef) string {
+		if r == nil {
+			return "-"
+		}
+		return r.readable()
 	}
 	field := func(label, value string) string {
 		return fmt.Sprintf("%-22s%s", label+":", value)
@@ -118,9 +124,9 @@ func (r stationStatusResult) String() string {
 			field("Name", value(entry.Name)),
 			field("State", value(entry.State)),
 			field("Scanning", fmt.Sprintf("%t", entry.Scanning)),
-			field("ConnectedNetwork", value(entry.ConnectedNetwork)),
-			field("ConnectedAccessPoint", value(entry.ConnectedAccessPoint)),
-			field("Affinities", list(entry.Affinities)),
+			field("ConnectedNetwork", optNameRef(entry.ConnectedNetwork)),
+			field("ConnectedAccessPoint", optAddrRef(entry.ConnectedAccessPoint)),
+			field("Affinities", readableAddrRefs(entry.Affinities)),
 		}
 		blocks = append(blocks, strings.Join(lines, "\n"))
 	}
@@ -139,13 +145,15 @@ func stationStatusEntryFromStation(ctx context.Context, s stationAPI) (stationSt
 		Name:       s.Name(),
 		State:      props.State.String(),
 		Scanning:   props.Scanning,
-		Affinities: props.Affinities,
+		Affinities: toAddrRefs(props.Affinities),
 	}
 	if props.ConnectedNetwork != nil {
-		entry.ConnectedNetwork = *props.ConnectedNetwork
+		cn := toNameRef(props.ConnectedNetwork.Name, props.ConnectedNetwork.Path)
+		entry.ConnectedNetwork = &cn
 	}
 	if props.ConnectedAccessPoint != nil {
-		entry.ConnectedAccessPoint = *props.ConnectedAccessPoint
+		ap := toAddrRef(props.ConnectedAccessPoint.Address, props.ConnectedAccessPoint.Path)
+		entry.ConnectedAccessPoint = &ap
 	}
 	return entry, nil
 }
@@ -312,8 +320,17 @@ func runStationScan(app *App, ctx context.Context, stationRef string, args []str
 }
 
 type stationNetworkResult struct {
-	Network   string  `json:"Network"`
+	Name      string  `json:"Name"`
+	Path      string  `json:"Path"`
 	SignalDBm float64 `json:"SignalDBm"`
+}
+
+// readable returns the network's SSID, falling back to its path when unresolved.
+func (r stationNetworkResult) readable() string {
+	if r.Name != "" {
+		return r.Name
+	}
+	return r.Path
 }
 
 type stationNetworksResult []stationNetworkResult
@@ -328,7 +345,7 @@ func (r stationNetworksResult) String() string {
 		if i > 0 {
 			b.WriteByte('\n')
 		}
-		fmt.Fprintf(&b, "%s\t%g dBm", n.Network, n.SignalDBm)
+		fmt.Fprintf(&b, "%s\t%g dBm", n.readable(), n.SignalDBm)
 	}
 	return b.String()
 }
@@ -340,7 +357,7 @@ func printStationNetworks(app *App, ctx context.Context, s stationAPI) error {
 	}
 	out := make(stationNetworksResult, 0, len(nets))
 	for _, n := range nets {
-		out = append(out, stationNetworkResult{Network: n.Network, SignalDBm: n.SignalStrength})
+		out = append(out, stationNetworkResult{Name: n.Name, Path: n.Path, SignalDBm: n.SignalStrength})
 	}
 	return app.printOutput(out)
 }
@@ -354,41 +371,132 @@ func runStationNetworks(app *App, ctx context.Context, stationRef string, args [
 	})
 }
 
-type stationAffinitiesResult []string
+type stationAffinitiesResult []addrRef
 
-// String returns the CLI string form of the value.
+// String returns the CLI string form of the value: one BSS MAC (or path when
+// unresolved) per line.
 func (r stationAffinitiesResult) String() string {
 	if len(r) == 0 {
 		return "no affinities set"
 	}
-	return strings.Join(r, "\n")
+	lines := make([]string, 0, len(r))
+	for _, ref := range r {
+		lines = append(lines, ref.readable())
+	}
+	return strings.Join(lines, "\n")
 }
 
 func runStationAffinities(app *App, ctx context.Context, stationRef string, args []string) error {
-	// `affinities` shows the current list; `affinities set <bss-path>...` writes it.
+	// `affinities` shows the current list; `affinities set <bss>...` writes it
+	// (each <bss> a MAC or object path); `affinities clear` removes them all.
 	if len(args) > 0 && args[0] == "set" {
-		paths := args[1:]
-		if len(paths) == 0 {
-			return fmt.Errorf("usage: spiderw station <station> affinities set <bss-path> [<bss-path>...]")
+		return runStationAffinitiesSet(app, ctx, stationRef, args[1:])
+	}
+	if len(args) > 0 && args[0] == "clear" {
+		if len(args) != 1 {
+			return fmt.Errorf("usage: spiderw station <station> affinities clear")
 		}
 		return withStation(app, ctx, stationRef, func(ctx context.Context, s stationAPI) error {
-			if err := s.SetAffinities(ctx, paths); err != nil {
+			if err := s.SetAffinities(ctx, nil); err != nil {
 				return err
 			}
-			return app.printOutput(stationAffinitiesResult(paths))
+			return app.printOutput(stationAffinitiesResult(nil))
 		})
 	}
 	if len(args) != 0 {
-		return fmt.Errorf("usage: spiderw station <station> affinities [set <bss-path>...]")
+		return fmt.Errorf("usage: spiderw station <station> affinities [set <bss>... | clear]")
 	}
 
+	// Read via Properties so affinities render as resolved BSS MACs.
 	return withStation(app, ctx, stationRef, func(ctx context.Context, s stationAPI) error {
-		affinities, err := s.Affinities(ctx)
+		props, err := s.Properties(ctx)
 		if err != nil {
 			return err
 		}
-		return app.printOutput(stationAffinitiesResult(affinities))
+		return app.printOutput(stationAffinitiesResult(toAddrRefs(props.Affinities)))
 	})
+}
+
+func runStationAffinitiesSet(app *App, ctx context.Context, stationRef string, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: spiderw station <station> affinities set <bss> [<bss>...] (BSS MAC or object path)")
+	}
+	return app.withClient(ctx, func(client clientAPI) error {
+		s, err := stationByRef(ctx, client, stationRef)
+		if err != nil {
+			return err
+		}
+		refs, err := resolveAffinityRefs(ctx, client, args)
+		if err != nil {
+			return err
+		}
+		paths := make([]string, len(refs))
+		for i, r := range refs {
+			paths[i] = r.Path
+		}
+		if err := s.SetAffinities(ctx, paths); err != nil {
+			return err
+		}
+		return app.printOutput(stationAffinitiesResult(refs))
+	})
+}
+
+// resolveAffinityRefs turns affinity arguments (each a BSS MAC or a full object
+// path) into resolved refs. A MAC is matched device-wide against every BSS's
+// Address; a value starting with "/" is taken as a path verbatim.
+func resolveAffinityRefs(ctx context.Context, client clientAPI, args []string) ([]addrRef, error) {
+	daemon := client.Daemon()
+	if daemon == nil {
+		return nil, fmt.Errorf("daemon not available")
+	}
+
+	var bsses []spiderw.BasicServiceSetRef
+	fetched := false
+	fetch := func() error {
+		if fetched {
+			return nil
+		}
+		b, err := daemon.BasicServiceSets(ctx)
+		if err != nil {
+			return err
+		}
+		bsses, fetched = b, true
+		return nil
+	}
+
+	out := make([]addrRef, 0, len(args))
+	for _, a := range args {
+		a = strings.TrimSpace(a)
+		if a == "" {
+			return nil, fmt.Errorf("empty affinity reference")
+		}
+		if err := fetch(); err != nil {
+			return nil, err
+		}
+		if strings.HasPrefix(a, "/") {
+			addr := ""
+			for _, b := range bsses {
+				if b.Path == a {
+					addr = b.Address
+					break
+				}
+			}
+			out = append(out, addrRef{Address: addr, Path: a})
+			continue
+		}
+		found := ""
+		for _, b := range bsses {
+			if strings.EqualFold(b.Address, a) {
+				found = b.Path
+				break
+			}
+		}
+		if found == "" {
+			return nil, fmt.Errorf("no basic service set found with address %q", a)
+		}
+		out = append(out, addrRef{Address: a, Path: found})
+	}
+	return out, nil
 }
 
 type stationDisconnectResult struct {
@@ -578,8 +686,9 @@ const stationHelpText = `Commands:
   <station> connect-hidden <ssid> [--passphrase=<s> | --passphrase-stdin]
                                         Connect to a hidden network by SSID
   <station> hidden-aps                  List hidden access points from the scan
-  <station> affinities                  Show the station's affinity BSS paths
-  <station> affinities set <p>...       Set the station's affinity BSS paths
+  <station> affinities                  Show the station's affinity BSSes (MACs)
+  <station> affinities set <bss>...     Set affinities by BSS MAC or object path
+  <station> affinities clear            Remove all affinities
 
 A station is a device in station mode. Connecting to a *visible* network is done
 via 'network <ssid> connect'.`
