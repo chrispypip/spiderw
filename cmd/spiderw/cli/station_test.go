@@ -3,6 +3,8 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -198,6 +200,58 @@ func TestStationCmd_Scan_Error(t *testing.T) {
 	out, code := driveCLI(stationClient(st), nil, false, "station", testStationPath, "scan", "--no-wait")
 	require.Equal(t, 1, code)
 	require.Contains(t, out, "scan boom")
+}
+
+func TestStationCmd_Scan_Timeout(t *testing.T) {
+	t.Parallel()
+
+	// The scan starts but never reports completion, so wait mode hits --timeout.
+	st := &fakeStation{path: testStationPath, scanNeverCompletes: true}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationPath, "scan", "--timeout=50ms")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "timed out waiting for scan to finish")
+}
+
+func TestStationCmd_Scan_RejectsNonPositiveTimeout(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationPath, "scan", "--timeout=0")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "--timeout must be positive")
+}
+
+func TestStationCmd_Scan_RejectsTimeoutWithNoWait(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{path: testStationPath}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationPath, "scan", "--no-wait", "--timeout=30s")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "--timeout has no effect with --no-wait")
+	require.False(t, st.scanCalled, "must reject before triggering the scan")
+}
+
+func TestStationCmd_Scan_HonorsContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	// A cancelled context aborts the wait rather than blocking until --timeout.
+	st := &fakeStation{path: testStationPath, scanNeverCompletes: true}
+	var buf bytes.Buffer
+	app := &App{
+		Stdout: &buf,
+		Stderr: &buf,
+		NewClient: func(ctx context.Context, bus spiderw.Bus) (clientAPI, error) {
+			return stationClient(st), nil
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := runStationScan(app, ctx, testStationPath, nil)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestStationCmd_Networks_JSON(t *testing.T) {

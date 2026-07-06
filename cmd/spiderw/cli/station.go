@@ -233,11 +233,25 @@ func runStationScan(app *App, ctx context.Context, stationRef string, args []str
 	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
 	fs.SetOutput(app.stderr())
 	noWait := fs.Bool("no-wait", false, "trigger the scan and return without waiting for it to finish")
+	timeout := fs.Duration("timeout", scanWaitTimeout, "how long to wait for the scan to finish (wait mode)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
-		return fmt.Errorf("usage: spiderw station <station> scan [--no-wait]")
+		return fmt.Errorf("usage: spiderw station <station> scan [--no-wait] [--timeout=<duration>]")
+	}
+
+	timeoutSet := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "timeout" {
+			timeoutSet = true
+		}
+	})
+	if *noWait && timeoutSet {
+		return fmt.Errorf("--timeout has no effect with --no-wait")
+	}
+	if *timeout <= 0 {
+		return fmt.Errorf("--timeout must be positive")
 	}
 
 	return withStation(app, ctx, stationRef, func(ctx context.Context, s stationAPI) error {
@@ -272,8 +286,10 @@ func runStationScan(app *App, ctx context.Context, stationRef string, args []str
 
 		select {
 		case <-done:
-		case <-time.After(scanWaitTimeout):
-			return fmt.Errorf("timed out waiting for scan to finish")
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(*timeout):
+			return fmt.Errorf("timed out waiting for scan to finish after %s", *timeout)
 		}
 
 		return printStationNetworks(app, ctx, s)
@@ -538,8 +554,10 @@ const stationHelpText = `Commands:
   list                                  List stations (object paths)
   status                                Show a snapshot of every station
   <station> status                      Show a snapshot of one station (by path)
-  <station> scan [--no-wait]            Scan for networks (waits for completion,
-                                        then lists results, unless --no-wait)
+  <station> scan [--no-wait] [--timeout=<dur>]
+                                        Scan for networks (waits for completion,
+                                        then lists results, unless --no-wait;
+                                        --timeout bounds the wait, default 15s)
   <station> networks                    List networks from the last scan
   <station> disconnect                  Disconnect from the current network
   <station> connect-hidden <ssid> [--passphrase=<s> | --passphrase-stdin]

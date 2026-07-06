@@ -356,19 +356,20 @@ func (f *fakeDevice) SubscribeModeChanged(ctx context.Context, fn func(spiderw.M
 }
 
 type fakeStation struct {
-	path              string
-	props             *spiderw.StationProperties
-	ordered           []spiderw.OrderedNetwork
-	hiddenAPs         []spiderw.HiddenAccessPoint
-	scanErr           error
-	setAffErr         error
-	disconnectErr     error
-	connectHiddenErr  error
-	setAffinitiesTo   []string
-	connectHiddenName string
-	scanCalled        bool
-	disconnectCalled  bool
-	err               error
+	path               string
+	props              *spiderw.StationProperties
+	ordered            []spiderw.OrderedNetwork
+	hiddenAPs          []spiderw.HiddenAccessPoint
+	scanErr            error
+	setAffErr          error
+	disconnectErr      error
+	connectHiddenErr   error
+	setAffinitiesTo    []string
+	connectHiddenName  string
+	scanCalled         bool
+	scanNeverCompletes bool
+	disconnectCalled   bool
+	err                error
 }
 
 func (f *fakeStation) Path() string { return f.path }
@@ -429,7 +430,9 @@ func (f *fakeStation) SubscribeScanningChanged(ctx context.Context, fn func(bool
 	// returns promptly in unit tests.
 	if fn != nil {
 		fn(true)
-		fn(false)
+		if !f.scanNeverCompletes {
+			fn(false)
+		}
 	}
 	return func() error { return nil }, nil
 }
