@@ -287,7 +287,7 @@ func (d *Device) SubscribePoweredChanged(ctx context.Context, fn func(bool)) (Un
 
 // SubscribeModeChanged registers fn for raw operating-mode changes. Mode is
 // read-write, so iwd emits a PropertiesChanged whenever a device switches mode.
-// An unparseable mode is skipped rather than surfaced as ModeUnknown.
+// An unparsable mode is skipped rather than surfaced as ModeUnknown.
 func (d *Device) SubscribeModeChanged(ctx context.Context, fn func(Mode)) (UnsubscribeFunc, error) {
 	if fn == nil {
 		return nil, fmt.Errorf("SubscribeModeChanged: fn cannot be nil")

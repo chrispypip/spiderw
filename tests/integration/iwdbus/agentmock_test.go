@@ -145,8 +145,8 @@ func TestAgentMock_AlreadyExistsAcrossClients(t *testing.T) {
 		Passphrase: func(ctx context.Context, networkPath string) (string, error) { return mockSecuredPassphrase, nil },
 	}
 
-	clientA := newMockClient(t, ctx)
-	_, err := clientA.RegisterAgent(ctx, cfg)
+	client1 := newMockClient(t, ctx)
+	_, err := client1.RegisterAgent(ctx, cfg)
 	require.NoError(t, err)
 
 	clientB := newMockClient(t, ctx)

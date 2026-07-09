@@ -23,7 +23,7 @@ func TestKnownNetwork_Public(t *testing.T) {
 		t.Parallel()
 
 		p := validCoreKnownNetworkProps()
-		p.Hidden = true // distinct from zero so a mis-mapped field is caught
+		p.Hidden = true // distinct from zero so a mismapped field is caught
 		k := newKnownNetwork((&fakeCoreKnownNetwork{}).setProps(p), "/net/connman/iwd/abc")
 		require.NotNil(t, k)
 		require.Equal(t, "/net/connman/iwd/abc", k.Path())
@@ -32,7 +32,7 @@ func TestKnownNetwork_Public(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, NetworkTypePSK, secType)
 
-		// Assert every bundle field so a mis-mapped field cannot pass unnoticed.
+		// Assert every bundle field so a mismapped field cannot pass unnoticed.
 		props, err := k.Properties(ctx)
 		require.NoError(t, err)
 		require.Equal(t, "HomeNet", props.Name)

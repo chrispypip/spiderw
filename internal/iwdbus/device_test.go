@@ -530,7 +530,7 @@ func testDevice_SubscribeModeChanged_IgnoresInvalid(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// An unparseable mode must not reach the typed handler.
+	// An unparsable mode must not reach the typed handler.
 	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdDeviceIface, map[string]dbus.Variant{
 		"Mode": dbus.MakeVariant("bad-mode"),
 	}, nil)

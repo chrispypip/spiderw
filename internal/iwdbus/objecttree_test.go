@@ -20,7 +20,7 @@ func testTree() *ObjectTree {
 			IwdAdapterIface: {"Name": v("phy0")},
 		},
 		"/net/connman/iwd/0/3/ssid_psk": {
-			IwdNetworkIface: {"Name": v("ShadowGate")},
+			IwdNetworkIface: {"Name": v("PrivateNet")},
 		},
 		"/net/connman/iwd/0/3/ssid_psk/deadbeefcafe": {
 			IwdBasicServiceSetIface: {"Address": v("de:ad:be:ef:ca:fe")},
@@ -48,7 +48,7 @@ func TestObjectTree_Lookups(t *testing.T) {
 		}{
 			{func() (string, bool) { return tree.DeviceName("/net/connman/iwd/0/3") }, "wlan0"},
 			{func() (string, bool) { return tree.AdapterName("/net/connman/iwd/0") }, "phy0"},
-			{func() (string, bool) { return tree.NetworkName("/net/connman/iwd/0/3/ssid_psk") }, "ShadowGate"},
+			{func() (string, bool) { return tree.NetworkName("/net/connman/iwd/0/3/ssid_psk") }, "PrivateNet"},
 			{func() (string, bool) {
 				return tree.BSSAddress("/net/connman/iwd/0/3/ssid_psk/deadbeefcafe")
 			}, "de:ad:be:ef:ca:fe"},

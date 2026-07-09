@@ -264,7 +264,7 @@ func TestNetworkCmd_UnknownSubcommand(t *testing.T) {
 }
 
 // TestPrintNetworkConnectedLine covers the monitor output helper directly (the
-// monitor command blocks on an OS signal and is not driveable in-process).
+// monitor command blocks on an OS signal and is not drivable in-process).
 func TestPrintNetworkConnectedLine(t *testing.T) {
 	t.Parallel()
 	var mu sync.Mutex

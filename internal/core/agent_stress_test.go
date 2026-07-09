@@ -14,7 +14,7 @@ import (
 
 // TestStress_Core_Agent_CancelDuringBlockedRequests drives many requests whose
 // callbacks block on their context while Cancel and Unregister race to abort
-// them, exercising the cancelation plumbing under load.
+// them, exercising the cancellation plumbing under load.
 func TestStress_Core_Agent_CancelDuringBlockedRequests(t *testing.T) {
 	a, h := NewAgent(CredentialCallbacks{
 		Passphrase: func(ctx context.Context, networkPath string) (string, error) {

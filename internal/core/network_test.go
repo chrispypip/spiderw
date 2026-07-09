@@ -20,7 +20,7 @@ func TestNetwork_Core(t *testing.T) {
 	t.Run("Properties", func(t *testing.T) {
 		t.Parallel()
 		p := validNetworkProps()
-		p.Connected = true // distinct from zero so a mis-mapped field is caught
+		p.Connected = true // distinct from zero so a mismapped field is caught
 		n := NewNetwork((&fakeIwdbusNetwork{}).setProps(p))
 		require.NotNil(t, n)
 

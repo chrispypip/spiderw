@@ -194,7 +194,7 @@ func TestWiring_Daemon_CleanupCalledExactlyOnce_FailurePaths(t *testing.T) {
 
 					// --- Assert: joined errors when cleanup fails ---
 					if sc.assertJoined {
-						require.ErrorIs(t, err, daemonErr, "expected errors.Is(err, daemonErr) ture; err=%v", err)
+						require.ErrorIs(t, err, daemonErr, "expected errors.Is(err, daemonErr) true; err=%v", err)
 						require.ErrorIs(t, err, sc.cleanupErr, "expected errors.Is(err, cleanupErr) true; err=%v", err)
 					}
 				})

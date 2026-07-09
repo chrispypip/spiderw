@@ -158,11 +158,11 @@ func TestStation_Public(t *testing.T) {
 		aff := []string{apP}
 		f.affinities.Store(&aff)
 
-		tree := fakeTree{netP: "ShadowGate", apP: "de:ad:be:ef:ca:fe"}
+		tree := fakeTree{netP: "PrivateNet", apP: "de:ad:be:ef:ca:fe"}
 		s := newStation(f, "/p", "").withResolver(fakeResolver{tree: tree})
 		props, err := s.Properties(ctx)
 		require.NoError(t, err)
-		require.Equal(t, NetworkRef{Path: netP, Name: "ShadowGate"}, *props.ConnectedNetwork)
+		require.Equal(t, NetworkRef{Path: netP, Name: "PrivateNet"}, *props.ConnectedNetwork)
 		require.Equal(t, BasicServiceSetRef{Path: apP, Address: "de:ad:be:ef:ca:fe"}, *props.ConnectedAccessPoint)
 		require.Equal(t, []BasicServiceSetRef{{Path: apP, Address: "de:ad:be:ef:ca:fe"}}, props.Affinities)
 	})

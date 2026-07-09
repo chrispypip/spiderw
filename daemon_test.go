@@ -138,7 +138,7 @@ func TestDaemon_Public(t *testing.T) {
 			op:   func(d *Daemon) (any, error) { return d.NetworkConfigurationEnabled(ctx) },
 			newBackend: func() *fakeCoreDaemon {
 				f := &fakeCoreDaemon{}
-				f.setInfoNetworkConfigurationEnaled(true)
+				f.setInfoNetworkConfigurationEnabled(true)
 				return f
 			},
 		},

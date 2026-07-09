@@ -58,7 +58,7 @@ type AgentIface interface {
 }
 
 // Agent is the core-layer handle for a registered credentials agent. It owns the
-// per-request cancelation state that iwd's Cancel calls act on, and the cleanup
+// per-request cancellation state that iwd's Cancel calls act on, and the cleanup
 // (UnregisterAgent + unexport) run by Unregister.
 //
 // iwd issues credential requests serially per agent, so a single in-flight
@@ -75,7 +75,7 @@ type Agent struct {
 }
 
 // NewAgent creates an unregistered core Agent from callbacks and returns it
-// along with the iwdbus.AgentHandler bound to its cancelation state. The caller
+// along with the iwdbus.AgentHandler bound to its cancellation state. The caller
 // (connect layer) exports the handler, registers it, then calls Bind to attach
 // the manager and cleanup used by Unregister.
 func NewAgent(callbacks CredentialCallbacks) (*Agent, iwdbus.AgentHandler) {
@@ -140,7 +140,7 @@ func (a *Agent) Unregister(ctx context.Context) error {
 }
 
 // buildHandler returns the iwdbus.AgentHandler whose request closures derive a
-// cancelable context (so Cancel can abort the in-flight request) and forward to
+// cancellable context (so Cancel can abort the in-flight request) and forward to
 // the normalized callbacks. A nil callback yields a nil handler func, which the
 // iwdbus layer maps to a Canceled reply.
 func (a *Agent) buildHandler() iwdbus.AgentHandler {
@@ -154,7 +154,7 @@ func (a *Agent) buildHandler() iwdbus.AgentHandler {
 	}
 }
 
-// beginRequest derives a cancelable context for one in-flight request and records
+// beginRequest derives a cancellable context for one in-flight request and records
 // its cancel so Cancel/Unregister can abort it. The returned done func clears the
 // record and releases the context.
 func (a *Agent) beginRequest() (context.Context, func()) {
@@ -176,7 +176,7 @@ func (a *Agent) wrapSecret(fn func(ctx context.Context, networkPath string) (str
 	}
 	return func(ctx context.Context, network dbus.ObjectPath) (string, error) {
 		// The dispatch ctx is intentionally not propagated; beginRequest derives a
-		// fresh cancelable context so Cancel/Unregister can abort the request.
+		// fresh cancellable context so Cancel/Unregister can abort the request.
 		reqCtx, done := a.beginRequest()
 		defer done()
 		return fn(reqCtx, string(network))
@@ -190,7 +190,7 @@ func (a *Agent) wrapUserNameAndPassword() func(ctx context.Context, network dbus
 	}
 	return func(ctx context.Context, network dbus.ObjectPath) (string, string, error) {
 		// The dispatch ctx is intentionally not propagated; beginRequest derives a
-		// fresh cancelable context so Cancel/Unregister can abort the request.
+		// fresh cancellable context so Cancel/Unregister can abort the request.
 		reqCtx, done := a.beginRequest()
 		defer done()
 		return fn(reqCtx, string(network))
@@ -204,7 +204,7 @@ func (a *Agent) wrapUserPassword() func(ctx context.Context, network dbus.Object
 	}
 	return func(ctx context.Context, network dbus.ObjectPath, user string) (string, error) {
 		// The dispatch ctx is intentionally not propagated; beginRequest derives a
-		// fresh cancelable context so Cancel/Unregister can abort the request.
+		// fresh cancellable context so Cancel/Unregister can abort the request.
 		reqCtx, done := a.beginRequest()
 		defer done()
 		return fn(reqCtx, string(network), user)

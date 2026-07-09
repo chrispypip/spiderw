@@ -50,7 +50,7 @@ func (f *fakeCoreDaemon) setInfoStateDirectory(stateDir string) {
 	f.stateDir.Store(&stateDirCopy)
 }
 
-func (f *fakeCoreDaemon) setInfoNetworkConfigurationEnaled(enabled bool) {
+func (f *fakeCoreDaemon) setInfoNetworkConfigurationEnabled(enabled bool) {
 	f.ncfg.Store(enabled)
 }
 

@@ -11,7 +11,7 @@ import (
 )
 
 // TestRace_Core_Agent_RequestsConcurrentWithCancel hammers the in-flight
-// cancelation state from many goroutines: credential requests set currentCancel
+// cancellation state from many goroutines: credential requests set currentCancel
 // while Cancel reads and invokes it.
 func TestRace_Core_Agent_RequestsConcurrentWithCancel(t *testing.T) {
 	a, h := NewAgent(CredentialCallbacks{

@@ -773,7 +773,7 @@ func testStation_SubscribeStateChanged_IgnoresInvalid(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// An unparseable state must not reach the typed handler.
+	// An unparsable state must not reach the typed handler.
 	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdStationIface, map[string]dbus.Variant{
 		"State": dbus.MakeVariant("bad-state"),
 	}, nil)

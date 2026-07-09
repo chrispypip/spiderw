@@ -39,7 +39,7 @@ func TestNetwork_Public(t *testing.T) {
 		require.Equal(t, NetworkTypeOpen, secType)
 
 		// No resolver: refs carry Path, with Name/Address empty. Assert every
-		// bundle field so a mis-mapped field cannot pass unnoticed.
+		// bundle field so a mismapped field cannot pass unnoticed.
 		props, err := n.Properties(ctx)
 		require.NoError(t, err)
 		require.Equal(t, "OpenNet", props.Name)

@@ -334,7 +334,7 @@ func TestAdapterStatusResult_String_UnnamedAndEmptyModes(t *testing.T) {
 }
 
 // TestPrintAdapterPoweredLine covers the monitor output helper directly (the
-// monitor command itself blocks on an OS signal and is not driveable in-process).
+// monitor command itself blocks on an OS signal and is not drivable in-process).
 func TestPrintAdapterPoweredLine(t *testing.T) {
 	t.Parallel()
 	var mu sync.Mutex

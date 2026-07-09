@@ -288,7 +288,7 @@ func TestDeviceStatusResult_String_UnnamedAndEmptyFields(t *testing.T) {
 }
 
 // TestPrintDeviceLines covers the monitor output helpers directly (the monitor
-// command blocks on an OS signal and is not driveable in-process).
+// command blocks on an OS signal and is not drivable in-process).
 func TestPrintDeviceLines(t *testing.T) {
 	t.Parallel()
 	var mu sync.Mutex

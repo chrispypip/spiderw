@@ -420,7 +420,7 @@ func (s *Station) SubscribePropertiesChanged(ctx context.Context, fn func(Statio
 }
 
 // SubscribeStateChanged registers fn for raw connection-state changes. An
-// unparseable state is skipped rather than surfaced as StationStateUnknown.
+// unparsable state is skipped rather than surfaced as StationStateUnknown.
 func (s *Station) SubscribeStateChanged(ctx context.Context, fn func(StationState)) (UnsubscribeFunc, error) {
 	if fn == nil {
 		return nil, fmt.Errorf("SubscribeStateChanged: fn cannot be nil")
