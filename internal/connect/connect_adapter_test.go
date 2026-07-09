@@ -91,9 +91,7 @@ func TestWiring_NewAdapter_FailurePaths(t *testing.T) {
 		newIwdAdapterFn = func(ctx context.Context, conn *dbus.Conn, path dbus.ObjectPath) (*iwdbus.Adapter, error) {
 			return nil, nil
 		}
-		newCoreAdapterFn = func(raw *iwdbus.Adapter) *core.Adapter {
-			return core.NewAdapter(raw)
-		}
+		newCoreAdapterFn = origNewCoreAdapter
 
 		w := &Wiring{Conn: &dbus.Conn{}}
 		a, err := w.NewAdapter(context.Background(), "/phy0")
@@ -115,5 +113,17 @@ func TestWiring_NewAdapter_FailurePaths(t *testing.T) {
 		require.Nil(t, a)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "core adapter interface not available")
+	})
+
+	t.Run("success", func(t *testing.T) {
+		newIwdAdapterFn = func(ctx context.Context, conn *dbus.Conn, path dbus.ObjectPath) (*iwdbus.Adapter, error) {
+			return &iwdbus.Adapter{}, nil
+		}
+		newCoreAdapterFn = origNewCoreAdapter
+
+		w := &Wiring{Conn: &dbus.Conn{}}
+		a, err := w.NewAdapter(context.Background(), "/phy0")
+		require.NoError(t, err)
+		require.NotNil(t, a)
 	})
 }

@@ -14,7 +14,7 @@ import (
 	"github.com/chrispypip/spiderw/internal/core"
 )
 
-func TestStress_Public_Adapter_MixedOperations(t *testing.T) {
+func TestStress_Public_Adapter_MixedMethods(t *testing.T) {
 	adapter := newTestAdapter(t)
 
 	// Ensure subscription tests have something to normalize.

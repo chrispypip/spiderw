@@ -41,12 +41,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("State", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Station)(nil).State(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-			require.True(t, errors.Is(err, ErrCore))
-		})
 
 		t.Run("DBusErrorMapping", func(t *testing.T) {
 			tests := []struct {
@@ -94,11 +88,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("Scanning", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Station)(nil).Scanning(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusStation{}
@@ -118,11 +107,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("ConnectedNetwork", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Station)(nil).ConnectedNetwork(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusStation{}
@@ -148,11 +132,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("ConnectedAccessPoint", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Station)(nil).ConnectedAccessPoint(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusStation{}
@@ -180,11 +159,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("Affinities", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Station)(nil).Affinities(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusStation{}
@@ -211,11 +185,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("Properties", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Station)(nil).Properties(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusStation{}
@@ -268,11 +237,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("Scan", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			err := (*Station)(nil).Scan(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusStation{}
@@ -290,11 +254,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("OrderedNetworks", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Station)(nil).OrderedNetworks(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusStation{}
@@ -332,11 +291,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("SetAffinities", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			err := (*Station)(nil).SetAffinities(ctx, []string{"/x"})
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("InvalidPathIsInvalidArgument", func(t *testing.T) {
 			tests := []string{"", "  ", "relative/path"}
@@ -368,11 +322,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("Disconnect", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			err := (*Station)(nil).Disconnect(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusStation{}
@@ -388,11 +337,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("ConnectHiddenNetwork", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			err := (*Station)(nil).ConnectHiddenNetwork(ctx, "HiddenNet")
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("EmptyNameIsInvalidArgument", func(t *testing.T) {
 			for _, bad := range []string{"", "   "} {
@@ -423,11 +367,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("HiddenAccessPoints", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Station)(nil).HiddenAccessPoints(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusStation{}
@@ -465,11 +404,6 @@ func TestStation_Core(t *testing.T) {
 	})
 
 	t.Run("SubscribePropertiesChanged", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Station)(nil).SubscribePropertiesChanged(ctx, func(StationPropertiesChanged) {})
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("NilCallback", func(t *testing.T) {
 			_, err := NewStation(&fakeIwdbusStation{}).SubscribePropertiesChanged(ctx, nil)
@@ -494,18 +428,35 @@ func TestStation_Core(t *testing.T) {
 			require.Equal(t, "connecting", got.Changed["State"])
 			require.Equal(t, []string{"ConnectedNetwork"}, got.Invalidated)
 		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewStation(f).SubscribePropertiesChanged(ctx, func(StationPropertiesChanged) {})
+			require.Error(t, err)
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
+			require.ErrorIs(t, err, ErrCore)
+		})
 	})
 
 	t.Run("SubscribeStateChanged", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Station)(nil).SubscribeStateChanged(ctx, func(StationState) {})
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrStationNotInitialized))
-		})
 
 		t.Run("NilCallback", func(t *testing.T) {
 			_, err := NewStation(&fakeIwdbusStation{}).SubscribeStateChanged(ctx, nil)
 			require.Error(t, err)
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindInvalidArgument, ce.Kind)
+			require.Equal(t, ResourceStation, ce.Resource)
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewStation(f).SubscribeStateChanged(ctx, func(StationState) {})
+			require.Error(t, err)
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
+			require.ErrorIs(t, err, ErrCore)
 		})
 
 		t.Run("DeliversEvent", func(t *testing.T) {
@@ -527,6 +478,19 @@ func TestStation_Core(t *testing.T) {
 		t.Run("NilCallback", func(t *testing.T) {
 			_, err := NewStation(&fakeIwdbusStation{}).SubscribeScanningChanged(ctx, nil)
 			require.Error(t, err)
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindInvalidArgument, ce.Kind)
+			require.Equal(t, ResourceStation, ce.Resource)
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusStation{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewStation(f).SubscribeScanningChanged(ctx, func(bool) {})
+			require.Error(t, err)
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
+			require.ErrorIs(t, err, ErrCore)
 		})
 
 		t.Run("DeliversEvent", func(t *testing.T) {
@@ -543,6 +507,119 @@ func TestStation_Core(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, fired)
 			require.True(t, got)
+		})
+	})
+
+	// Every method wraps a backend failure into a matchable core Error carrying
+	// ResourceStation with the cause chained through ErrCore, so a wrong-resource
+	// or swallowed-cause bug in any single method is caught (not just State).
+	t.Run("BackendErrorWraps", func(t *testing.T) {
+		t.Parallel()
+		backendErr := errors.New("dbus boom")
+		for _, tc := range []struct {
+			name string
+			call func(*Station) error
+		}{
+			{"State", func(s *Station) error { _, err := s.State(ctx); return err }},
+			{"Scanning", func(s *Station) error { _, err := s.Scanning(ctx); return err }},
+			{"ConnectedNetwork", func(s *Station) error { _, err := s.ConnectedNetwork(ctx); return err }},
+			{"ConnectedAccessPoint", func(s *Station) error { _, err := s.ConnectedAccessPoint(ctx); return err }},
+			{"Affinities", func(s *Station) error { _, err := s.Affinities(ctx); return err }},
+			{"Properties", func(s *Station) error { _, err := s.Properties(ctx); return err }},
+			{"Scan", func(s *Station) error { return s.Scan(ctx) }},
+			{"OrderedNetworks", func(s *Station) error { _, err := s.OrderedNetworks(ctx); return err }},
+			{"SetAffinities", func(s *Station) error { return s.SetAffinities(ctx, []string{"/x"}) }},
+			{"Disconnect", func(s *Station) error { return s.Disconnect(ctx) }},
+			{"ConnectHiddenNetwork", func(s *Station) error { return s.ConnectHiddenNetwork(ctx, "Hidden") }},
+			{"HiddenAccessPoints", func(s *Station) error { _, err := s.HiddenAccessPoints(ctx); return err }},
+			{"SubscribePropertiesChanged", func(s *Station) error {
+				_, err := s.SubscribePropertiesChanged(ctx, func(StationPropertiesChanged) {})
+				return err
+			}},
+			{"SubscribeStateChanged", func(s *Station) error {
+				_, err := s.SubscribeStateChanged(ctx, func(StationState) {})
+				return err
+			}},
+			{"SubscribeScanningChanged", func(s *Station) error {
+				_, err := s.SubscribeScanningChanged(ctx, func(bool) {})
+				return err
+			}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				f := &fakeIwdbusStation{}
+				f.state.Store(iwdbus.StationStateConnected)
+				f.setErr(backendErr)
+				err := tc.call(NewStation(f))
+				require.Error(t, err)
+				var ce *Error
+				require.ErrorAs(t, err, &ce)
+				require.Equal(t, ResourceStation, ce.Resource)
+				require.ErrorIs(t, err, backendErr)
+				require.ErrorIs(t, err, ErrCore)
+			})
+		}
+	})
+
+	// Every method guards a nil (uninitialized) receiver, returning a matchable
+	// ErrStationNotInitialized (which wraps ErrCore) rather than panicking.
+	t.Run("Uninitialized", func(t *testing.T) {
+		var s *Station
+		for _, tc := range []struct {
+			name string
+			call func() error
+		}{
+			{"State", func() error { _, err := s.State(ctx); return err }},
+			{"Scanning", func() error { _, err := s.Scanning(ctx); return err }},
+			{"ConnectedNetwork", func() error { _, err := s.ConnectedNetwork(ctx); return err }},
+			{"ConnectedAccessPoint", func() error { _, err := s.ConnectedAccessPoint(ctx); return err }},
+			{"Affinities", func() error { _, err := s.Affinities(ctx); return err }},
+			{"Properties", func() error { _, err := s.Properties(ctx); return err }},
+			{"Scan", func() error { return s.Scan(ctx) }},
+			{"OrderedNetworks", func() error { _, err := s.OrderedNetworks(ctx); return err }},
+			{"SetAffinities", func() error { return s.SetAffinities(ctx, []string{"/x"}) }},
+			{"Disconnect", func() error { return s.Disconnect(ctx) }},
+			{"ConnectHiddenNetwork", func() error { return s.ConnectHiddenNetwork(ctx, "x") }},
+			{"HiddenAccessPoints", func() error { _, err := s.HiddenAccessPoints(ctx); return err }},
+			{"SubscribePropertiesChanged", func() error {
+				_, err := s.SubscribePropertiesChanged(ctx, func(StationPropertiesChanged) {})
+				return err
+			}},
+			{"SubscribeScanningChanged", func() error {
+				_, err := s.SubscribeScanningChanged(ctx, func(bool) {})
+				return err
+			}},
+			{"SubscribeStateChanged", func() error {
+				_, err := s.SubscribeStateChanged(ctx, func(StationState) {})
+				return err
+			}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				err := tc.call()
+				require.ErrorIs(t, err, ErrStationNotInitialized)
+				require.ErrorIs(t, err, ErrCore)
+			})
+		}
+	})
+
+	t.Run("ParseStationState", func(t *testing.T) {
+		t.Run("Valid", func(t *testing.T) {
+			state, err := ParseStationState("connected")
+			require.NoError(t, err)
+			require.Equal(t, StationStateConnected, state)
+		})
+
+		t.Run("Invalid", func(t *testing.T) {
+			state, err := ParseStationState("bogus")
+			require.Error(t, err)
+			require.Equal(t, StationStateUnknown, state)
+
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindInvalidArgument, ce.Kind)
+			require.Equal(t, ResourceStation, ce.Resource)
+			require.ErrorIs(t, err, ErrCore)
+			require.Contains(t, err.Error(), "invalid station state")
 		})
 	})
 }

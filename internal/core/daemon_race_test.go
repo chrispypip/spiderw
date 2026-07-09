@@ -26,7 +26,7 @@ func TestRace_Core_Daemon_Info_ContextCancel(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRace_Core_Daemon_MixedCalls(t *testing.T) {
+func TestRace_Core_Daemon_MixedMethods(t *testing.T) {
 	daemon := newTestDaemon(t)
 
 	const N = 100

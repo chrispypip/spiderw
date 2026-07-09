@@ -36,33 +36,20 @@ func TestAdapter_Iwdbus(t *testing.T) {
 		t.Parallel()
 		t.Run("Adapter_GetPowered", testAdapter_GetPowered)
 		t.Run("Adapter_GetPoweredTimeout", testAdapter_GetPoweredTimeout)
-		t.Run("Adapter_GetPowered_WrongType", testAdapter_GetPowered_WrongType)
-		t.Run("Adapter_GetPowered_NoIntro", testAdapter_GetPowered_NoIntro)
-		t.Run("Adapter_GetPowered_Err", testAdapter_GetPowered_Err)
 		t.Run("Adapter_GetName", testAdapter_GetName)
 		t.Run("Adapter_GetNameTimeout", testAdapter_GetNameTimeout)
-		t.Run("Adapter_GetName_WrongType", testAdapter_GetName_WrongType)
-		t.Run("Adapter_GetName_NoIntro", testAdapter_GetName_NoIntro)
-		t.Run("Adapter_GetName_Err", testAdapter_GetName_Err)
 		t.Run("Adapter_GetModel_Valid", testAdapter_GetModel_Valid)
 		t.Run("Adapter_GetModel_Nil", testAdapter_GetModel_Nil)
 		t.Run("Adapter_GetModelTimeout", testAdapter_GetModelTimeout)
-		t.Run("Adapter_GetModel_WrongType", testAdapter_GetModel_WrongType)
-		t.Run("Adapter_GetModel_NoIntro", testAdapter_GetModel_NoIntro)
-		t.Run("Adapter_GetModel_Err", testAdapter_GetModel_Err)
 		t.Run("Adapter_GetVendor_Valid", testAdapter_GetVendor_Valid)
-		t.Run("Adapter_GetVendor_NoIntro", testAdapter_GetVendor_NoIntro)
 		t.Run("Adapter_GetVendor_Nil", testAdapter_GetVendor_Nil)
 		t.Run("Adapter_GetVendorTimeout", testAdapter_GetVendorTimeout)
-		t.Run("Adapter_GetVendor_WrongType", testAdapter_GetVendor_WrongType)
-		t.Run("Adapter_GetVendor_Err", testAdapter_GetVendor_Err)
 		t.Run("Adapter_GetSupportedModes", testAdapter_GetSupportedModes)
 		t.Run("Adapter_GetSupportedModes_Empty", testAdapter_GetSupportedModes_Empty)
 		t.Run("Adapter_GetSupportedModes_Nil", testAdapter_GetSupportedModes_Nil)
 		t.Run("Adapter_GetSupportedModesTimeout", testAdapter_GetSupportedModesTimeout)
-		t.Run("Adapter_GetSupportedModes_WrongType", testAdapter_GetSupportedModes_WrongType)
-		t.Run("Adapter_GetSupportedModes_NoIntro", testAdapter_GetSupportedModes_NoIntro)
-		t.Run("Adapter_GetSupportedModes_Err", testAdapter_GetSupportedModes_Err)
+		t.Run("Adapter_GetterWrongTypes", testAdapter_GetterWrongTypes)
+		t.Run("Adapter_GetterBackendErrors", testAdapter_GetterBackendErrors)
 	})
 
 	t.Run("AdapterSupports", func(t *testing.T) {
@@ -71,17 +58,13 @@ func TestAdapter_Iwdbus(t *testing.T) {
 		t.Run("Adapter_SupportsModeTimeout", testAdapter_SupportsModeTimeout)
 		t.Run("Adapter_SupportsMode_Invalid", testAdapter_SupportsMode_Invalid)
 		t.Run("Adapter_SupportsMode_GetSupportedModesError", testAdapter_SupportsMode_GetSupportedModesError)
-		t.Run("Adapter_SupportsMode_NoIntro", testAdapter_SupportsMode_NoIntro)
 		t.Run("Adapter_SupportsMode_Concurrent", testAdapter_SupportsMode_Concurrent)
 		t.Run("Adapter_SupportsStation", testAdapter_SupportsStation)
 		t.Run("Adapter_SupportsStationMultiple", testAdapter_SupportsStationMultiple)
-		t.Run("Adapter_SupportsStation_NoIntro", testAdapter_SupportsStation_NoIntro)
 		t.Run("Adapter_SupportsAP", testAdapter_SupportsAP)
 		t.Run("Adapter_SupportsAPMultiple", testAdapter_SupportsAPMultiple)
-		t.Run("Adapter_SupportsAP_NoIntro", testAdapter_SupportsAP_NoIntro)
 		t.Run("Adapter_SupportsAdHoc", testAdapter_SupportsAdHoc)
 		t.Run("Adapter_SupportsAdHocMultiple", testAdapter_SupportsAdHocMultiple)
-		t.Run("Adapter_SupportsAdHoc_NoIntro", testAdapter_SupportsAdHoc_NoIntro)
 		t.Run("Adapter_SupportsStation_Timeout", testAdapter_SupportsStation_Timeout)
 		t.Run("Adapter_SupportsAP_Timeout", testAdapter_SupportsAP_Timeout)
 		t.Run("Adapter_SupportsAdHoc_Timeout", testAdapter_SupportsAdHoc_Timeout)
@@ -91,8 +74,9 @@ func TestAdapter_Iwdbus(t *testing.T) {
 		t.Parallel()
 		t.Run("Adapter_SetPowered", testAdapter_SetPowered)
 		t.Run("Adapter_SetPoweredTimeout", testAdapter_SetPoweredTimeout)
-		t.Run("Adapter_SetPowered_Err", testAdapter_SetPowered_Err)
 	})
+
+	t.Run("NotInitialized", testAdapter_NoIntro)
 
 	t.Run("Subscribe", func(t *testing.T) {
 		t.Parallel()
@@ -501,43 +485,75 @@ func testAdapter_GetPoweredTimeout(t *testing.T) {
 	require.Error(t, err)
 }
 
-func testAdapter_GetPowered_WrongType(t *testing.T) {
+// testAdapter_GetterWrongTypes checks that every scalar getter reports a variant
+// conversion error (with a type-specific hint) when the backend returns a value
+// of the wrong Go type.
+func testAdapter_GetterWrongTypes(t *testing.T) {
 	t.Parallel()
 
-	a := &Adapter{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return "not-bool", nil
-		},
-	}}
+	for _, tc := range []struct {
+		name     string
+		badValue interface{}
+		call     func(context.Context, *Adapter) error
+		wantHint string
+	}{
+		{"GetPowered", "not-bool", func(ctx context.Context, a *Adapter) error { _, err := a.GetPowered(ctx); return err }, "expected bool"},
+		{"GetName", 123, func(ctx context.Context, a *Adapter) error { _, err := a.GetName(ctx); return err }, "expected string"},
+		{"GetModel", 123, func(ctx context.Context, a *Adapter) error { _, err := a.GetModel(ctx); return err }, "expected string or variant(string)"},
+		{"GetVendor", 123, func(ctx context.Context, a *Adapter) error { _, err := a.GetVendor(ctx); return err }, "expected string or variant(string)"},
+		{"GetSupportedModes", "not-bool", func(ctx context.Context, a *Adapter) error { _, err := a.GetSupportedModes(ctx); return err }, "unexpected type string"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	_, err := a.GetPowered(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus variant conversion error")
-	require.Contains(t, err.Error(), "expected bool")
+			a := &Adapter{call: &fakeCaller{
+				getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
+					return tc.badValue, nil
+				},
+			}}
+
+			err := tc.call(context.Background(), a)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "dbus variant conversion error")
+			require.Contains(t, err.Error(), tc.wantHint)
+		})
+	}
 }
 
-func testAdapter_GetPowered_NoIntro(t *testing.T) {
+// testAdapter_GetterBackendErrors checks that every getter and setter propagates
+// a backend call failure unchanged.
+func testAdapter_GetterBackendErrors(t *testing.T) {
 	t.Parallel()
 
-	a := &Adapter{call: nil}
+	newFailing := func() *Adapter {
+		return &Adapter{call: &fakeCaller{
+			getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
+				return nil, fmt.Errorf("dbus failure")
+			},
+			setPropFn: func(ctx context.Context, iface, prop string, val interface{}) error {
+				return fmt.Errorf("dbus failure")
+			},
+		}}
+	}
 
-	_, err := a.GetPowered(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "adapter is not initialized")
-}
-
-func testAdapter_GetPowered_Err(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return nil, fmt.Errorf("dbus failure")
-		},
-	}}
-
-	_, err := a.GetPowered(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
+	for _, tc := range []struct {
+		name string
+		call func(context.Context, *Adapter) error
+	}{
+		{"GetPowered", func(ctx context.Context, a *Adapter) error { _, err := a.GetPowered(ctx); return err }},
+		{"GetName", func(ctx context.Context, a *Adapter) error { _, err := a.GetName(ctx); return err }},
+		{"GetModel", func(ctx context.Context, a *Adapter) error { _, err := a.GetModel(ctx); return err }},
+		{"GetVendor", func(ctx context.Context, a *Adapter) error { _, err := a.GetVendor(ctx); return err }},
+		{"GetSupportedModes", func(ctx context.Context, a *Adapter) error { _, err := a.GetSupportedModes(ctx); return err }},
+		{"SetPowered", func(ctx context.Context, a *Adapter) error { return a.SetPowered(ctx, true) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.call(context.Background(), newFailing())
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "dbus failure")
+		})
+	}
 }
 
 func testAdapter_GetName(t *testing.T) {
@@ -573,45 +589,6 @@ func testAdapter_GetNameTimeout(t *testing.T) {
 
 	_, err := a.GetName(ctx)
 	require.Error(t, err)
-}
-
-func testAdapter_GetName_WrongType(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return 123, nil
-		},
-	}}
-
-	_, err := a.GetName(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus variant conversion error")
-	require.Contains(t, err.Error(), "expected string")
-}
-
-func testAdapter_GetName_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: nil}
-
-	_, err := a.GetName(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "adapter is not initialized")
-}
-
-func testAdapter_GetName_Err(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return nil, fmt.Errorf("dbus failure")
-		},
-	}}
-
-	_, err := a.GetName(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
 }
 
 func testAdapter_GetModel_Valid(t *testing.T) {
@@ -664,45 +641,6 @@ func testAdapter_GetModelTimeout(t *testing.T) {
 	require.Error(t, err)
 }
 
-func testAdapter_GetModel_WrongType(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return 123, nil
-		},
-	}}
-
-	_, err := a.GetModel(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus variant conversion error")
-	require.Contains(t, err.Error(), "expected string or variant(string)")
-}
-
-func testAdapter_GetModel_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: nil}
-
-	_, err := a.GetModel(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "adapter is not initialized")
-}
-
-func testAdapter_GetModel_Err(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return nil, fmt.Errorf("dbus failure")
-		},
-	}}
-
-	_, err := a.GetModel(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
-}
-
 func testAdapter_GetVendor_Valid(t *testing.T) {
 	t.Parallel()
 
@@ -716,16 +654,6 @@ func testAdapter_GetVendor_Valid(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, model)
 	require.Equal(t, "Broadcom", *model)
-}
-
-func testAdapter_GetVendor_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: nil}
-
-	_, err := a.GetVendor(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "adapter is not initialized")
 }
 
 func testAdapter_GetVendor_Nil(t *testing.T) {
@@ -761,35 +689,6 @@ func testAdapter_GetVendorTimeout(t *testing.T) {
 
 	_, err := a.GetVendor(ctx)
 	require.Error(t, err)
-}
-
-func testAdapter_GetVendor_WrongType(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return 123, nil
-		},
-	}}
-
-	_, err := a.GetVendor(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus variant conversion error")
-	require.Contains(t, err.Error(), "expected string or variant(string)")
-}
-
-func testAdapter_GetVendor_Err(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return nil, fmt.Errorf("dbus failure")
-		},
-	}}
-
-	_, err := a.GetVendor(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
 }
 
 func testAdapter_GetSupportedModes(t *testing.T) {
@@ -855,45 +754,6 @@ func testAdapter_GetSupportedModesTimeout(t *testing.T) {
 	require.Error(t, err)
 }
 
-func testAdapter_GetSupportedModes_WrongType(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return "not-bool", nil
-		},
-	}}
-
-	_, err := a.GetSupportedModes(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus variant conversion error")
-	require.Contains(t, err.Error(), "unexpected type string")
-}
-
-func testAdapter_GetSupportedModes_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: nil}
-
-	_, err := a.GetSupportedModes(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "adapter is not initialized")
-}
-
-func testAdapter_GetSupportedModes_Err(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return nil, fmt.Errorf("dbus failure")
-		},
-	}}
-
-	_, err := a.GetSupportedModes(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
-}
-
 func testAdapter_SupportsMode_Valid(t *testing.T) {
 	t.Parallel()
 
@@ -940,6 +800,7 @@ func testAdapter_SupportsMode_Invalid(t *testing.T) {
 
 	_, err := a.SupportsMode(context.Background(), ModeUnknown)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid mode")
 }
 
 func testAdapter_SupportsMode_GetSupportedModesError(t *testing.T) {
@@ -954,16 +815,6 @@ func testAdapter_SupportsMode_GetSupportedModesError(t *testing.T) {
 	_, err := a.SupportsMode(context.Background(), ModeStation)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "dbus failure")
-}
-
-func testAdapter_SupportsMode_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: nil}
-
-	_, err := a.SupportsMode(context.Background(), ModeStation)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "adapter is not initialized")
 }
 
 func testAdapter_SupportsMode_Concurrent(t *testing.T) {
@@ -1026,20 +877,6 @@ func testAdapter_SetPoweredTimeout(t *testing.T) {
 	require.Error(t, err)
 }
 
-func testAdapter_SetPowered_Err(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: &fakeCaller{
-		setPropFn: func(ctx context.Context, iface, prop string, val interface{}) error {
-			return fmt.Errorf("dbus failure")
-		},
-	}}
-
-	err := a.SetPowered(context.Background(), true)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
-}
-
 func testAdapter_SupportsStation(t *testing.T) {
 	t.Parallel()
 
@@ -1066,16 +903,6 @@ func testAdapter_SupportsStationMultiple(t *testing.T) {
 	ok, err := a.SupportsStation(context.Background())
 	require.NoError(t, err)
 	require.True(t, ok)
-}
-
-func testAdapter_SupportsStation_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: nil}
-
-	_, err := a.SupportsStation(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "adapter is not initialized")
 }
 
 func testAdapter_SupportsAP(t *testing.T) {
@@ -1106,16 +933,6 @@ func testAdapter_SupportsAPMultiple(t *testing.T) {
 	require.True(t, ok)
 }
 
-func testAdapter_SupportsAP_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: nil}
-
-	_, err := a.SupportsAP(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "adapter is not initialized")
-}
-
 func testAdapter_SupportsAdHoc(t *testing.T) {
 	t.Parallel()
 
@@ -1142,16 +959,6 @@ func testAdapter_SupportsAdHocMultiple(t *testing.T) {
 	ok, err := a.SupportsStation(context.Background())
 	require.NoError(t, err)
 	require.True(t, ok)
-}
-
-func testAdapter_SupportsAdHoc_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	a := &Adapter{call: nil}
-
-	_, err := a.SupportsAdHoc(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "adapter is not initialized")
 }
 
 func testAdapter_SupportsStation_Timeout(t *testing.T) {
@@ -1466,4 +1273,35 @@ func testAdapter_FirehosePropertiesChanged(t *testing.T) {
 
 func newGetAllAdapter(fn func(ctx context.Context, iface string) (map[string]dbus.Variant, error)) *Adapter {
 	return &Adapter{call: &fakeCaller{getAllFn: fn}}
+}
+
+// testAdapter_NoIntro checks every init-guarded method reports a clean
+// "adapter is not initialized" error when the Adapter has no caller.
+func testAdapter_NoIntro(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name string
+		call func(*Adapter) error
+	}{
+		{"GetName", func(a *Adapter) error { _, err := a.GetName(ctx); return err }},
+		{"GetModel", func(a *Adapter) error { _, err := a.GetModel(ctx); return err }},
+		{"GetVendor", func(a *Adapter) error { _, err := a.GetVendor(ctx); return err }},
+		{"GetPowered", func(a *Adapter) error { _, err := a.GetPowered(ctx); return err }},
+		{"GetSupportedModes", func(a *Adapter) error { _, err := a.GetSupportedModes(ctx); return err }},
+		{"GetProperties", func(a *Adapter) error { _, err := a.GetProperties(ctx); return err }},
+		{"SetPowered", func(a *Adapter) error { return a.SetPowered(ctx, true) }},
+		{"SupportsMode", func(a *Adapter) error { _, err := a.SupportsMode(ctx, ModeStation); return err }},
+		{"SupportsStation", func(a *Adapter) error { _, err := a.SupportsStation(ctx); return err }},
+		{"SupportsAP", func(a *Adapter) error { _, err := a.SupportsAP(ctx); return err }},
+		{"SupportsAdHoc", func(a *Adapter) error { _, err := a.SupportsAdHoc(ctx); return err }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.call(&Adapter{call: nil})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "adapter is not initialized")
+		})
+	}
 }

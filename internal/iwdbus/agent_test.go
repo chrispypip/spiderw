@@ -19,6 +19,7 @@ func TestAgent_Iwdbus(t *testing.T) {
 		t.Run("RegisterAgent", testAgentManager_RegisterAgent)
 		t.Run("UnregisterAgent", testAgentManager_UnregisterAgent)
 		t.Run("RegisterAgent_ErrorMapping", testAgentManager_RegisterAgent_ErrorMapping)
+		t.Run("UnregisterAgent_ErrorMapping", testAgentManager_UnregisterAgent_ErrorMapping)
 		t.Run("RegisterAgent_Uninitialized", testAgentManager_RegisterAgent_Uninitialized)
 		t.Run("UnregisterAgent_Uninitialized", testAgentManager_UnregisterAgent_Uninitialized)
 	})
@@ -74,6 +75,17 @@ func testAgentManager_RegisterAgent_ErrorMapping(t *testing.T) {
 		return nil, dbus.Error{Name: IwdErrorBusy, Body: []interface{}{"busy"}}
 	}}}
 	err := m.RegisterAgent(context.Background(), "/spiderw/agent")
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrBusy)
+	require.ErrorIs(t, err, ErrDBusMethod)
+}
+
+func testAgentManager_UnregisterAgent_ErrorMapping(t *testing.T) {
+	t.Parallel()
+	m := &AgentManager{intro: &fakeCaller{callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+		return nil, dbus.Error{Name: IwdErrorBusy, Body: []interface{}{"busy"}}
+	}}}
+	err := m.UnregisterAgent(context.Background(), "/spiderw/agent")
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrBusy)
 	require.ErrorIs(t, err, ErrDBusMethod)

@@ -148,6 +148,126 @@ func Fuzz_Iwdbus_ParseMode(f *testing.F) {
 	})
 }
 
+// Fuzz_Iwdbus_EnumParsers exercises the string→enum decoders of externally
+// supplied iwd property values. They must never panic on arbitrary input.
+func Fuzz_Iwdbus_EnumParsers(f *testing.F) {
+	f.Add("station")
+	f.Add("connected")
+	f.Add("psk")
+	f.Add("")
+	f.Add("bogus")
+
+	f.Fuzz(func(t *testing.T, s string) {
+		// string form
+		_, _ = parseNetworkType(s)
+		_, _ = parseStationState(s)
+		_, _ = parseDeviceMode(s)
+		// wrong-type form (exercises the type-assertion failure branch)
+		_, _ = parseNetworkType(int64(1))
+		_, _ = parseStationState(dbus.MakeVariant(s))
+		_, _ = parseDeviceMode(struct{}{})
+	})
+}
+
+// Fuzz_Iwdbus_ObjectPathParsers exercises the object-path decoders across every
+// accepted concrete shape (string, dbus.ObjectPath, dbus.Variant) plus a
+// wrong-typed value, ensuring path validation never panics on adversarial input.
+func Fuzz_Iwdbus_ObjectPathParsers(f *testing.F) {
+	f.Add("/net/connman/iwd/0/3")
+	f.Add("/")
+	f.Add("")
+	f.Add("not-absolute")
+	f.Add("/with spaces/and\x00nul")
+
+	f.Fuzz(func(t *testing.T, s string) {
+		for _, v := range []interface{}{
+			s,
+			dbus.ObjectPath(s),
+			dbus.MakeVariant(s),
+			dbus.MakeVariant(dbus.ObjectPath(s)),
+			int64(7), // wrong type
+			nil,
+		} {
+			_, _ = parseNetworkObjectPath("field", v)
+			_, _ = parseObjectPath(v)
+			_, _ = parseOptionalObjectPath(v)
+			_, _ = parseStationObjectPath("field", v)
+		}
+	})
+}
+
+// Fuzz_Iwdbus_ObjectPathListParsers exercises the array-of-object-path decoders
+// across the []dbus.ObjectPath and []interface{} forms with adversarial paths.
+func Fuzz_Iwdbus_ObjectPathListParsers(f *testing.F) {
+	f.Add([]byte("/a,/b"))
+	f.Add([]byte(""))
+	f.Add([]byte("not-a-path"))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		var typed []dbus.ObjectPath
+		var iface []interface{}
+		if len(data) > 0 {
+			for _, part := range bytes.Split(data, []byte{','}) {
+				typed = append(typed, dbus.ObjectPath(part))
+				iface = append(iface, dbus.ObjectPath(part))
+			}
+		}
+		_, _ = parseObjectPathList(typed)
+		_, _ = parseObjectPathList(iface)
+		_, _ = parseStationAffinities(typed)
+		_, _ = parseStationAffinities(iface)
+		_, _ = parseStationAffinities(dbus.MakeVariant(typed))
+		// wrong element type + wrong container type
+		_, _ = parseObjectPathList([]interface{}{123})
+		_, _ = parseStationAffinities("not-an-array")
+	})
+}
+
+// Fuzz_Iwdbus_ManagedObjectExtractors exercises the managed-object map decoders
+// that pull required properties out of an ObjectManager reply, using the fuzz
+// input as both the object path and the property value.
+func Fuzz_Iwdbus_ManagedObjectExtractors(f *testing.F) {
+	f.Add("/net/connman/iwd/0/3", "wlan0")
+	f.Add("", "")
+	f.Add("bad", "  ")
+
+	f.Fuzz(func(t *testing.T, path string, val string) {
+		p := dbus.ObjectPath(path)
+		_, _ = bssAddressFromManagedObject(p, map[string]dbus.Variant{"Address": dbus.MakeVariant(val)})
+		_, _ = bssAddressFromManagedObject(p, map[string]dbus.Variant{}) // missing
+		_, _ = bssAddressFromManagedObject(p, map[string]dbus.Variant{"Address": dbus.MakeVariant(int64(1))})
+		_, _ = objectNameFromManagedObject("adapter", p, map[string]dbus.Variant{"Name": dbus.MakeVariant(val)})
+		_, _ = objectNameFromManagedObject("device", p, map[string]dbus.Variant{})
+		_ = stationNameFromDevice(map[string]map[string]dbus.Variant{
+			IwdDeviceIface: {"Name": dbus.MakeVariant(val)},
+		})
+	})
+}
+
+// Fuzz_Iwdbus_ParseDaemonInfo exercises the Daemon.GetInfo payload decoder across
+// both accepted map shapes (dbus.Variant-valued and interface{}-valued) plus a
+// non-map payload, ensuring malformed daemon metadata never panics.
+func Fuzz_Iwdbus_ParseDaemonInfo(f *testing.F) {
+	f.Add("1.30", "/var/lib/iwd", true)
+	f.Add("", "", false)
+
+	f.Fuzz(func(t *testing.T, version string, stateDir string, netConf bool) {
+		_, _ = parseDaemonInfo(map[string]dbus.Variant{
+			"Version":                     dbus.MakeVariant(version),
+			"StateDirectory":              dbus.MakeVariant(stateDir),
+			"NetworkConfigurationEnabled": dbus.MakeVariant(netConf),
+		})
+		_, _ = parseDaemonInfo(map[string]interface{}{
+			"Version":                     version,
+			"StateDirectory":              dbus.MakeVariant(stateDir),
+			"NetworkConfigurationEnabled": netConf,
+		})
+		// wrong field types + non-map payload
+		_, _ = parseDaemonInfo(map[string]dbus.Variant{"Version": dbus.MakeVariant(int64(1))})
+		_, _ = parseDaemonInfo(version)
+	})
+}
+
 func Fuzz_Iwdbus_IsUnknownPropertyError(f *testing.F) {
 	f.Add([]byte("GetProperty failed: unknown property"))
 	f.Add([]byte("some other error"))

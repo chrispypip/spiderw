@@ -68,7 +68,7 @@ func TestStress_Core_Daemon_MixedMethods(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Core_Daemon_Nil(t *testing.T) {
+func TestStress_Core_Daemon_NilReceiver(t *testing.T) {
 	var d *Daemon
 
 	const N = 500

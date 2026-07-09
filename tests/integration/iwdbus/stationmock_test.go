@@ -145,7 +145,7 @@ func TestStationMock_Unavailable(t *testing.T) {
 
 // TestStationMock_CLIStatus drives the `station status` CLI command in-process
 // against the mock, confirming the read path renders end to end.
-func TestStationMock_CLIStatus(t *testing.T) {
+func TestStationMock_CLI_Status(t *testing.T) {
 	tmpDir := t.TempDir()
 	iwdmock.StartMockNormal(t, tmpDir)
 
@@ -158,7 +158,7 @@ func TestStationMock_CLIStatus(t *testing.T) {
 }
 
 // TestStationMock_CLIList drives `station list` against the mock.
-func TestStationMock_CLIList(t *testing.T) {
+func TestStationMock_CLI_List(t *testing.T) {
 	tmpDir := t.TempDir()
 	iwdmock.StartMockNormal(t, tmpDir)
 
@@ -221,7 +221,7 @@ func TestStationMock_OrderedNetworks(t *testing.T) {
 
 // TestStationMock_CLIAffinitiesByMAC drives `affinities set <mac>`: the MAC
 // resolves device-wide to its BSS object path, and `affinities` then renders it.
-func TestStationMock_CLIAffinitiesByMAC(t *testing.T) {
+func TestStationMock_CLI_AffinitiesByMAC(t *testing.T) {
 	tmpDir := t.TempDir()
 	iwdmock.StartMockNormal(t, tmpDir)
 
@@ -269,7 +269,7 @@ func TestStationMock_SetAffinities(t *testing.T) {
 
 // TestStationMock_CLIScan drives `station <path> scan` (wait mode) against the
 // mock: it waits for the scan to finish, then lists the networks.
-func TestStationMock_CLIScan(t *testing.T) {
+func TestStationMock_CLI_Scan(t *testing.T) {
 	tmpDir := t.TempDir()
 	iwdmock.StartMockNormal(t, tmpDir)
 
@@ -280,7 +280,7 @@ func TestStationMock_CLIScan(t *testing.T) {
 }
 
 // TestStationMock_CLINetworks drives `station <path> networks` against the mock.
-func TestStationMock_CLINetworks(t *testing.T) {
+func TestStationMock_CLI_Networks(t *testing.T) {
 	tmpDir := t.TempDir()
 	iwdmock.StartMockNormal(t, tmpDir)
 
@@ -415,7 +415,7 @@ func TestStationMock_HiddenAccessPoints(t *testing.T) {
 
 // TestStationMock_CLIDisconnectHiddenAPs drives the disconnect / connect-hidden /
 // hidden-aps CLI verbs against the mock.
-func TestStationMock_CLIDisconnectHiddenAPs(t *testing.T) {
+func TestStationMock_CLI_DisconnectHiddenAPs(t *testing.T) {
 	t.Run("disconnect", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		iwdmock.StartMockNormal(t, tmpDir)

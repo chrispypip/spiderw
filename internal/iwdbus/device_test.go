@@ -18,43 +18,31 @@ func TestDevice_Iwdbus(t *testing.T) {
 	t.Run("Getters", func(t *testing.T) {
 		t.Parallel()
 		t.Run("Device_GetName", testDevice_GetName)
-		t.Run("Device_GetName_WrongType", testDevice_GetName_WrongType)
-		t.Run("Device_GetName_NoIntro", testDevice_GetName_NoIntro)
-		t.Run("Device_GetName_Err", testDevice_GetName_Err)
 		t.Run("Device_GetNameTimeout", testDevice_GetNameTimeout)
 		t.Run("Device_GetAddress", testDevice_GetAddress)
-		t.Run("Device_GetAddress_WrongType", testDevice_GetAddress_WrongType)
-		t.Run("Device_GetAddress_NoIntro", testDevice_GetAddress_NoIntro)
 		t.Run("Device_GetPowered", testDevice_GetPowered)
-		t.Run("Device_GetPowered_WrongType", testDevice_GetPowered_WrongType)
-		t.Run("Device_GetPowered_NoIntro", testDevice_GetPowered_NoIntro)
 		t.Run("Device_GetMode", testDevice_GetMode)
 		t.Run("Device_GetMode_Invalid", testDevice_GetMode_Invalid)
-		t.Run("Device_GetMode_WrongType", testDevice_GetMode_WrongType)
-		t.Run("Device_GetMode_NoIntro", testDevice_GetMode_NoIntro)
 		t.Run("Device_GetAdapter", testDevice_GetAdapter)
 		t.Run("Device_GetAdapter_String", testDevice_GetAdapter_String)
-		t.Run("Device_GetAdapter_WrongType", testDevice_GetAdapter_WrongType)
-		t.Run("Device_GetAdapter_NoIntro", testDevice_GetAdapter_NoIntro)
+		t.Run("Device_GetterWrongTypes", testDevice_GetterWrongTypes)
+		t.Run("Device_GetterBackendErrors", testDevice_GetterBackendErrors)
 	})
 
 	t.Run("Set", func(t *testing.T) {
 		t.Parallel()
 		t.Run("Device_SetPowered", testDevice_SetPowered)
-		t.Run("Device_SetPowered_Err", testDevice_SetPowered_Err)
-		t.Run("Device_SetPowered_NoIntro", testDevice_SetPowered_NoIntro)
 		t.Run("Device_SetMode", testDevice_SetMode)
 		t.Run("Device_SetMode_Invalid", testDevice_SetMode_Invalid)
-		t.Run("Device_SetMode_Err", testDevice_SetMode_Err)
-		t.Run("Device_SetMode_NoIntro", testDevice_SetMode_NoIntro)
 	})
 
 	t.Run("Properties", func(t *testing.T) {
 		t.Parallel()
 		t.Run("Device_GetProperties", testDevice_GetProperties)
 		t.Run("Device_GetProperties_Errors", testDevice_GetProperties_Errors)
-		t.Run("Device_GetProperties_NoIntro", testDevice_GetProperties_NoIntro)
 	})
+
+	t.Run("NotInitialized", testDevice_NoIntro)
 
 	t.Run("Subscribe", func(t *testing.T) {
 		t.Parallel()
@@ -89,43 +77,70 @@ func testDevice_GetName(t *testing.T) {
 	require.Equal(t, "wlan0", name)
 }
 
-func testDevice_GetName_WrongType(t *testing.T) {
+// testDevice_GetterWrongTypes checks that every scalar getter reports a
+// type-specific conversion error when the backend returns the wrong Go type.
+func testDevice_GetterWrongTypes(t *testing.T) {
 	t.Parallel()
 
-	d := &Device{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return 123, nil
-		},
-	}}
+	for _, tc := range []struct {
+		name     string
+		badValue interface{}
+		call     func(context.Context, *Device) error
+		wantHint string
+	}{
+		{"GetName", 123, func(ctx context.Context, d *Device) error { _, err := d.GetName(ctx); return err }, "expected string"},
+		{"GetAddress", 123, func(ctx context.Context, d *Device) error { _, err := d.GetAddress(ctx); return err }, "expected string"},
+		{"GetPowered", "not-bool", func(ctx context.Context, d *Device) error { _, err := d.GetPowered(ctx); return err }, "expected bool"},
+		{"GetMode", 42, func(ctx context.Context, d *Device) error { _, err := d.GetMode(ctx); return err }, "expected string"},
+		{"GetAdapter", 123, func(ctx context.Context, d *Device) error { _, err := d.GetAdapter(ctx); return err }, "expected object path"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	_, err := d.GetName(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus variant conversion error")
-	require.Contains(t, err.Error(), "expected string")
+			d := &Device{call: &fakeCaller{
+				getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
+					return tc.badValue, nil
+				},
+			}}
+
+			err := tc.call(context.Background(), d)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.wantHint)
+		})
+	}
 }
 
-func testDevice_GetName_NoIntro(t *testing.T) {
+// testDevice_GetterBackendErrors checks that getters and setters propagate a
+// backend call failure unchanged.
+func testDevice_GetterBackendErrors(t *testing.T) {
 	t.Parallel()
 
-	d := &Device{call: nil}
+	newFailing := func() *Device {
+		return &Device{call: &fakeCaller{
+			getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
+				return nil, fmt.Errorf("dbus failure")
+			},
+			setPropFn: func(ctx context.Context, iface, prop string, val interface{}) error {
+				return fmt.Errorf("dbus failure")
+			},
+		}}
+	}
 
-	_, err := d.GetName(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "device is not initialized")
-}
-
-func testDevice_GetName_Err(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return nil, fmt.Errorf("dbus failure")
-		},
-	}}
-
-	_, err := d.GetName(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
+	for _, tc := range []struct {
+		name string
+		call func(context.Context, *Device) error
+	}{
+		{"GetName", func(ctx context.Context, d *Device) error { _, err := d.GetName(ctx); return err }},
+		{"SetPowered", func(ctx context.Context, d *Device) error { return d.SetPowered(ctx, true) }},
+		{"SetMode", func(ctx context.Context, d *Device) error { return d.SetMode(ctx, ModeStation) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.call(context.Background(), newFailing())
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "dbus failure")
+		})
+	}
 }
 
 func testDevice_GetNameTimeout(t *testing.T) {
@@ -164,30 +179,6 @@ func testDevice_GetAddress(t *testing.T) {
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", addr)
 }
 
-func testDevice_GetAddress_WrongType(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return 123, nil
-		},
-	}}
-
-	_, err := d.GetAddress(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "expected string")
-}
-
-func testDevice_GetAddress_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: nil}
-
-	_, err := d.GetAddress(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "device is not initialized")
-}
-
 func testDevice_GetPowered(t *testing.T) {
 	t.Parallel()
 
@@ -201,30 +192,6 @@ func testDevice_GetPowered(t *testing.T) {
 	val, err := d.GetPowered(context.Background())
 	require.NoError(t, err)
 	require.True(t, val)
-}
-
-func testDevice_GetPowered_WrongType(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return "not-bool", nil
-		},
-	}}
-
-	_, err := d.GetPowered(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "expected bool")
-}
-
-func testDevice_GetPowered_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: nil}
-
-	_, err := d.GetPowered(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "device is not initialized")
 }
 
 func testDevice_GetMode(t *testing.T) {
@@ -256,30 +223,6 @@ func testDevice_GetMode_Invalid(t *testing.T) {
 	require.Contains(t, err.Error(), "invalid mode")
 }
 
-func testDevice_GetMode_WrongType(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return 42, nil
-		},
-	}}
-
-	_, err := d.GetMode(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "expected string")
-}
-
-func testDevice_GetMode_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: nil}
-
-	_, err := d.GetMode(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "device is not initialized")
-}
-
 func testDevice_GetAdapter(t *testing.T) {
 	t.Parallel()
 
@@ -309,30 +252,6 @@ func testDevice_GetAdapter_String(t *testing.T) {
 	require.Equal(t, dbus.ObjectPath("/net/connman/iwd/phy0"), path)
 }
 
-func testDevice_GetAdapter_WrongType(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return 123, nil
-		},
-	}}
-
-	_, err := d.GetAdapter(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "expected object path")
-}
-
-func testDevice_GetAdapter_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: nil}
-
-	_, err := d.GetAdapter(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "device is not initialized")
-}
-
 func testDevice_SetPowered(t *testing.T) {
 	t.Parallel()
 
@@ -350,30 +269,6 @@ func testDevice_SetPowered(t *testing.T) {
 	err := d.SetPowered(context.Background(), true)
 	require.NoError(t, err)
 	require.True(t, called)
-}
-
-func testDevice_SetPowered_Err(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: &fakeCaller{
-		setPropFn: func(ctx context.Context, iface, prop string, val interface{}) error {
-			return fmt.Errorf("dbus failure")
-		},
-	}}
-
-	err := d.SetPowered(context.Background(), true)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
-}
-
-func testDevice_SetPowered_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: nil}
-
-	err := d.SetPowered(context.Background(), true)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "device is not initialized")
 }
 
 func testDevice_SetMode(t *testing.T) {
@@ -407,30 +302,6 @@ func testDevice_SetMode_Invalid(t *testing.T) {
 	err := d.SetMode(context.Background(), ModeUnknown)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid mode")
-}
-
-func testDevice_SetMode_Err(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: &fakeCaller{
-		setPropFn: func(ctx context.Context, iface, prop string, val interface{}) error {
-			return fmt.Errorf("dbus failure")
-		},
-	}}
-
-	err := d.SetMode(context.Background(), ModeStation)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
-}
-
-func testDevice_SetMode_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: nil}
-
-	err := d.SetMode(context.Background(), ModeStation)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "device is not initialized")
 }
 
 func testDevice_GetProperties(t *testing.T) {
@@ -516,16 +387,6 @@ func testDevice_GetProperties_Errors(t *testing.T) {
 			require.Contains(t, err.Error(), tc.wantContains)
 		})
 	}
-}
-
-func testDevice_GetProperties_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	d := &Device{call: nil}
-
-	_, err := d.GetProperties(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "device is not initialized")
 }
 
 func testDevice_SubscribePropertiesChanged(t *testing.T) {
@@ -741,4 +602,32 @@ func testDevice_FirehosePropertiesChanged(t *testing.T) {
 
 func newGetAllDevice(fn func(ctx context.Context, iface string) (map[string]dbus.Variant, error)) *Device {
 	return &Device{call: &fakeCaller{getAllFn: fn}}
+}
+
+// testDevice_NoIntro checks every init-guarded method reports a clean
+// "device is not initialized" error when the Device has no caller.
+func testDevice_NoIntro(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name string
+		call func(*Device) error
+	}{
+		{"GetName", func(d *Device) error { _, err := d.GetName(ctx); return err }},
+		{"GetAddress", func(d *Device) error { _, err := d.GetAddress(ctx); return err }},
+		{"GetPowered", func(d *Device) error { _, err := d.GetPowered(ctx); return err }},
+		{"GetMode", func(d *Device) error { _, err := d.GetMode(ctx); return err }},
+		{"GetAdapter", func(d *Device) error { _, err := d.GetAdapter(ctx); return err }},
+		{"GetProperties", func(d *Device) error { _, err := d.GetProperties(ctx); return err }},
+		{"SetPowered", func(d *Device) error { return d.SetPowered(ctx, true) }},
+		{"SetMode", func(d *Device) error { return d.SetMode(ctx, ModeStation) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.call(&Device{call: nil})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "device is not initialized")
+		})
+	}
 }

@@ -41,12 +41,6 @@ func TestDevice_Core(t *testing.T) {
 	})
 
 	t.Run("Name", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Device)(nil).Name(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrDeviceNotInitialized))
-			require.True(t, errors.Is(err, ErrCore))
-		})
 
 		t.Run("DBusErrorMapping", func(t *testing.T) {
 			tests := []struct {
@@ -94,10 +88,16 @@ func TestDevice_Core(t *testing.T) {
 	})
 
 	t.Run("Address", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Device)(nil).Address(ctx)
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusDevice{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewDevice(f).Address(ctx)
 			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrDeviceNotInitialized))
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindUnavailable, ce.Kind)
+			require.Equal(t, ResourceDevice, ce.Resource)
 		})
 
 		t.Run("EmptyIsInvalidState", func(t *testing.T) {
@@ -118,11 +118,6 @@ func TestDevice_Core(t *testing.T) {
 	})
 
 	t.Run("Powered", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (&Device{raw: nil}).Powered(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrDeviceNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusDevice{}
@@ -140,11 +135,6 @@ func TestDevice_Core(t *testing.T) {
 	})
 
 	t.Run("SetPowered", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			err := (*Device)(nil).SetPowered(ctx, true)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrDeviceNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusDevice{}
@@ -163,11 +153,6 @@ func TestDevice_Core(t *testing.T) {
 	})
 
 	t.Run("Mode", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Device)(nil).Mode(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrDeviceNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusDevice{}
@@ -196,11 +181,6 @@ func TestDevice_Core(t *testing.T) {
 	})
 
 	t.Run("SetMode", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			err := (*Device)(nil).SetMode(ctx, ModeAP)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrDeviceNotInitialized))
-		})
 
 		t.Run("InvalidArgument", func(t *testing.T) {
 			f := &fakeIwdbusDevice{}
@@ -229,10 +209,16 @@ func TestDevice_Core(t *testing.T) {
 	})
 
 	t.Run("Adapter", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Device)(nil).Adapter(ctx)
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusDevice{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewDevice(f).Adapter(ctx)
 			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrDeviceNotInitialized))
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindUnavailable, ce.Kind)
+			require.Equal(t, ResourceDevice, ce.Resource)
 		})
 
 		t.Run("EmptyIsInvalidState", func(t *testing.T) {
@@ -253,11 +239,6 @@ func TestDevice_Core(t *testing.T) {
 	})
 
 	t.Run("Properties", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Device)(nil).Properties(ctx)
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrDeviceNotInitialized))
-		})
 
 		t.Run("Error", func(t *testing.T) {
 			f := &fakeIwdbusDevice{}
@@ -307,11 +288,6 @@ func TestDevice_Core(t *testing.T) {
 	})
 
 	t.Run("SubscribePropertiesChanged", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Device)(nil).SubscribePropertiesChanged(ctx, func(DevicePropertiesChanged) {})
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrDeviceNotInitialized))
-		})
 
 		t.Run("NilCallback", func(t *testing.T) {
 			_, err := NewDevice(&fakeIwdbusDevice{}).SubscribePropertiesChanged(ctx, nil)
@@ -336,12 +312,34 @@ func TestDevice_Core(t *testing.T) {
 			require.Equal(t, "ap", got.Changed["Mode"])
 			require.Equal(t, []string{"Address"}, got.Invalidated)
 		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusDevice{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewDevice(f).SubscribePropertiesChanged(ctx, func(DevicePropertiesChanged) {})
+			require.Error(t, err)
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
+			require.ErrorIs(t, err, ErrCore)
+		})
 	})
 
 	t.Run("SubscribePoweredChanged", func(t *testing.T) {
 		t.Run("NilCallback", func(t *testing.T) {
 			_, err := NewDevice(&fakeIwdbusDevice{}).SubscribePoweredChanged(ctx, nil)
 			require.Error(t, err)
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindInvalidArgument, ce.Kind)
+			require.Equal(t, ResourceDevice, ce.Resource)
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusDevice{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewDevice(f).SubscribePoweredChanged(ctx, func(bool) {})
+			require.Error(t, err)
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
+			require.ErrorIs(t, err, ErrCore)
 		})
 
 		t.Run("DeliversEvent", func(t *testing.T) {
@@ -362,15 +360,23 @@ func TestDevice_Core(t *testing.T) {
 	})
 
 	t.Run("SubscribeModeChanged", func(t *testing.T) {
-		t.Run("Uninitialized", func(t *testing.T) {
-			_, err := (*Device)(nil).SubscribeModeChanged(ctx, func(Mode) {})
-			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrDeviceNotInitialized))
-		})
 
 		t.Run("NilCallback", func(t *testing.T) {
 			_, err := NewDevice(&fakeIwdbusDevice{}).SubscribeModeChanged(ctx, nil)
 			require.Error(t, err)
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindInvalidArgument, ce.Kind)
+			require.Equal(t, ResourceDevice, ce.Resource)
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusDevice{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewDevice(f).SubscribeModeChanged(ctx, func(Mode) {})
+			require.Error(t, err)
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
+			require.ErrorIs(t, err, ErrCore)
 		})
 
 		t.Run("DeliversEvent", func(t *testing.T) {
@@ -386,5 +392,86 @@ func TestDevice_Core(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, ModeAdHoc, got)
 		})
+	})
+
+	// Every method wraps a backend failure into a matchable core Error carrying
+	// ResourceDevice with the cause chained through ErrCore, so a wrong-resource
+	// or swallowed-cause bug in any single method is caught.
+	t.Run("BackendErrorWraps", func(t *testing.T) {
+		backendErr := errors.New("dbus boom")
+		for _, tc := range []struct {
+			name string
+			call func(*Device) error
+		}{
+			{"Name", func(d *Device) error { _, err := d.Name(ctx); return err }},
+			{"Address", func(d *Device) error { _, err := d.Address(ctx); return err }},
+			{"Powered", func(d *Device) error { _, err := d.Powered(ctx); return err }},
+			{"SetPowered", func(d *Device) error { return d.SetPowered(ctx, true) }},
+			{"Mode", func(d *Device) error { _, err := d.Mode(ctx); return err }},
+			{"SetMode", func(d *Device) error { return d.SetMode(ctx, ModeStation) }},
+			{"Adapter", func(d *Device) error { _, err := d.Adapter(ctx); return err }},
+			{"Properties", func(d *Device) error { _, err := d.Properties(ctx); return err }},
+			{"SubscribePropertiesChanged", func(d *Device) error {
+				_, err := d.SubscribePropertiesChanged(ctx, func(DevicePropertiesChanged) {})
+				return err
+			}},
+			{"SubscribePoweredChanged", func(d *Device) error {
+				_, err := d.SubscribePoweredChanged(ctx, func(bool) {})
+				return err
+			}},
+			{"SubscribeModeChanged", func(d *Device) error {
+				_, err := d.SubscribeModeChanged(ctx, func(Mode) {})
+				return err
+			}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				f := &fakeIwdbusDevice{}
+				f.setErr(backendErr)
+				err := tc.call(NewDevice(f))
+				require.Error(t, err)
+				var ce *Error
+				require.ErrorAs(t, err, &ce)
+				require.Equal(t, ResourceDevice, ce.Resource)
+				require.ErrorIs(t, err, backendErr)
+				require.ErrorIs(t, err, ErrCore)
+			})
+		}
+	})
+
+	// Every method guards a nil (uninitialized) receiver, returning a matchable
+	// ErrDeviceNotInitialized (which wraps ErrCore) rather than panicking.
+	t.Run("Uninitialized", func(t *testing.T) {
+		var d *Device
+		for _, tc := range []struct {
+			name string
+			call func() error
+		}{
+			{"Name", func() error { _, err := d.Name(ctx); return err }},
+			{"Address", func() error { _, err := d.Address(ctx); return err }},
+			{"Powered", func() error { _, err := d.Powered(ctx); return err }},
+			{"Mode", func() error { _, err := d.Mode(ctx); return err }},
+			{"Adapter", func() error { _, err := d.Adapter(ctx); return err }},
+			{"Properties", func() error { _, err := d.Properties(ctx); return err }},
+			{"SetPowered", func() error { return d.SetPowered(ctx, true) }},
+			{"SetMode", func() error { return d.SetMode(ctx, ModeStation) }},
+			{"SubscribePropertiesChanged", func() error {
+				_, err := d.SubscribePropertiesChanged(ctx, func(DevicePropertiesChanged) {})
+				return err
+			}},
+			{"SubscribePoweredChanged", func() error {
+				_, err := d.SubscribePoweredChanged(ctx, func(bool) {})
+				return err
+			}},
+			{"SubscribeModeChanged", func() error {
+				_, err := d.SubscribeModeChanged(ctx, func(Mode) {})
+				return err
+			}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				err := tc.call()
+				require.ErrorIs(t, err, ErrDeviceNotInitialized)
+				require.ErrorIs(t, err, ErrCore)
+			})
+		}
 	})
 }

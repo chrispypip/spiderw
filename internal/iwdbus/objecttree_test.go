@@ -31,6 +31,9 @@ func testTree() *ObjectTree {
 		"/net/connman/iwd/0/3/badtype": {
 			IwdNetworkIface: {"Name": v(int32(7))}, // wrong type
 		},
+		"/net/connman/iwd/0/3/noname": {
+			IwdNetworkIface: {"Connected": v(true)}, // iface present, Name property absent
+		},
 	}}
 }
 
@@ -71,6 +74,11 @@ func TestObjectTree_Lookups(t *testing.T) {
 
 	t.Run("wrong property type", func(t *testing.T) {
 		_, ok := tree.NetworkName("/net/connman/iwd/0/3/badtype")
+		require.False(t, ok)
+	})
+
+	t.Run("interface present but property absent", func(t *testing.T) {
+		_, ok := tree.NetworkName("/net/connman/iwd/0/3/noname")
 		require.False(t, ok)
 	})
 

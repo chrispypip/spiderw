@@ -22,6 +22,7 @@ type fakeCoreKnownNetworkError struct {
 // and stress tests can drive the public wrapper from many goroutines.
 type fakeCoreKnownNetwork struct {
 	props        atomic.Pointer[core.KnownNetworkProperties]
+	err          atomic.Pointer[fakeCoreKnownNetworkError]
 	forgetErr    atomic.Pointer[fakeCoreKnownNetworkError]
 	autoConnEvnt atomic.Pointer[bool]
 }
@@ -30,6 +31,24 @@ func (f *fakeCoreKnownNetwork) setProps(p core.KnownNetworkProperties) *fakeCore
 	cp := p
 	f.props.Store(&cp)
 	return f
+}
+
+// setErr makes every accessor (and the subscribe calls) return err so the public
+// wrapper's backend-error mapping can be exercised.
+func (f *fakeCoreKnownNetwork) setErr(err error) *fakeCoreKnownNetwork {
+	if err == nil {
+		f.err.Store(nil)
+		return f
+	}
+	f.err.Store(&fakeCoreKnownNetworkError{err: err})
+	return f
+}
+
+func (f *fakeCoreKnownNetwork) loadErr() error {
+	if box := f.err.Load(); box != nil {
+		return box.err
+	}
+	return nil
 }
 
 func (f *fakeCoreKnownNetwork) setForgetErr(err error) *fakeCoreKnownNetwork {
@@ -54,22 +73,25 @@ func (f *fakeCoreKnownNetwork) loadProps() core.KnownNetworkProperties {
 }
 
 func (f *fakeCoreKnownNetwork) Name(ctx context.Context) (string, error) {
-	return f.loadProps().Name, nil
+	return f.loadProps().Name, f.loadErr()
 }
 func (f *fakeCoreKnownNetwork) Type(ctx context.Context) (core.NetworkType, error) {
-	return f.loadProps().Type, nil
+	return f.loadProps().Type, f.loadErr()
 }
 func (f *fakeCoreKnownNetwork) Hidden(ctx context.Context) (bool, error) {
-	return f.loadProps().Hidden, nil
+	return f.loadProps().Hidden, f.loadErr()
 }
 func (f *fakeCoreKnownNetwork) LastConnectedTime(ctx context.Context) (*string, error) {
-	return f.loadProps().LastConnectedTime, nil
+	return f.loadProps().LastConnectedTime, f.loadErr()
 }
 func (f *fakeCoreKnownNetwork) AutoConnect(ctx context.Context) (bool, error) {
-	return f.loadProps().AutoConnect, nil
+	return f.loadProps().AutoConnect, f.loadErr()
 }
 
 func (f *fakeCoreKnownNetwork) SetAutoConnect(ctx context.Context, autoConnect bool) error {
+	if err := f.loadErr(); err != nil {
+		return err
+	}
 	p := f.loadProps()
 	p.AutoConnect = autoConnect
 	f.props.Store(&p)
@@ -84,28 +106,34 @@ func (f *fakeCoreKnownNetwork) Forget(ctx context.Context) error {
 }
 
 func (f *fakeCoreKnownNetwork) Properties(ctx context.Context) (*core.KnownNetworkProperties, error) {
+	if err := f.loadErr(); err != nil {
+		return nil, err
+	}
 	p := f.loadProps()
 	return &p, nil
 }
 
 func (f *fakeCoreKnownNetwork) SubscribePropertiesChanged(ctx context.Context, fn func(core.KnownNetworkPropertiesChanged)) (core.UnsubscribeFunc, error) {
 	if fn == nil {
-		return nil, nil
+		return nil, f.loadErr()
 	}
 	if ev := f.autoConnEvnt.Load(); ev != nil {
-		fn(core.KnownNetworkPropertiesChanged{Changed: map[string]any{"AutoConnect": *ev}})
+		fn(core.KnownNetworkPropertiesChanged{
+			Changed:     map[string]any{"AutoConnect": *ev},
+			Invalidated: []string{"LastConnectedTime"},
+		})
 	}
-	return func() error { return nil }, nil
+	return func() error { return nil }, f.loadErr()
 }
 
 func (f *fakeCoreKnownNetwork) SubscribeAutoConnectChanged(ctx context.Context, fn func(bool)) (core.UnsubscribeFunc, error) {
 	if fn == nil {
-		return nil, nil
+		return nil, f.loadErr()
 	}
 	if ev := f.autoConnEvnt.Load(); ev != nil {
 		fn(*ev)
 	}
-	return func() error { return nil }, nil
+	return func() error { return nil }, f.loadErr()
 }
 
 func validCoreKnownNetworkProps() core.KnownNetworkProperties {

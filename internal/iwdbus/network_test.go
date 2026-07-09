@@ -24,7 +24,6 @@ func TestNetwork_Iwdbus(t *testing.T) {
 		t.Run("GetKnownNetwork", testNetwork_GetKnownNetwork)
 		t.Run("GetKnownNetwork_Absent", testNetwork_GetKnownNetwork_Absent)
 		t.Run("GetExtendedServiceSet", testNetwork_GetExtendedServiceSet)
-		t.Run("GetName_NoIntro", testNetwork_GetName_NoIntro)
 	})
 
 	t.Run("Connect", func(t *testing.T) {
@@ -32,7 +31,6 @@ func TestNetwork_Iwdbus(t *testing.T) {
 		t.Run("Success", testNetwork_Connect)
 		t.Run("NoAgent", testNetwork_Connect_NoAgent)
 		t.Run("OtherError", testNetwork_Connect_OtherError)
-		t.Run("NoIntro", testNetwork_Connect_NoIntro)
 	})
 
 	t.Run("Properties", func(t *testing.T) {
@@ -41,6 +39,8 @@ func TestNetwork_Iwdbus(t *testing.T) {
 		t.Run("OptionalKnownNetworkAbsent", testNetwork_GetProperties_NoKnownNetwork)
 		t.Run("Errors", testNetwork_GetProperties_Errors)
 	})
+
+	t.Run("NotInitialized", testNetwork_NoIntro)
 
 	t.Run("Subscribe", func(t *testing.T) {
 		t.Parallel()
@@ -150,14 +150,6 @@ func testNetwork_GetExtendedServiceSet(t *testing.T) {
 	}, ess)
 }
 
-func testNetwork_GetName_NoIntro(t *testing.T) {
-	t.Parallel()
-	n := &Network{call: nil}
-	_, err := n.GetName(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "network is not initialized")
-}
-
 func testNetwork_Connect(t *testing.T) {
 	t.Parallel()
 	var called bool
@@ -193,14 +185,6 @@ func testNetwork_Connect_OtherError(t *testing.T) {
 	require.NotErrorIs(t, err, ErrNoAgent)
 	require.NotErrorIs(t, err, ErrFailed)
 	require.ErrorIs(t, err, ErrDBusMethod)
-}
-
-func testNetwork_Connect_NoIntro(t *testing.T) {
-	t.Parallel()
-	n := &Network{call: nil}
-	err := n.Connect(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "network is not initialized")
 }
 
 func fullNetworkProps() map[string]dbus.Variant {
@@ -353,4 +337,32 @@ func testNetwork_FirehosePropertiesChanged(t *testing.T) {
 	s, ok := recv.Body[0].(string)
 	require.True(t, ok)
 	require.Equal(t, IwdNetworkIface, s)
+}
+
+// testNetwork_NoIntro checks every init-guarded method reports a clean
+// "network is not initialized" error when the Network has no caller.
+func testNetwork_NoIntro(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name string
+		call func(*Network) error
+	}{
+		{"GetName", func(n *Network) error { _, err := n.GetName(ctx); return err }},
+		{"GetType", func(n *Network) error { _, err := n.GetType(ctx); return err }},
+		{"GetConnected", func(n *Network) error { _, err := n.GetConnected(ctx); return err }},
+		{"GetDevice", func(n *Network) error { _, err := n.GetDevice(ctx); return err }},
+		{"GetKnownNetwork", func(n *Network) error { _, err := n.GetKnownNetwork(ctx); return err }},
+		{"GetExtendedServiceSet", func(n *Network) error { _, err := n.GetExtendedServiceSet(ctx); return err }},
+		{"GetProperties", func(n *Network) error { _, err := n.GetProperties(ctx); return err }},
+		{"Connect", func(n *Network) error { return n.Connect(ctx) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.call(&Network{call: nil})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "network is not initialized")
+		})
+	}
 }

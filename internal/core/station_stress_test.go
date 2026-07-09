@@ -4,6 +4,7 @@ package core
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -48,7 +49,36 @@ func TestStress_Core_Station_MixedMethods(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Core_Station_SubscribeStateChanged_Fanout(t *testing.T) {
+func TestStress_Core_Station_MixedContexts(t *testing.T) {
+	station := newTestStation(t)
+
+	const N = 800
+	var wg sync.WaitGroup
+
+	for range N {
+		wg.Go(func() {
+			var ctx context.Context
+			var cancel context.CancelFunc
+
+			switch rand.Intn(3) {
+			case 0:
+				ctx, cancel = context.WithTimeout(context.Background(), time.Millisecond)
+			case 1:
+				ctx, cancel = context.WithCancel(context.Background())
+				cancel()
+			default:
+				ctx, cancel = context.WithTimeout(context.Background(), time.Second)
+			}
+			defer cancel()
+
+			_, _ = station.State(ctx)
+		})
+	}
+
+	wg.Wait()
+}
+
+func TestStress_Core_Station_SubscribeStateChanged_Concurrent(t *testing.T) {
 	station := newTestStation(t)
 
 	const N = 4000
@@ -65,7 +95,41 @@ func TestStress_Core_Station_SubscribeStateChanged_Fanout(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Core_Station_Nil(t *testing.T) {
+func TestStress_Core_Station_SubscribeScanningChanged_Concurrent(t *testing.T) {
+	station := newTestStation(t)
+
+	const N = 4000
+	var wg sync.WaitGroup
+
+	for range N {
+		wg.Go(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			_, _ = station.SubscribeScanningChanged(ctx, func(bool) {})
+		})
+	}
+
+	wg.Wait()
+}
+
+func TestStress_Core_Station_SubscribePropertiesChanged_Concurrent(t *testing.T) {
+	station := newTestStation(t)
+
+	const N = 4000
+	var wg sync.WaitGroup
+
+	for range N {
+		wg.Go(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			_, _ = station.SubscribePropertiesChanged(ctx, func(StationPropertiesChanged) {})
+		})
+	}
+
+	wg.Wait()
+}
+
+func TestStress_Core_Station_NilReceiver(t *testing.T) {
 	var s *Station
 
 	const N = 1000

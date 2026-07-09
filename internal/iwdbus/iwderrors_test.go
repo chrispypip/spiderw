@@ -69,3 +69,10 @@ func TestIwdErrorSentinel_Unrecognized(t *testing.T) {
 	require.Nil(t, iwdErrorSentinel(dbus.Error{Name: "net.connman.iwd.Unheard"}))
 	require.Nil(t, iwdErrorSentinel(context.Canceled))
 }
+
+func TestWrapIwd_NilErrorReturnsNil(t *testing.T) {
+	t.Parallel()
+
+	require.NoError(t, wrapIwdMethod("iface", "method", nil))
+	require.NoError(t, wrapIwdProperty("iface", "property", nil))
+}

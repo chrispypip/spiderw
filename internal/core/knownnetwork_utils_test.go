@@ -115,7 +115,10 @@ func (f *fakeIwdbusKnownNetwork) SubscribePropertiesChanged(ctx context.Context,
 		return nil, f.loadErr()
 	}
 	if ev := f.autoConnEvnt.Load(); ev != nil {
-		fn(iwdbus.KnownNetworkPropertiesChanged{Changed: map[string]dbus.Variant{"AutoConnect": dbus.MakeVariant(*ev)}})
+		fn(iwdbus.KnownNetworkPropertiesChanged{
+			Changed:     map[string]dbus.Variant{"AutoConnect": dbus.MakeVariant(*ev)},
+			Invalidated: []string{"LastConnectedTime"},
+		})
 	}
 	return func() error { return nil }, f.loadErr()
 }

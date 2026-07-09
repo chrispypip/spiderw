@@ -6,9 +6,13 @@ import (
 	"context"
 	"sync"
 	"testing"
+
+	"github.com/godbus/dbus/v5"
+
+	"github.com/chrispypip/spiderw/internal/iwdbus"
 )
 
-func TestRace_Core_Station_MixedCalls(t *testing.T) {
+func TestRace_Core_Station_MixedMethods(t *testing.T) {
 	station := newTestStation(t)
 
 	const N = 200
@@ -46,7 +50,7 @@ func TestRace_Core_Station_MixedCalls(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRace_Core_Station_SubscribeStateChanged_ConcurrentCallbacks(t *testing.T) {
+func TestRace_Core_Station_SubscribeStateChanged_Concurrent(t *testing.T) {
 	station := newTestStation(t)
 
 	const N = 200
@@ -64,7 +68,7 @@ func TestRace_Core_Station_SubscribeStateChanged_ConcurrentCallbacks(t *testing.
 	wg.Wait()
 }
 
-func TestRace_Core_Station_SubscribeScanningChanged_ConcurrentCallbacks(t *testing.T) {
+func TestRace_Core_Station_SubscribeScanningChanged_Concurrent(t *testing.T) {
 	station := newTestStation(t)
 
 	const N = 200
@@ -76,6 +80,37 @@ func TestRace_Core_Station_SubscribeScanningChanged_ConcurrentCallbacks(t *testi
 			defer cancel()
 
 			_, _ = station.SubscribeScanningChanged(ctx, func(bool) {})
+		})
+	}
+
+	wg.Wait()
+}
+
+func TestRace_Core_Station_SubscribePropertiesChanged_Concurrent(t *testing.T) {
+	station := newTestStation(t)
+
+	f := station.raw.(*fakeIwdbusStation)
+	f.subPropsEvent.Store(iwdbus.StationPropertiesChanged{
+		Changed:     map[string]dbus.Variant{"State": dbus.MakeVariant("roaming")},
+		Invalidated: []string{"ConnectedNetwork"},
+	})
+
+	const N = 200
+	var wg sync.WaitGroup
+
+	for range N {
+		wg.Go(func() {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			_, _ = station.SubscribePropertiesChanged(ctx, func(ev StationPropertiesChanged) {
+				// The core wrapper must clone per callback; mutating here must not
+				// race another concurrent callback.
+				if ev.Changed != nil {
+					ev.Changed["user-mutation"] = 1
+				}
+				_ = ev.Invalidated
+			})
 		})
 	}
 

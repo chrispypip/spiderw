@@ -51,12 +51,6 @@ func TestStation_Public(t *testing.T) {
 			_, err := newStation(f, "/p", "").State(ctx)
 			require.Error(t, err)
 		})
-
-		t.Run("NilReceiver", func(t *testing.T) {
-			_, err := (*Station)(nil).State(ctx)
-			require.Error(t, err)
-			require.ErrorIs(t, err, ErrInternal)
-		})
 	})
 
 	t.Run("Scanning", func(t *testing.T) {
@@ -181,6 +175,24 @@ func TestStation_Public(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("PropertiesBackendError", func(t *testing.T) {
+		f := &fakeCoreStation{}
+		f.setErr(core.WrapStationUnavailable("op", "boom", errors.New("x")))
+		_, err := newStation(f, "/p", "").Properties(ctx)
+		require.Error(t, err)
+		var pe *Error
+		require.ErrorAs(t, err, &pe)
+		require.Equal(t, ResourceStation, pe.Resource)
+	})
+
+	t.Run("PropertiesInvalidStateRejected", func(t *testing.T) {
+		f := &fakeCoreStation{}
+		f.state.Store(core.StationState("garbage"))
+		_, err := newStation(f, "/p", "").Properties(ctx)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidArgument)
+	})
+
 	t.Run("Scan", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
 			f := &fakeCoreStation{}
@@ -192,10 +204,6 @@ func TestStation_Public(t *testing.T) {
 			f := &fakeCoreStation{}
 			f.setErr(errors.New("boom"))
 			require.Error(t, newStation(f, "/p", "").Scan(ctx))
-		})
-
-		t.Run("NilReceiver", func(t *testing.T) {
-			require.ErrorIs(t, (*Station)(nil).Scan(ctx), ErrInternal)
 		})
 	})
 
@@ -229,6 +237,16 @@ func TestStation_Public(t *testing.T) {
 			_, err := newStation(f, "/p", "").OrderedNetworks(ctx)
 			require.Error(t, err)
 		})
+
+		t.Run("ResolverError", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			nets := []core.OrderedNetwork{{Network: "/n", SignalStrength: -6000}}
+			f.orderedNetworks.Store(&nets)
+			s := newStation(f, "/p", "").withResolver(fakeResolver{err: errors.New("tree boom")})
+			_, err := s.OrderedNetworks(ctx)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "tree boom")
+		})
 	})
 
 	t.Run("SetAffinities", func(t *testing.T) {
@@ -254,10 +272,6 @@ func TestStation_Public(t *testing.T) {
 			require.Error(t, err)
 			require.ErrorIs(t, err, ErrNotSupported)
 		})
-
-		t.Run("NilReceiver", func(t *testing.T) {
-			require.ErrorIs(t, (*Station)(nil).SetAffinities(ctx, []string{"/x"}), ErrInternal)
-		})
 	})
 
 	t.Run("Disconnect", func(t *testing.T) {
@@ -265,10 +279,6 @@ func TestStation_Public(t *testing.T) {
 			f := &fakeCoreStation{}
 			require.NoError(t, newStation(f, "/p", "").Disconnect(ctx))
 			require.True(t, f.disconnectCalled.Load())
-		})
-
-		t.Run("NilReceiver", func(t *testing.T) {
-			require.ErrorIs(t, (*Station)(nil).Disconnect(ctx), ErrInternal)
 		})
 	})
 
@@ -283,10 +293,6 @@ func TestStation_Public(t *testing.T) {
 			f := &fakeCoreStation{}
 			f.setErr(errors.New("boom"))
 			require.Error(t, newStation(f, "/p", "").ConnectHiddenNetwork(ctx, "HiddenNet"))
-		})
-
-		t.Run("NilReceiver", func(t *testing.T) {
-			require.ErrorIs(t, (*Station)(nil).ConnectHiddenNetwork(ctx, "x"), ErrInternal)
 		})
 	})
 
@@ -319,6 +325,76 @@ func TestStation_Public(t *testing.T) {
 			_, err := newStation(f, "/p", "").HiddenAccessPoints(ctx)
 			require.Error(t, err)
 		})
+
+		t.Run("InvalidTypeRejected", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			aps := []core.HiddenAccessPoint{{Address: "aa:bb:cc:dd:ee:ff", SignalStrength: -6000, Type: core.NetworkType("garbage")}}
+			f.hiddenAPs.Store(&aps)
+			_, err := newStation(f, "/p", "").HiddenAccessPoints(ctx)
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrInvalidArgument)
+		})
+	})
+
+	t.Run("StateString", func(t *testing.T) {
+		require.Equal(t, "connected", StationStateConnected.String())
+		require.Equal(t, "disconnected", StationStateDisconnected.String())
+	})
+
+	t.Run("NewStation_NilCore", func(t *testing.T) {
+		require.Nil(t, newStation(nil, "/p", "name"))
+	})
+
+	t.Run("StateInvalidRejectedAtBoundary", func(t *testing.T) {
+		f := &fakeCoreStation{}
+		f.state.Store(core.StationState("garbage"))
+		_, err := newStation(f, "/p", "").State(ctx)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidArgument)
+
+		var pe *Error
+		require.ErrorAs(t, err, &pe)
+		require.Equal(t, ResourceStation, pe.Resource)
+	})
+
+	t.Run("SubscribePropertiesChanged", func(t *testing.T) {
+		t.Run("NilCallback", func(t *testing.T) {
+			_, err := newStation(&fakeCoreStation{}, "/p", "").SubscribePropertiesChanged(ctx, nil)
+			require.Error(t, err)
+			var pe *Error
+			require.ErrorAs(t, err, &pe)
+			require.Equal(t, KindInvalidArgument, pe.Kind)
+			require.Equal(t, ResourceStation, pe.Resource)
+		})
+
+		t.Run("NilReceiver", func(t *testing.T) {
+			_, err := (*Station)(nil).SubscribePropertiesChanged(ctx, func(StationPropertiesChanged) {})
+			require.ErrorIs(t, err, ErrInternal)
+		})
+
+		t.Run("DeliversEvent", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			f.subPropsEvent.Store(core.StationPropertiesChanged{
+				Changed:     map[string]any{"State": "roaming"},
+				Invalidated: []string{"ConnectedNetwork"},
+			})
+
+			var got StationPropertiesChanged
+			_, err := newStation(f, "/p", "").SubscribePropertiesChanged(ctx, func(ev StationPropertiesChanged) { got = ev })
+			require.NoError(t, err)
+			require.Equal(t, "roaming", got.Changed["State"])
+			require.Equal(t, []string{"ConnectedNetwork"}, got.Invalidated)
+		})
+
+		t.Run("BackendError", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			f.setErr(core.WrapStationUnavailable("op", "boom", errors.New("x")))
+			_, err := newStation(f, "/p", "").SubscribePropertiesChanged(ctx, func(StationPropertiesChanged) {})
+			require.Error(t, err)
+			var pe *Error
+			require.ErrorAs(t, err, &pe)
+			require.Equal(t, ResourceStation, pe.Resource)
+		})
 	})
 
 	t.Run("SubscribeStateChanged", func(t *testing.T) {
@@ -326,6 +402,11 @@ func TestStation_Public(t *testing.T) {
 			_, err := newStation(&fakeCoreStation{}, "/p", "").SubscribeStateChanged(ctx, nil)
 			require.Error(t, err)
 			require.ErrorIs(t, err, ErrInvalidArgument)
+		})
+
+		t.Run("NilReceiver", func(t *testing.T) {
+			_, err := (*Station)(nil).SubscribeStateChanged(ctx, func(StationState) {})
+			require.ErrorIs(t, err, ErrInternal)
 		})
 
 		t.Run("DeliversEvent", func(t *testing.T) {
@@ -341,31 +422,135 @@ func TestStation_Public(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, StationStateRoaming, got)
 		})
+
+		t.Run("BackendError", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			f.setErr(core.WrapStationUnavailable("op", "boom", errors.New("x")))
+			_, err := newStation(f, "/p", "").SubscribeStateChanged(ctx, func(StationState) {})
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrInternal)
+		})
+
+		t.Run("DropsUnrecognizedState", func(t *testing.T) {
+			// The public wrapper defensively drops a state the lower layers should
+			// never deliver rather than surfacing StationStateUnknown.
+			f := &fakeCoreStation{}
+			f.subPropsEvent.Store(core.StationPropertiesChanged{
+				Changed: map[string]any{"State": "not-a-real-state"},
+			})
+
+			fired := false
+			_, err := newStation(f, "/p", "").SubscribeStateChanged(ctx, func(StationState) { fired = true })
+			require.NoError(t, err)
+			require.False(t, fired)
+		})
 	})
 
 	t.Run("SubscribeScanningChanged", func(t *testing.T) {
-		f := &fakeCoreStation{}
-		f.subPropsEvent.Store(core.StationPropertiesChanged{
-			Changed: map[string]any{"Scanning": true},
+		t.Run("NilCallback", func(t *testing.T) {
+			_, err := newStation(&fakeCoreStation{}, "/p", "").SubscribeScanningChanged(ctx, nil)
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrInvalidArgument)
 		})
 
-		var got, fired = false, false
-		_, err := newStation(f, "/p", "").SubscribeScanningChanged(ctx, func(b bool) {
-			got = b
-			fired = true
+		t.Run("NilReceiver", func(t *testing.T) {
+			_, err := (*Station)(nil).SubscribeScanningChanged(ctx, func(bool) {})
+			require.ErrorIs(t, err, ErrInternal)
 		})
-		require.NoError(t, err)
-		require.True(t, fired)
-		require.True(t, got)
+
+		t.Run("DeliversEvent", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			f.subPropsEvent.Store(core.StationPropertiesChanged{
+				Changed: map[string]any{"Scanning": true},
+			})
+
+			var got, fired = false, false
+			_, err := newStation(f, "/p", "").SubscribeScanningChanged(ctx, func(b bool) {
+				got = b
+				fired = true
+			})
+			require.NoError(t, err)
+			require.True(t, fired)
+			require.True(t, got)
+		})
+
+		t.Run("BackendError", func(t *testing.T) {
+			f := &fakeCoreStation{}
+			f.setErr(core.WrapStationUnavailable("op", "boom", errors.New("x")))
+			_, err := newStation(f, "/p", "").SubscribeScanningChanged(ctx, func(bool) {})
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrInternal)
+		})
 	})
 
 	t.Run("Path", func(t *testing.T) {
 		require.Equal(t, "", (*Station)(nil).Path())
 		require.Equal(t, "/p", newStation(&fakeCoreStation{}, "/p", "").Path())
 	})
+
+	// A backend failure from any method must surface as a translated public
+	// *Error carrying ResourceStation (not a leaked core error), so a method that
+	// forgets to translate or reports the wrong resource is caught.
+	t.Run("BackendErrorTranslates", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			call func(*Station) error
+		}{
+			{"State", func(s *Station) error { _, err := s.State(ctx); return err }},
+			{"Scanning", func(s *Station) error { _, err := s.Scanning(ctx); return err }},
+			{"ConnectedNetwork", func(s *Station) error { _, err := s.ConnectedNetwork(ctx); return err }},
+			{"ConnectedAccessPoint", func(s *Station) error { _, err := s.ConnectedAccessPoint(ctx); return err }},
+			{"Affinities", func(s *Station) error { _, err := s.Affinities(ctx); return err }},
+			{"Properties", func(s *Station) error { _, err := s.Properties(ctx); return err }},
+			{"Scan", func(s *Station) error { return s.Scan(ctx) }},
+			{"OrderedNetworks", func(s *Station) error { _, err := s.OrderedNetworks(ctx); return err }},
+			{"SetAffinities", func(s *Station) error { return s.SetAffinities(ctx, []string{"/x"}) }},
+			{"Disconnect", func(s *Station) error { return s.Disconnect(ctx) }},
+			{"ConnectHiddenNetwork", func(s *Station) error { return s.ConnectHiddenNetwork(ctx, "Hidden") }},
+			{"HiddenAccessPoints", func(s *Station) error { _, err := s.HiddenAccessPoints(ctx); return err }},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				f := &fakeCoreStation{}
+				f.state.Store(core.StationStateConnected)
+				f.setErr(core.WrapStationUnavailable("op", "boom", errors.New("x")))
+				err := tc.call(newStation(f, "/p", ""))
+				require.Error(t, err)
+				var pe *Error
+				require.ErrorAs(t, err, &pe)
+				require.Equal(t, ResourceStation, pe.Resource)
+			})
+		}
+	})
+
+	// Every error-returning method guards a nil receiver, mapping to ErrInternal
+	// rather than panicking.
+	t.Run("NilReceiver", func(t *testing.T) {
+		var s *Station
+		for _, tc := range []struct {
+			name string
+			call func() error
+		}{
+			{"State", func() error { _, err := s.State(ctx); return err }},
+			{"Scanning", func() error { _, err := s.Scanning(ctx); return err }},
+			{"ConnectedNetwork", func() error { _, err := s.ConnectedNetwork(ctx); return err }},
+			{"ConnectedAccessPoint", func() error { _, err := s.ConnectedAccessPoint(ctx); return err }},
+			{"Affinities", func() error { _, err := s.Affinities(ctx); return err }},
+			{"Properties", func() error { _, err := s.Properties(ctx); return err }},
+			{"Scan", func() error { return s.Scan(ctx) }},
+			{"OrderedNetworks", func() error { _, err := s.OrderedNetworks(ctx); return err }},
+			{"SetAffinities", func() error { return s.SetAffinities(ctx, []string{"/x"}) }},
+			{"Disconnect", func() error { return s.Disconnect(ctx) }},
+			{"ConnectHiddenNetwork", func() error { return s.ConnectHiddenNetwork(ctx, "x") }},
+			{"HiddenAccessPoints", func() error { _, err := s.HiddenAccessPoints(ctx); return err }},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				require.ErrorIs(t, tc.call(), ErrInternal)
+			})
+		}
+	})
 }
 
-func TestClientStation(t *testing.T) {
+func TestClient_Station(t *testing.T) {
 	ctx := context.Background()
 
 	newStationClient := func(factory func(ctx context.Context, path string) (core.StationIface, error)) *Client {
@@ -423,7 +608,7 @@ func TestClientStation(t *testing.T) {
 	})
 }
 
-func TestClientAllStations(t *testing.T) {
+func TestClient_AllStations(t *testing.T) {
 	ctx := context.Background()
 
 	newAllStationsClient := func(

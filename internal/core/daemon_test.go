@@ -107,6 +107,7 @@ func TestDaemon_Core(t *testing.T) {
 				{name: "version only whitespace", info: &iwdbus.DaemonInfo{Version: "   ", StateDirectory: "/x"}, wantMsg: "Version"},
 				{name: "empty state directory", info: &iwdbus.DaemonInfo{Version: "1", StateDirectory: ""}, wantMsg: "StateDirectory"},
 				{name: "state directory whitespace", info: &iwdbus.DaemonInfo{Version: "1", StateDirectory: "   "}, wantMsg: "StateDirectory"},
+				{name: "state directory relative", info: &iwdbus.DaemonInfo{Version: "1", StateDirectory: "relative/path"}, wantMsg: "StateDirectory"},
 			}
 
 			for _, tc := range tests {
@@ -501,6 +502,14 @@ func TestDaemon_Core(t *testing.T) {
 	})
 
 	t.Run("Networks", func(t *testing.T) {
+		t.Run("Uninitialized", func(t *testing.T) {
+			var d *Daemon
+			_, err := d.Networks(context.Background())
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrDaemonNotInitialized)
+			require.ErrorIs(t, err, ErrCore)
+		})
+
 		t.Run("DBusErrorMapping", func(t *testing.T) {
 			f := &fakeIwdbusDaemon{}
 			f.setErr(iwdbus.ErrDBusIntrospection)
@@ -560,6 +569,14 @@ func TestDaemon_Core(t *testing.T) {
 	})
 
 	t.Run("KnownNetworks", func(t *testing.T) {
+		t.Run("Uninitialized", func(t *testing.T) {
+			var d *Daemon
+			_, err := d.KnownNetworks(context.Background())
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrDaemonNotInitialized)
+			require.ErrorIs(t, err, ErrCore)
+		})
+
 		t.Run("DBusErrorMapping", func(t *testing.T) {
 			f := &fakeIwdbusDaemon{}
 			f.setErr(iwdbus.ErrDBusIntrospection)
@@ -659,6 +676,31 @@ func TestDaemon_Core(t *testing.T) {
 				tc.run(t, d)
 			})
 		}
+
+		// Each convenience method delegates to Info, so an Info failure
+		// propagates unchanged rather than being swallowed.
+		t.Run("PropagateInfoError", func(t *testing.T) {
+			for _, tc := range []struct {
+				name string
+				call func(*Daemon) error
+			}{
+				{"Version", func(d *Daemon) error { _, err := d.Version(context.Background()); return err }},
+				{"StateDirectory", func(d *Daemon) error { _, err := d.StateDirectory(context.Background()); return err }},
+				{"NetworkConfigurationEnabled", func(d *Daemon) error {
+					_, err := d.NetworkConfigurationEnabled(context.Background())
+					return err
+				}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					f := fakeIwdbusDaemonWithInfo(&iwdbus.DaemonInfo{Version: "1", StateDirectory: "/x"})
+					f.setErr(iwdbus.ErrDBusMethod)
+					err := tc.call(NewDaemon(f))
+					require.Error(t, err)
+					require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
+					require.ErrorIs(t, err, ErrCore)
+				})
+			}
+		})
 	})
 
 	t.Run("Concurrency", func(t *testing.T) {

@@ -100,6 +100,28 @@ func TestDaemon_Iwdbus(t *testing.T) {
 				},
 				want: DaemonInfo{Version: "x"},
 			},
+			{
+				name: "empty Version rejected",
+				in: map[string]dbus.Variant{
+					"Version": dbus.MakeVariant(""),
+				},
+				wantErrContains: []string{"dbus variant conversion error", "Version must not be empty"},
+			},
+			{
+				name: "empty StateDirectory rejected",
+				in: map[string]dbus.Variant{
+					"Version":        dbus.MakeVariant("1"),
+					"StateDirectory": dbus.MakeVariant(""),
+				},
+				wantErrContains: []string{"dbus variant conversion error", "StateDirectory must not be empty"},
+			},
+			{
+				name: "map[interface{}] missing keys ok",
+				in: map[string]interface{}{
+					"Version": dbus.MakeVariant("7.0"),
+				},
+				want: DaemonInfo{Version: "7.0"},
+			},
 		}
 
 		for _, tc := range tests {
@@ -360,6 +382,154 @@ func TestDaemon_GetDevices_Guards(t *testing.T) {
 		require.True(t, errors.Is(err, ErrDBusConnection))
 		require.True(t, errors.Is(err, ErrDaemonUninitialized))
 	})
+}
+
+// TestDaemon_GetEnumerators_Guards covers the nil-receiver/nil-conn guards for
+// the remaining enumerators (the enumeration bodies themselves need a real bus
+// and are covered by the integration suite).
+func TestDaemon_GetEnumerators_Guards(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		call func(d *Daemon) error
+	}{
+		{"GetBasicServiceSets", func(d *Daemon) error { _, err := d.GetBasicServiceSets(context.Background()); return err }},
+		{"GetNetworks", func(d *Daemon) error { _, err := d.GetNetworks(context.Background()); return err }},
+		{"GetKnownNetworks", func(d *Daemon) error { _, err := d.GetKnownNetworks(context.Background()); return err }},
+		{"GetStations", func(d *Daemon) error { _, err := d.GetStations(context.Background()); return err }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			t.Run("NilReceiver", func(t *testing.T) {
+				t.Parallel()
+				err := tc.call(nil)
+				require.Error(t, err)
+				require.True(t, errors.Is(err, ErrDBusConnection))
+				require.True(t, errors.Is(err, ErrDaemonUninitialized))
+			})
+
+			t.Run("NilConn", func(t *testing.T) {
+				t.Parallel()
+				err := tc.call(&Daemon{conn: nil})
+				require.Error(t, err)
+				require.True(t, errors.Is(err, ErrDBusConnection))
+				require.True(t, errors.Is(err, ErrDaemonUninitialized))
+			})
+		})
+	}
+}
+
+// TestBSSAddressFromManagedObject covers the address-extraction/validation helper
+// used by GetBasicServiceSets. Its error branches are not reachable through the
+// mock (which reports a valid Address), so they are exercised directly here.
+func TestBSSAddressFromManagedObject(t *testing.T) {
+	t.Parallel()
+
+	const validPath = dbus.ObjectPath("/net/connman/iwd/phy0/wlan0/aabbccddeeff")
+
+	tests := []struct {
+		name            string
+		path            dbus.ObjectPath
+		props           map[string]dbus.Variant
+		want            string
+		wantErrContains []string
+	}{
+		{
+			name:  "valid",
+			path:  validPath,
+			props: map[string]dbus.Variant{"Address": dbus.MakeVariant("aa:bb:cc:dd:ee:ff")},
+			want:  "aa:bb:cc:dd:ee:ff",
+		},
+		{
+			name:  "address is trimmed",
+			path:  validPath,
+			props: map[string]dbus.Variant{"Address": dbus.MakeVariant("  aa:bb:cc:dd:ee:ff  ")},
+			want:  "aa:bb:cc:dd:ee:ff",
+		},
+		{
+			name:            "invalid path",
+			path:            dbus.ObjectPath(""),
+			props:           map[string]dbus.Variant{"Address": dbus.MakeVariant("aa:bb:cc:dd:ee:ff")},
+			wantErrContains: []string{"variant=Path", "invalid basic service set path"},
+		},
+		{
+			name:            "missing Address property",
+			path:            validPath,
+			props:           map[string]dbus.Variant{},
+			wantErrContains: []string{"variant=Address", "missing Address property"},
+		},
+		{
+			name:            "Address wrong type",
+			path:            validPath,
+			props:           map[string]dbus.Variant{"Address": dbus.MakeVariant(42)},
+			wantErrContains: []string{"variant=Address", "expected string, got int"},
+		},
+		{
+			name:            "empty Address",
+			path:            validPath,
+			props:           map[string]dbus.Variant{"Address": dbus.MakeVariant("   ")},
+			wantErrContains: []string{"variant=Address", "basic service set Address was empty"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := bssAddressFromManagedObject(tc.path, tc.props)
+			if len(tc.wantErrContains) > 0 {
+				require.Error(t, err)
+				require.True(t, errors.Is(err, ErrDBusVariant))
+				for _, sub := range tc.wantErrContains {
+					require.Contains(t, err.Error(), sub)
+				}
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// TestStationNameFromDevice covers the best-effort station-name extraction from
+// the co-located Device interface. Every non-happy branch returns "" rather than
+// erroring, and the mock only exercises the happy path, so they are covered here.
+func TestStationNameFromDevice(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name   string
+		ifaces map[string]map[string]dbus.Variant
+		want   string
+	}{
+		{
+			name:   "resolves and trims device name",
+			ifaces: map[string]map[string]dbus.Variant{IwdDeviceIface: {"Name": dbus.MakeVariant("  wlan0 ")}},
+			want:   "wlan0",
+		},
+		{
+			name:   "no device interface",
+			ifaces: map[string]map[string]dbus.Variant{IwdStationIface: {}},
+			want:   "",
+		},
+		{
+			name:   "device interface without Name",
+			ifaces: map[string]map[string]dbus.Variant{IwdDeviceIface: {"Powered": dbus.MakeVariant(true)}},
+			want:   "",
+		},
+		{
+			name:   "Name wrong type",
+			ifaces: map[string]map[string]dbus.Variant{IwdDeviceIface: {"Name": dbus.MakeVariant(42)}},
+			want:   "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.want, stationNameFromDevice(tc.ifaces))
+		})
+	}
 }
 
 // TestObjectNameFromManagedObject covers the name-extraction/validation helper

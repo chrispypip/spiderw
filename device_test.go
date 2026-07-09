@@ -194,6 +194,16 @@ func TestDevice_Public(t *testing.T) {
 		t.Run("NilCallback", func(t *testing.T) {
 			_, err := (&Device{core: &fakeCoreDevice{}}).SubscribePoweredChanged(ctx, nil)
 			require.Error(t, err)
+			var pe *Error
+			require.ErrorAs(t, err, &pe)
+			require.Equal(t, KindInvalidArgument, pe.Kind)
+			require.Equal(t, ResourceDevice, pe.Resource)
+		})
+
+		t.Run("NilReceiver", func(t *testing.T) {
+			_, err := (*Device)(nil).SubscribePoweredChanged(ctx, func(bool) {})
+			require.Error(t, err)
+			require.True(t, errors.Is(err, ErrInternal))
 		})
 
 		t.Run("DeliversEvent", func(t *testing.T) {
@@ -217,6 +227,10 @@ func TestDevice_Public(t *testing.T) {
 		t.Run("NilCallback", func(t *testing.T) {
 			_, err := (&Device{core: &fakeCoreDevice{}}).SubscribeModeChanged(ctx, nil)
 			require.Error(t, err)
+			var pe *Error
+			require.ErrorAs(t, err, &pe)
+			require.Equal(t, KindInvalidArgument, pe.Kind)
+			require.Equal(t, ResourceDevice, pe.Resource)
 		})
 
 		t.Run("NilReceiver", func(t *testing.T) {
@@ -238,5 +252,74 @@ func TestDevice_Public(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, ModeAdHoc, got)
 		})
+
+		t.Run("DropsUnrecognizedMode", func(t *testing.T) {
+			// The public wrapper defensively drops a mode the lower layers should
+			// never deliver rather than surfacing ModeUnknown.
+			f := &fakeCoreDevice{}
+			f.subPropsEvent.Store(core.DevicePropertiesChanged{
+				Changed: map[string]any{"Mode": "not-a-real-mode"},
+			})
+
+			fired := false
+			_, err := (&Device{core: f}).SubscribeModeChanged(ctx, func(Mode) { fired = true })
+			require.NoError(t, err)
+			require.False(t, fired)
+		})
+	})
+
+	// Properties invalid-mode / resolver-error branches, plus each subscribe's
+	// backend-error branch, complete the Device facade's coverage.
+	t.Run("PropertiesInvalidModeRejected", func(t *testing.T) {
+		f := newFullBackend()
+		f.mode.Store(core.Mode("garbage"))
+		_, err := (&Device{core: f}).Properties(ctx)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidArgument)
+	})
+
+	t.Run("PropertiesResolverErrorPropagates", func(t *testing.T) {
+		d := newDevice(newFullBackend(), "/p").withResolver(fakeResolver{err: errors.New("tree boom")})
+		_, err := d.Properties(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "tree boom")
+	})
+
+	t.Run("PropertiesResolvesAdapterRef", func(t *testing.T) {
+		d := newDevice(newFullBackend(), "/p").
+			withResolver(fakeResolver{tree: fakeTree{"/net/connman/iwd/phy0": "phy0"}})
+		props, err := d.Properties(ctx)
+		require.NoError(t, err)
+		require.Equal(t, AdapterRef{Path: "/net/connman/iwd/phy0", Name: "phy0"}, props.Adapter)
+	})
+
+	t.Run("SubscribeBackendErrors", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			call func(*Device) error
+		}{
+			{"PropertiesChanged", func(d *Device) error {
+				_, err := d.SubscribePropertiesChanged(ctx, func(DevicePropertiesChanged) {})
+				return err
+			}},
+			{"PoweredChanged", func(d *Device) error {
+				_, err := d.SubscribePoweredChanged(ctx, func(bool) {})
+				return err
+			}},
+			{"ModeChanged", func(d *Device) error {
+				_, err := d.SubscribeModeChanged(ctx, func(Mode) {})
+				return err
+			}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				f := &fakeCoreDevice{}
+				f.setErr(core.WrapDeviceUnavailable("op", "boom", errors.New("x")))
+				err := tc.call(&Device{core: f})
+				require.Error(t, err)
+				var pe *Error
+				require.ErrorAs(t, err, &pe)
+				require.Equal(t, ResourceDevice, pe.Resource)
+			})
+		}
 	})
 }

@@ -28,7 +28,7 @@ func TestRace_Core_KnownNetwork_SetAutoConnectConcurrentWithGet(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRace_Core_KnownNetwork_MixedCalls(t *testing.T) {
+func TestRace_Core_KnownNetwork_MixedMethods(t *testing.T) {
 	known := newTestKnownNetwork(t)
 
 	const N = 200
@@ -62,7 +62,7 @@ func TestRace_Core_KnownNetwork_MixedCalls(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRace_Core_KnownNetwork_SubscribeAutoConnectChanged_ConcurrentCallbacks(t *testing.T) {
+func TestRace_Core_KnownNetwork_SubscribeAutoConnectChanged_Concurrent(t *testing.T) {
 	known := newTestKnownNetwork(t)
 
 	const N = 200
@@ -80,7 +80,7 @@ func TestRace_Core_KnownNetwork_SubscribeAutoConnectChanged_ConcurrentCallbacks(
 	wg.Wait()
 }
 
-func TestRace_Core_KnownNetwork_SubscribePropertiesChanged_ConcurrentCallbacks(t *testing.T) {
+func TestRace_Core_KnownNetwork_SubscribePropertiesChanged_Concurrent(t *testing.T) {
 	known := newTestKnownNetwork(t)
 
 	const N = 200

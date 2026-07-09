@@ -159,10 +159,10 @@ func (f *fakeCoreStation) SubscribeStateChanged(ctx context.Context, fn func(cor
 	if v := f.subPropsEvent.Load(); v != nil {
 		props := v.(core.StationPropertiesChanged)
 		if st, ok := props.Changed["State"]; ok {
+			// Deliver the raw state as the core layer would; the public wrapper is
+			// responsible for validating and dropping unrecognized states.
 			if s, ok := st.(string); ok {
-				if state, parseErr := core.ParseStationState(s); parseErr == nil {
-					fn(state)
-				}
+				fn(core.StationState(s))
 			}
 		}
 	}

@@ -46,7 +46,7 @@ func TestStress_Public_Network_MixedMethods(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Public_Network_SubscribeConnectedChanged_Fanout(t *testing.T) {
+func TestStress_Public_Network_SubscribeConnectedChanged_Concurrent(t *testing.T) {
 	network := newTestNetwork(t)
 
 	fn := network.core.(*fakeCoreNetwork)
@@ -67,7 +67,7 @@ func TestStress_Public_Network_SubscribeConnectedChanged_Fanout(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Public_Network_Nil(t *testing.T) {
+func TestStress_Public_Network_NilReceiver(t *testing.T) {
 	var n *Network
 
 	const N = 1000

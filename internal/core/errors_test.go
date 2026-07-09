@@ -239,6 +239,31 @@ func TestErrors_Core(t *testing.T) {
 			require.True(t, strings.Contains(msg, "dbus property error"))
 		})
 
+		t.Run("MessageWithoutDetails", func(t *testing.T) {
+			// With no Details, Error() omits the trailing parenthetical.
+			err := &Error{Kind: KindUnavailable, Resource: ResourceAdapter, Op: "Op", Err: iwdbus.ErrDBusProperty}
+			msg := err.Error()
+			require.Contains(t, msg, "adapter unavailable: Op=Op")
+			require.NotContains(t, msg, "(")
+		})
+
+		t.Run("LabelWithoutResource", func(t *testing.T) {
+			// A ResourceUnknown error labels with the bare kind, no resource prefix.
+			require.Equal(t, string(KindUnavailable), errorLabel(KindUnavailable, ResourceUnknown))
+
+			err := &Error{Kind: KindOperationFailed, Resource: ResourceUnknown, Op: "Op", Err: iwdbus.ErrDBusProperty}
+			require.Contains(t, err.Error(), string(KindOperationFailed)+": Op=Op")
+		})
+
+		t.Run("WrapAgentUnavailable", func(t *testing.T) {
+			err := WrapAgentUnavailable("Op", "details", iwdbus.ErrDBusMethod)
+			require.Error(t, err)
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, ResourceAgent, ce.Resource)
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
+		})
+
 		t.Run("WithNestedIwdBus", func(t *testing.T) {
 			low := fakeErr{"boom"}
 			inner := &iwdbus.Error{

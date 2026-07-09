@@ -220,6 +220,44 @@ func TestDaemon_Public(t *testing.T) {
 	})
 }
 
+func TestDaemon_Coverage(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("InfoString", func(t *testing.T) {
+		require.Equal(t, "<nil>", (*DaemonInfo)(nil).String())
+
+		info := &DaemonInfo{Version: "1.30", StateDirectory: "/var/lib/iwd", NetworkConfigurationEnabled: true}
+		s := info.String()
+		require.Contains(t, s, "Version: 1.30")
+		require.Contains(t, s, "StateDirectory: /var/lib/iwd")
+		require.Contains(t, s, "NetworkConfigurationEnabled: true")
+	})
+
+	t.Run("NewDaemon_NilCore", func(t *testing.T) {
+		require.Nil(t, newDaemon(nil))
+	})
+
+	t.Run("NetworksBackendError", func(t *testing.T) {
+		f := &fakeCoreDaemon{}
+		f.setErr(core.WrapDaemonUnavailable("op", "boom", errors.New("x")))
+		_, err := newDaemon(f).Networks(ctx)
+		require.Error(t, err)
+		var pe *Error
+		require.ErrorAs(t, err, &pe)
+		require.Equal(t, ResourceDaemon, pe.Resource)
+	})
+
+	t.Run("KnownNetworksBackendError", func(t *testing.T) {
+		f := &fakeCoreDaemon{}
+		f.setErr(core.WrapDaemonUnavailable("op", "boom", errors.New("x")))
+		_, err := newDaemon(f).KnownNetworks(ctx)
+		require.Error(t, err)
+		var pe *Error
+		require.ErrorAs(t, err, &pe)
+		require.Equal(t, ResourceDaemon, pe.Resource)
+	})
+}
+
 func TestDaemon_StationsMapsName(t *testing.T) {
 	ctx := context.Background()
 	f := &fakeCoreDaemon{}

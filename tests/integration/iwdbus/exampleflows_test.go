@@ -12,12 +12,12 @@ import (
 	"github.com/chrispypip/spiderw/tests/testutil/iwdmock"
 )
 
-// TestExampleFlows runs the same call sequences as the godoc examples in
+// TestExampleFlowsMock runs the same call sequences as the godoc examples in
 // example_test.go against the iwd mock, so the documented flows are verified at
 // runtime (the examples themselves are compile-checked but not executed, since
 // they target the system bus and real iwd). Each subtest mirrors one Example*,
 // swapping SystemBus for SessionBus and log.Fatal for require assertions.
-func TestExampleFlows(t *testing.T) {
+func TestExampleFlowsMock(t *testing.T) {
 	tmpDir := t.TempDir()
 	iwdmock.StartMockNormal(t, tmpDir)
 	ctx := context.Background()

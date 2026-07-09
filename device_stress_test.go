@@ -13,7 +13,7 @@ import (
 	"github.com/chrispypip/spiderw/internal/core"
 )
 
-func TestStress_Public_Device_MixedOperations(t *testing.T) {
+func TestStress_Public_Device_MixedMethods(t *testing.T) {
 	device := newTestDevice(t)
 
 	// Ensure subscription tests have something to normalize.

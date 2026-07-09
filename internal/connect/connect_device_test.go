@@ -91,9 +91,7 @@ func TestWiring_NewDevice_FailurePaths(t *testing.T) {
 		newIwdDeviceFn = func(ctx context.Context, conn *dbus.Conn, path dbus.ObjectPath) (*iwdbus.Device, error) {
 			return nil, nil
 		}
-		newCoreDeviceFn = func(raw *iwdbus.Device) *core.Device {
-			return core.NewDevice(raw)
-		}
+		newCoreDeviceFn = origNewCoreDevice
 
 		w := &Wiring{Conn: &dbus.Conn{}}
 		d, err := w.NewDevice(context.Background(), "/phy0/wlan0")
@@ -115,5 +113,17 @@ func TestWiring_NewDevice_FailurePaths(t *testing.T) {
 		require.Nil(t, d)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "core device interface not available")
+	})
+
+	t.Run("success", func(t *testing.T) {
+		newIwdDeviceFn = func(ctx context.Context, conn *dbus.Conn, path dbus.ObjectPath) (*iwdbus.Device, error) {
+			return &iwdbus.Device{}, nil
+		}
+		newCoreDeviceFn = origNewCoreDevice
+
+		w := &Wiring{Conn: &dbus.Conn{}}
+		d, err := w.NewDevice(context.Background(), "/phy0/wlan0")
+		require.NoError(t, err)
+		require.NotNil(t, d)
 	})
 }

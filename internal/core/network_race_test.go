@@ -28,7 +28,7 @@ func TestRace_Core_Network_ConnectConcurrentWithGet(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRace_Core_Network_MixedCalls(t *testing.T) {
+func TestRace_Core_Network_MixedMethods(t *testing.T) {
 	network := newTestNetwork(t)
 
 	const N = 200
@@ -62,7 +62,7 @@ func TestRace_Core_Network_MixedCalls(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRace_Core_Network_SubscribeConnectedChanged_ConcurrentCallbacks(t *testing.T) {
+func TestRace_Core_Network_SubscribeConnectedChanged_Concurrent(t *testing.T) {
 	network := newTestNetwork(t)
 
 	const N = 200
@@ -80,7 +80,7 @@ func TestRace_Core_Network_SubscribeConnectedChanged_ConcurrentCallbacks(t *test
 	wg.Wait()
 }
 
-func TestRace_Core_Network_SubscribePropertiesChanged_ConcurrentCallbacks(t *testing.T) {
+func TestRace_Core_Network_SubscribePropertiesChanged_Concurrent(t *testing.T) {
 	network := newTestNetwork(t)
 
 	const N = 200

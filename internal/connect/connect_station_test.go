@@ -91,9 +91,7 @@ func TestWiring_NewStation_FailurePaths(t *testing.T) {
 		newIwdStationFn = func(ctx context.Context, conn *dbus.Conn, path dbus.ObjectPath) (*iwdbus.Station, error) {
 			return nil, nil
 		}
-		newCoreStationFn = func(raw *iwdbus.Station) *core.Station {
-			return core.NewStation(raw)
-		}
+		newCoreStationFn = origNewCoreStation
 
 		w := &Wiring{Conn: &dbus.Conn{}}
 		s, err := w.NewStation(context.Background(), "/phy0/wlan0")
@@ -115,5 +113,17 @@ func TestWiring_NewStation_FailurePaths(t *testing.T) {
 		require.Nil(t, s)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "core station interface not available")
+	})
+
+	t.Run("success", func(t *testing.T) {
+		newIwdStationFn = func(ctx context.Context, conn *dbus.Conn, path dbus.ObjectPath) (*iwdbus.Station, error) {
+			return &iwdbus.Station{}, nil
+		}
+		newCoreStationFn = origNewCoreStation
+
+		w := &Wiring{Conn: &dbus.Conn{}}
+		s, err := w.NewStation(context.Background(), "/phy0/wlan0")
+		require.NoError(t, err)
+		require.NotNil(t, s)
 	})
 }

@@ -47,6 +47,17 @@ func (f *fakeCoreNetwork) setConnectedEvent(connected bool) *fakeCoreNetwork {
 	return f
 }
 
+// setErr makes every accessor (and the subscribe calls) return err so the public
+// wrapper's backend-error mapping can be exercised.
+func (f *fakeCoreNetwork) setErr(err error) *fakeCoreNetwork {
+	if err == nil {
+		f.err.Store(nil)
+		return f
+	}
+	f.err.Store(&fakeCoreNetworkError{err: err})
+	return f
+}
+
 func (f *fakeCoreNetwork) loadErr() error {
 	if box := f.err.Load(); box != nil {
 		return box.err
@@ -103,7 +114,10 @@ func (f *fakeCoreNetwork) SubscribePropertiesChanged(ctx context.Context, fn fun
 		return nil, f.loadErr()
 	}
 	if ev := f.connectedEvnt.Load(); ev != nil {
-		fn(core.NetworkPropertiesChanged{Changed: map[string]any{"Connected": *ev}})
+		fn(core.NetworkPropertiesChanged{
+			Changed:     map[string]any{"Connected": *ev},
+			Invalidated: []string{"KnownNetwork"},
+		})
 	}
 	return func() error { return nil }, f.loadErr()
 }

@@ -82,14 +82,36 @@ func TestBasicServiceSet_Core(t *testing.T) {
 		require.Contains(t, err.Error(), "empty Address")
 	})
 
+	t.Run("Properties_BackendError", func(t *testing.T) {
+		t.Parallel()
+
+		b := NewBasicServiceSet(&fakeIwdbusBSS{err: iwdbus.WrapProperty(iwdbus.IwdBasicServiceSetIface, "Address", errors.New("dbus failure"))})
+
+		_, err := b.Properties(context.Background())
+		require.Error(t, err)
+		var ce *Error
+		require.ErrorAs(t, err, &ce)
+		require.Equal(t, ResourceBasicServiceSet, ce.Resource)
+		require.Contains(t, err.Error(), "dbus failure")
+	})
+
 	t.Run("NilReceiver", func(t *testing.T) {
 		t.Parallel()
 
 		var b *BasicServiceSet
-
-		_, err := b.Address(context.Background())
-		require.Error(t, err)
-		require.ErrorIs(t, err, ErrBasicServiceSetNotInitialized)
+		for _, tc := range []struct {
+			name string
+			call func() error
+		}{
+			{"Address", func() error { _, err := b.Address(context.Background()); return err }},
+			{"Properties", func() error { _, err := b.Properties(context.Background()); return err }},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				err := tc.call()
+				require.ErrorIs(t, err, ErrBasicServiceSetNotInitialized)
+				require.ErrorIs(t, err, ErrCore)
+			})
+		}
 	})
 
 	t.Run("NewBasicServiceSet_NilRaw", func(t *testing.T) {

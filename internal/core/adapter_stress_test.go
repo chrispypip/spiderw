@@ -76,7 +76,7 @@ func TestStress_Core_Adapter_MixedMethods(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Core_Adapter_SubscribePropertiesChanged_Fanout(t *testing.T) {
+func TestStress_Core_Adapter_SubscribePropertiesChanged_Concurrent(t *testing.T) {
 	adapter := newTestAdapter(t)
 
 	const N = 4000
@@ -93,7 +93,7 @@ func TestStress_Core_Adapter_SubscribePropertiesChanged_Fanout(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Core_Adapter_SubscribePoweredChanged_Fanout(t *testing.T) {
+func TestStress_Core_Adapter_SubscribePoweredChanged_Concurrent(t *testing.T) {
 	adapter := newTestAdapter(t)
 
 	const N = 4000
@@ -110,7 +110,7 @@ func TestStress_Core_Adapter_SubscribePoweredChanged_Fanout(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Core_Adapter_Nil(t *testing.T) {
+func TestStress_Core_Adapter_NilReceiver(t *testing.T) {
 	var a *Adapter
 
 	const N = 1000

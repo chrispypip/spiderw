@@ -12,7 +12,7 @@ import (
 	"github.com/chrispypip/spiderw/tests/testutil/iwdmock"
 )
 
-func TestSignalFirehose_DaemonSurvives(t *testing.T) {
+func TestFirehoseMock_DaemonSurvives(t *testing.T) {
 	iwdmock.StartMockFirehose(t)
 
 	for range 40 {
@@ -24,7 +24,7 @@ func TestSignalFirehose_DaemonSurvives(t *testing.T) {
 	}
 }
 
-func TestSignalFirehose_AdapterSurvives(t *testing.T) {
+func TestFirehoseMock_AdapterSurvives(t *testing.T) {
 	iwdmock.StartMockFirehose(t)
 
 	for range 20 {
@@ -48,7 +48,7 @@ func TestSignalFirehose_AdapterSurvives(t *testing.T) {
 	}
 }
 
-func TestSignalFirehose_PublicAdapterSubscribePoweredReceivesSignals(t *testing.T) {
+func TestFirehoseMock_PublicAdapterSubscribePoweredReceivesSignals(t *testing.T) {
 	iwdmock.StartMockFirehose(t)
 
 	ctx := context.Background()
@@ -72,7 +72,7 @@ func TestSignalFirehose_PublicAdapterSubscribePoweredReceivesSignals(t *testing.
 	requireFired(t, fired, "adapter powered subscription did not receive firehose signal")
 }
 
-func TestSignalFirehose_DeviceSurvives(t *testing.T) {
+func TestFirehoseMock_DeviceSurvives(t *testing.T) {
 	iwdmock.StartMockFirehose(t)
 
 	for range 20 {
@@ -91,7 +91,7 @@ func TestSignalFirehose_DeviceSurvives(t *testing.T) {
 	}
 }
 
-func TestSignalFirehose_NetworkSurvives(t *testing.T) {
+func TestFirehoseMock_NetworkSurvives(t *testing.T) {
 	iwdmock.StartMockFirehose(t)
 
 	for range 20 {
@@ -105,7 +105,7 @@ func TestSignalFirehose_NetworkSurvives(t *testing.T) {
 	}
 }
 
-func TestSignalFirehose_KnownNetworkSurvives(t *testing.T) {
+func TestFirehoseMock_KnownNetworkSurvives(t *testing.T) {
 	iwdmock.StartMockFirehose(t)
 
 	for range 20 {
@@ -119,7 +119,7 @@ func TestSignalFirehose_KnownNetworkSurvives(t *testing.T) {
 	}
 }
 
-func TestSignalFirehose_PublicKnownNetworkSubscribeReceivesSignals(t *testing.T) {
+func TestFirehoseMock_PublicKnownNetworkSubscribeReceivesSignals(t *testing.T) {
 	iwdmock.StartMockFirehose(t)
 
 	ctx := context.Background()
@@ -140,7 +140,7 @@ func TestSignalFirehose_PublicKnownNetworkSubscribeReceivesSignals(t *testing.T)
 	requireFired(t, fired, "known-network auto-connect subscription did not receive firehose signal")
 }
 
-func TestSignalFirehose_PublicNetworkSubscribeReceivesSignals(t *testing.T) {
+func TestFirehoseMock_PublicNetworkSubscribeReceivesSignals(t *testing.T) {
 	iwdmock.StartMockFirehose(t)
 
 	ctx := context.Background()
@@ -161,7 +161,7 @@ func TestSignalFirehose_PublicNetworkSubscribeReceivesSignals(t *testing.T) {
 	requireFired(t, connectedFired, "network connected subscription did not receive firehose signal")
 }
 
-func TestSignalFirehose_PublicDeviceSubscribeReceivesSignals(t *testing.T) {
+func TestFirehoseMock_PublicDeviceSubscribeReceivesSignals(t *testing.T) {
 	iwdmock.StartMockFirehose(t)
 
 	ctx := context.Background()

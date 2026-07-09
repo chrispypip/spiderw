@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -72,6 +73,14 @@ func TestNetworkCmd_Status_JSON(t *testing.T) {
 	var entries []networkStatusEntry
 	require.NoError(t, json.Unmarshal([]byte(out), &entries))
 	require.Len(t, entries, 3)
+}
+
+func TestNetworkCmd_Status_Human(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithNetwork(), nil, false, "network", "status")
+	require.Equal(t, 0, code, out)
+	require.Contains(t, out, "OpenNet")
 }
 
 func TestNetworkCmd_List(t *testing.T) {
@@ -252,4 +261,19 @@ func TestNetworkCmd_UnknownSubcommand(t *testing.T) {
 	out, code := driveCLI(fakeWithNetwork(), nil, false, "network", "OpenNet", "powered")
 	require.Equal(t, 1, code)
 	require.Contains(t, out, "unknown network command")
+}
+
+// TestPrintNetworkConnectedLine covers the monitor output helper directly (the
+// monitor command blocks on an OS signal and is not driveable in-process).
+func TestPrintNetworkConnectedLine(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+
+	app, buf := appWithBuffer(false)
+	require.NoError(t, printNetworkConnectedLine(app, "OpenNet", true, &mu))
+	require.Equal(t, "connected=true\n", buf.String())
+
+	appJSON, bufJSON := appWithBuffer(true)
+	require.NoError(t, printNetworkConnectedLine(appJSON, "OpenNet", false, &mu))
+	require.Contains(t, bufJSON.String(), `"Connected":false`)
 }

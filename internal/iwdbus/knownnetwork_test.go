@@ -23,21 +23,18 @@ func TestKnownNetwork_Iwdbus(t *testing.T) {
 		t.Run("GetLastConnectedTime", testKnownNetwork_GetLastConnectedTime)
 		t.Run("GetLastConnectedTime_Absent", testKnownNetwork_GetLastConnectedTime_Absent)
 		t.Run("GetAutoConnect", testKnownNetwork_GetAutoConnect)
-		t.Run("GetName_NoIntro", testKnownNetwork_GetName_NoIntro)
 	})
 
 	t.Run("Set", func(t *testing.T) {
 		t.Parallel()
 		t.Run("SetAutoConnect", testKnownNetwork_SetAutoConnect)
 		t.Run("SetAutoConnect_Err", testKnownNetwork_SetAutoConnect_Err)
-		t.Run("SetAutoConnect_NoIntro", testKnownNetwork_SetAutoConnect_NoIntro)
 	})
 
 	t.Run("Forget", func(t *testing.T) {
 		t.Parallel()
 		t.Run("Success", testKnownNetwork_Forget)
 		t.Run("ErrorMapping", testKnownNetwork_Forget_ErrorMapping)
-		t.Run("NoIntro", testKnownNetwork_Forget_NoIntro)
 	})
 
 	t.Run("Properties", func(t *testing.T) {
@@ -47,10 +44,51 @@ func TestKnownNetwork_Iwdbus(t *testing.T) {
 		t.Run("Errors", testKnownNetwork_GetProperties_Errors)
 	})
 
+	t.Run("NotInitialized", testKnownNetwork_NoIntro)
+
 	t.Run("Subscribe", func(t *testing.T) {
 		t.Parallel()
 		t.Run("AutoConnectChanged", testKnownNetwork_SubscribeAutoConnectChanged)
 	})
+
+	t.Run("Firehose", func(t *testing.T) {
+		t.Parallel()
+		t.Run("NilCallback", testKnownNetwork_Firehose_NilCallback)
+		t.Run("ReceivesAll", testKnownNetwork_FirehoseReceivesAll)
+	})
+}
+
+func testKnownNetwork_Firehose_NilCallback(t *testing.T) {
+	t.Parallel()
+	k := &KnownNetwork{signals: newFakeSignalSource(t)}
+	err := k.Firehose(context.Background(), nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "fn cannot be nil")
+}
+
+func testKnownNetwork_FirehoseReceivesAll(t *testing.T) {
+	fake := newFakeSignalSource(t)
+	known := &KnownNetwork{signals: fake}
+
+	var recv FirehoseSignal
+	fired := make(chan struct{}, 1)
+
+	err := known.Firehose(context.Background(), func(s FirehoseSignal) {
+		recv = s
+		fired <- struct{}{}
+	})
+	require.NoError(t, err)
+
+	fake.emit(
+		IwdKnownNetworkIface,
+		"PropertiesChanged",
+		map[string]dbus.Variant{"AutoConnect": dbus.MakeVariant(false)},
+		nil,
+	)
+
+	requireFired(t, fired)
+	require.Equal(t, IwdKnownNetworkIface, recv.Interface)
+	require.Equal(t, "PropertiesChanged", recv.Member)
 }
 
 func testKnownNetwork_GetName(t *testing.T) {
@@ -132,14 +170,6 @@ func testKnownNetwork_GetAutoConnect(t *testing.T) {
 	require.True(t, auto)
 }
 
-func testKnownNetwork_GetName_NoIntro(t *testing.T) {
-	t.Parallel()
-	k := &KnownNetwork{call: nil}
-	_, err := k.GetName(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "known network is not initialized")
-}
-
 func testKnownNetwork_SetAutoConnect(t *testing.T) {
 	t.Parallel()
 	var called bool
@@ -162,14 +192,6 @@ func testKnownNetwork_SetAutoConnect_Err(t *testing.T) {
 	err := k.SetAutoConnect(context.Background(), true)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "dbus failure")
-}
-
-func testKnownNetwork_SetAutoConnect_NoIntro(t *testing.T) {
-	t.Parallel()
-	k := &KnownNetwork{call: nil}
-	err := k.SetAutoConnect(context.Background(), true)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "known network is not initialized")
 }
 
 func testKnownNetwork_Forget(t *testing.T) {
@@ -196,14 +218,6 @@ func testKnownNetwork_Forget_ErrorMapping(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrBusy)
 	require.ErrorIs(t, err, ErrDBusMethod)
-}
-
-func testKnownNetwork_Forget_NoIntro(t *testing.T) {
-	t.Parallel()
-	k := &KnownNetwork{call: nil}
-	err := k.Forget(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "known network is not initialized")
 }
 
 func fullKnownNetworkProps() map[string]dbus.Variant {
@@ -303,4 +317,32 @@ func testKnownNetwork_SubscribeAutoConnectChanged(t *testing.T) {
 
 	requireFired(t, fired)
 	require.False(t, recv)
+}
+
+// testKnownNetwork_NoIntro checks every init-guarded method reports a clean
+// "known network is not initialized" error when the KnownNetwork has no caller.
+func testKnownNetwork_NoIntro(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name string
+		call func(*KnownNetwork) error
+	}{
+		{"GetName", func(k *KnownNetwork) error { _, err := k.GetName(ctx); return err }},
+		{"GetType", func(k *KnownNetwork) error { _, err := k.GetType(ctx); return err }},
+		{"GetHidden", func(k *KnownNetwork) error { _, err := k.GetHidden(ctx); return err }},
+		{"GetAutoConnect", func(k *KnownNetwork) error { _, err := k.GetAutoConnect(ctx); return err }},
+		{"GetLastConnectedTime", func(k *KnownNetwork) error { _, err := k.GetLastConnectedTime(ctx); return err }},
+		{"GetProperties", func(k *KnownNetwork) error { _, err := k.GetProperties(ctx); return err }},
+		{"SetAutoConnect", func(k *KnownNetwork) error { return k.SetAutoConnect(ctx, true) }},
+		{"Forget", func(k *KnownNetwork) error { return k.Forget(ctx) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.call(&KnownNetwork{call: nil})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "known network is not initialized")
+		})
+	}
 }

@@ -147,10 +147,10 @@ func (f *fakeCoreDevice) SubscribeModeChanged(ctx context.Context, fn func(core.
 	if v := f.subPropsEvent.Load(); v != nil {
 		props := v.(core.DevicePropertiesChanged)
 		if m, ok := props.Changed["Mode"]; ok {
+			// Deliver the raw mode as the core layer would; the public wrapper is
+			// responsible for validating and dropping unrecognized modes.
 			if s, ok := m.(string); ok {
-				if mode, parseOK := core.ParseMode(s); parseOK == nil {
-					fn(mode)
-				}
+				fn(core.Mode(s))
 			}
 		}
 	}

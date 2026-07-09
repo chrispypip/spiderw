@@ -74,7 +74,7 @@ func TestStress_Core_Device_MixedMethods(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Core_Device_SubscribePropertiesChanged_Fanout(t *testing.T) {
+func TestStress_Core_Device_SubscribePropertiesChanged_Concurrent(t *testing.T) {
 	device := newTestDevice(t)
 
 	const N = 4000
@@ -91,7 +91,7 @@ func TestStress_Core_Device_SubscribePropertiesChanged_Fanout(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Core_Device_SubscribeModeChanged_Fanout(t *testing.T) {
+func TestStress_Core_Device_SubscribeModeChanged_Concurrent(t *testing.T) {
 	device := newTestDevice(t)
 
 	const N = 4000
@@ -108,7 +108,7 @@ func TestStress_Core_Device_SubscribeModeChanged_Fanout(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Core_Device_Nil(t *testing.T) {
+func TestStress_Core_Device_NilReceiver(t *testing.T) {
 	var d *Device
 
 	const N = 1000

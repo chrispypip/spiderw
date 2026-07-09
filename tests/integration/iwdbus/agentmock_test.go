@@ -172,7 +172,7 @@ func TestAgentMock_ManagerUnavailable(t *testing.T) {
 
 // TestAgentMock_CLISecuredConnect drives the secured connect through the CLI with
 // a passphrase flag.
-func TestAgentMock_CLISecuredConnect(t *testing.T) {
+func TestAgentMock_CLI_SecuredConnect(t *testing.T) {
 	tmpDir := t.TempDir()
 	iwdmock.StartMockNormal(t, tmpDir)
 
@@ -183,7 +183,7 @@ func TestAgentMock_CLISecuredConnect(t *testing.T) {
 
 // TestAgentMock_CLISecuredConnectStdin drives the secured connect through the CLI
 // reading the passphrase from stdin.
-func TestAgentMock_CLISecuredConnectWrong(t *testing.T) {
+func TestAgentMock_CLI_SecuredConnectWrong(t *testing.T) {
 	tmpDir := t.TempDir()
 	iwdmock.StartMockNormal(t, tmpDir)
 

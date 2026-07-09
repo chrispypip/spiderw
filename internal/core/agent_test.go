@@ -33,6 +33,7 @@ func TestAgent_Core(t *testing.T) {
 	t.Run("Lifecycle", func(t *testing.T) {
 		t.Parallel()
 		t.Run("Unregister", testAgentCore_Unregister)
+		t.Run("UnregisterErrors", testAgentCore_UnregisterErrors)
 		t.Run("UnregisterIdempotent", testAgentCore_UnregisterIdempotent)
 		t.Run("UnregisterUnbound", testAgentCore_UnregisterUnbound)
 		t.Run("UnregisterNilReceiver", testAgentCore_UnregisterNilReceiver)
@@ -169,6 +170,30 @@ func testAgentCore_Unregister(t *testing.T) {
 	require.NoError(t, a.Unregister(context.Background()))
 	require.Equal(t, []dbus.ObjectPath{"/spiderw/agent"}, mgr.unregisterCalls)
 	require.True(t, unexported)
+}
+
+func testAgentCore_UnregisterErrors(t *testing.T) {
+	t.Parallel()
+	// Unregister cancels any in-flight request, then joins the unregister and
+	// unexport failures — both wrapped as matchable core Errors.
+	mgr := &fakeAgentManager{unregisterErr: errors.New("unreg boom")}
+	a, _ := NewAgent(CredentialCallbacks{Passphrase: func(ctx context.Context, networkPath string) (string, error) { return "", nil }})
+	a.Bind(mgr, "/spiderw/agent", func() error { return errors.New("unexport boom") })
+
+	canceled := false
+	a.mu.Lock()
+	a.currentCancel = func() { canceled = true }
+	a.mu.Unlock()
+
+	err := a.Unregister(context.Background())
+	require.Error(t, err)
+	require.True(t, canceled, "in-flight request should be canceled")
+	require.ErrorContains(t, err, "unreg boom")
+	require.ErrorContains(t, err, "unexport boom")
+
+	var ce *Error
+	require.ErrorAs(t, err, &ce)
+	require.Equal(t, ResourceAgent, ce.Resource)
 }
 
 func testAgentCore_UnregisterIdempotent(t *testing.T) {

@@ -46,7 +46,7 @@ func TestStress_Public_KnownNetwork_MixedMethods(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStress_Public_KnownNetwork_SubscribeAutoConnectChanged_Fanout(t *testing.T) {
+func TestStress_Public_KnownNetwork_SubscribeAutoConnectChanged_Concurrent(t *testing.T) {
 	known := newTestKnownNetwork(t)
 
 	fn := known.core.(*fakeCoreKnownNetwork)
@@ -67,7 +67,7 @@ func TestStress_Public_KnownNetwork_SubscribeAutoConnectChanged_Fanout(t *testin
 	wg.Wait()
 }
 
-func TestStress_Public_KnownNetwork_Nil(t *testing.T) {
+func TestStress_Public_KnownNetwork_NilReceiver(t *testing.T) {
 	var k *KnownNetwork
 
 	const N = 1000

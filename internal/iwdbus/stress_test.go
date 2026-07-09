@@ -287,7 +287,7 @@ func TestStress_Iwdbus_Dispatch_MixedHandlers(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 }
 
-func TestStress_Iwdbus_ParseIntrospectChildNames(t *testing.T) {
+func TestStress_Iwdbus_ParseIntrospectionChildNames(t *testing.T) {
 	// Hammer parseIntrospectChildNames with a variety of shapes concurrently.
 	base := `<node><node name="phy0"/><node name="phy1"/><node name="phy2"/></node>`
 

@@ -6,12 +6,33 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/chrispypip/spiderw"
 )
+
+func TestParseBoolArg(t *testing.T) {
+	t.Parallel()
+
+	for _, in := range []string{"true", "1", "yes", "y", "on", "enable", "enabled", "  TRUE  ", "On"} {
+		got, err := parseBoolArg(in)
+		require.NoError(t, err, in)
+		require.True(t, got, in)
+	}
+	for _, in := range []string{"false", "0", "no", "n", "off", "disable", "disabled", "  FALSE ", "Off"} {
+		got, err := parseBoolArg(in)
+		require.NoError(t, err, in)
+		require.False(t, got, in)
+	}
+	for _, in := range []string{"maybe", "", "2", "yep"} {
+		_, err := parseBoolArg(in)
+		require.Error(t, err, in)
+		require.Contains(t, err.Error(), "invalid boolean value")
+	}
+}
 
 func fakeWithKnownNetwork() *fakeClient {
 	known := &fakeKnownNetwork{
@@ -56,6 +77,44 @@ func TestKnownNetworkCmd_Status_JSON(t *testing.T) {
 	require.NotNil(t, entries[0].LastConnectedTime)
 	require.Equal(t, "hotspot", entries[1].Type)
 	require.Nil(t, entries[1].LastConnectedTime)
+}
+
+func TestKnownNetworkCmd_Status_Human(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithKnownNetwork(), nil, false, "known-network", "status")
+	require.Equal(t, 0, code, out)
+	require.Contains(t, out, "KnownNet")
+	require.Contains(t, out, "GuestHotspot")
+	require.Contains(t, out, "psk")
+}
+
+func TestKnownNetworkCmd_SingleStatus(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Human", func(t *testing.T) {
+		out, code := driveCLI(fakeWithKnownNetwork(), nil, false, "known-network", "KnownNet", "status")
+		require.Equal(t, 0, code, out)
+		require.Contains(t, out, "KnownNet")
+		require.Contains(t, out, "psk")
+	})
+
+	t.Run("JSON", func(t *testing.T) {
+		out, code := driveCLI(fakeWithKnownNetwork(), nil, true, "known-network", "KnownNet", "status")
+		require.Equal(t, 0, code, out)
+		var entries []knownNetworkStatusEntry
+		require.NoError(t, json.Unmarshal([]byte(out), &entries))
+		require.Len(t, entries, 1)
+		require.Equal(t, "KnownNet", entries[0].Name)
+	})
+}
+
+func TestKnownNetworkCmd_Hidden(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithKnownNetwork(), nil, false, "known-network", "KnownNet", "hidden")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "false\n", out)
 }
 
 func TestKnownNetworkCmd_List(t *testing.T) {
@@ -149,4 +208,19 @@ func TestKnownNetworkCmd_UnknownSubcommand(t *testing.T) {
 	out, code := driveCLI(fakeWithKnownNetwork(), nil, false, "known-network", "KnownNet", "powered")
 	require.Equal(t, 1, code)
 	require.Contains(t, out, "unknown known-network command")
+}
+
+// TestPrintKnownNetworkAutoConnectLine covers the monitor output helper directly
+// (the monitor command blocks on an OS signal and is not driveable in-process).
+func TestPrintKnownNetworkAutoConnectLine(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+
+	app, buf := appWithBuffer(false)
+	require.NoError(t, printKnownNetworkAutoConnectLine(app, "HomeNet", true, &mu))
+	require.Equal(t, "autoconnect=true\n", buf.String())
+
+	appJSON, bufJSON := appWithBuffer(true)
+	require.NoError(t, printKnownNetworkAutoConnectLine(appJSON, "HomeNet", false, &mu))
+	require.Contains(t, bufJSON.String(), `"AutoConnect":false`)
 }

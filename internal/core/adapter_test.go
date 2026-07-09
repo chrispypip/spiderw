@@ -247,15 +247,24 @@ func TestAdapter_Core(t *testing.T) {
 		})
 
 		t.Run("ErrorMapping", func(t *testing.T) {
-			f := &fakeIwdbusAdapter{}
-			f.setErr(iwdbus.ErrDBusMethod)
-			a := NewAdapter(f)
-			_, err := a.Model(ctx)
-			require.Error(t, err)
-			var ce *Error
-			require.ErrorAs(t, err, &ce)
-			require.Equal(t, KindUnavailable, ce.Kind)
-			require.Equal(t, ResourceAdapter, ce.Resource)
+			for _, name := range []string{"Model", "Vendor"} {
+				t.Run(name, func(t *testing.T) {
+					f := &fakeIwdbusAdapter{}
+					f.setErr(iwdbus.ErrDBusMethod)
+					a := NewAdapter(f)
+					var err error
+					if name == "Model" {
+						_, err = a.Model(ctx)
+					} else {
+						_, err = a.Vendor(ctx)
+					}
+					require.Error(t, err)
+					var ce *Error
+					require.ErrorAs(t, err, &ce)
+					require.Equal(t, KindUnavailable, ce.Kind)
+					require.Equal(t, ResourceAdapter, ce.Resource)
+				})
+			}
 		})
 	})
 
@@ -425,6 +434,123 @@ func TestAdapter_Core(t *testing.T) {
 		wg.Wait()
 	})
 
+	t.Run("Supports", func(t *testing.T) {
+		modes := []iwdbus.Mode{iwdbus.ModeStation, iwdbus.ModeAP, iwdbus.ModeAdHoc}
+		for _, tc := range []struct {
+			name string
+			call func(*Adapter) (bool, error)
+		}{
+			{"Station", func(a *Adapter) (bool, error) { return a.SupportsStation(ctx) }},
+			{"AP", func(a *Adapter) (bool, error) { return a.SupportsAP(ctx) }},
+			{"AdHoc", func(a *Adapter) (bool, error) { return a.SupportsAdHoc(ctx) }},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Run("Success", func(t *testing.T) {
+					f := &fakeIwdbusAdapter{}
+					f.modes.Store(modes)
+					ok, err := tc.call(NewAdapter(f))
+					require.NoError(t, err)
+					require.True(t, ok)
+				})
+				t.Run("ErrorMapping", func(t *testing.T) {
+					f := &fakeIwdbusAdapter{}
+					f.setErr(iwdbus.ErrDBusMethod)
+					_, err := tc.call(NewAdapter(f))
+					require.Error(t, err)
+					var ce *Error
+					require.ErrorAs(t, err, &ce)
+					require.Equal(t, KindUnavailable, ce.Kind)
+					require.Equal(t, ResourceAdapter, ce.Resource)
+				})
+			})
+		}
+	})
+
+	t.Run("SupportedModesErrorMapping", func(t *testing.T) {
+		f := &fakeIwdbusAdapter{}
+		f.setErr(iwdbus.ErrDBusMethod)
+		_, err := NewAdapter(f).SupportedModes(ctx)
+		require.Error(t, err)
+		var ce *Error
+		require.ErrorAs(t, err, &ce)
+		require.Equal(t, KindUnavailable, ce.Kind)
+		require.Equal(t, ResourceAdapter, ce.Resource)
+	})
+
+	t.Run("SubscribeErrorMapping", func(t *testing.T) {
+		t.Run("PropertiesChanged", func(t *testing.T) {
+			f := &fakeIwdbusAdapter{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewAdapter(f).SubscribePropertiesChanged(ctx, func(AdapterPropertiesChanged) {})
+			require.Error(t, err)
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
+			require.ErrorIs(t, err, ErrCore)
+		})
+		t.Run("PoweredChanged", func(t *testing.T) {
+			f := &fakeIwdbusAdapter{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewAdapter(f).SubscribePoweredChanged(ctx, func(bool) {})
+			require.Error(t, err)
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
+			require.ErrorIs(t, err, ErrCore)
+		})
+	})
+
+	t.Run("NilReceiver", func(t *testing.T) {
+		var a *Adapter
+		for _, tc := range []struct {
+			name string
+			call func() error
+		}{
+			{"Powered", func() error { _, err := a.Powered(ctx); return err }},
+			{"SetPowered", func() error { return a.SetPowered(ctx, true) }},
+			{"Name", func() error { _, err := a.Name(ctx); return err }},
+			{"Model", func() error { _, err := a.Model(ctx); return err }},
+			{"Vendor", func() error { _, err := a.Vendor(ctx); return err }},
+			{"SupportedModes", func() error { _, err := a.SupportedModes(ctx); return err }},
+			{"Properties", func() error { _, err := a.Properties(ctx); return err }},
+			{"SupportsMode", func() error { _, err := a.SupportsMode(ctx, ModeStation); return err }},
+			{"SupportsStation", func() error { _, err := a.SupportsStation(ctx); return err }},
+			{"SupportsAP", func() error { _, err := a.SupportsAP(ctx); return err }},
+			{"SupportsAdHoc", func() error { _, err := a.SupportsAdHoc(ctx); return err }},
+			{"SubscribePropertiesChanged", func() error {
+				_, err := a.SubscribePropertiesChanged(ctx, func(AdapterPropertiesChanged) {})
+				return err
+			}},
+			{"SubscribePoweredChanged", func() error {
+				_, err := a.SubscribePoweredChanged(ctx, func(bool) {})
+				return err
+			}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				err := tc.call()
+				require.ErrorIs(t, err, ErrAdapterNotInitialized)
+				require.ErrorIs(t, err, ErrCore)
+			})
+		}
+	})
+
+	t.Run("ParseMode", func(t *testing.T) {
+		t.Run("Valid", func(t *testing.T) {
+			mode, err := ParseMode("station")
+			require.NoError(t, err)
+			require.Equal(t, ModeStation, mode)
+		})
+
+		t.Run("Invalid", func(t *testing.T) {
+			mode, err := ParseMode("bogus")
+			require.Error(t, err)
+			require.Equal(t, ModeUnknown, mode)
+
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, KindInvalidArgument, ce.Kind)
+			require.Equal(t, ResourceAdapter, ce.Resource)
+			require.ErrorIs(t, err, ErrCore)
+			require.Contains(t, err.Error(), "invalid mode")
+		})
+	})
+
 	t.Run("ErrorMessageStability", func(t *testing.T) {
 		f := &fakeIwdbusAdapter{}
 		f.name.Store("")
@@ -436,6 +562,28 @@ func TestAdapter_Core(t *testing.T) {
 		require.Contains(t, msg, "invalid state")
 		require.Contains(t, msg, "Adapter.Name")
 		require.Contains(t, msg, "Name")
+	})
+}
+
+func TestUnsubscribeFunc_Unsubscribe(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NilIsNoop", func(t *testing.T) {
+		t.Parallel()
+		var u UnsubscribeFunc
+		require.NoError(t, u.Unsubscribe())
+	})
+
+	t.Run("InvokesUnderlying", func(t *testing.T) {
+		t.Parallel()
+		sentinel := errors.New("unsub boom")
+		called := false
+		u := UnsubscribeFunc(func() error {
+			called = true
+			return sentinel
+		})
+		require.ErrorIs(t, u.Unsubscribe(), sentinel)
+		require.True(t, called)
 	})
 }
 
@@ -483,6 +631,17 @@ func TestAdapter_Properties(t *testing.T) {
 		_, err := a.Properties(ctx)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "empty Name")
+	})
+
+	t.Run("InvalidModeInvalidState", func(t *testing.T) {
+		f := &fakeIwdbusAdapter{}
+		f.name.Store("phy0")
+		f.modes.Store([]iwdbus.Mode{iwdbus.Mode("bad-mode")})
+		a := NewAdapter(f)
+
+		_, err := a.Properties(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unknown supported mode")
 	})
 
 	t.Run("BackendErrorWrapped", func(t *testing.T) {

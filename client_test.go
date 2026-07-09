@@ -17,6 +17,412 @@ import (
 // NOTE: These tests manipulate package-level seam variables (systemConnectFn/sessionConnectFn)
 // and therefore MUST NOT run in parallel.
 
+// TestClient_ObjectLookups covers the single-object lookup entry points
+// (Client.Adapter/Network/KnownNetwork/BasicServiceSet), which construct a
+// handle from a path via the shared clientObject helper.
+func TestClient_ObjectLookups(t *testing.T) {
+	ctx := context.Background()
+
+	newClient := func(wire *connect.Wiring) *Client {
+		return &Client{daemon: newDaemon(&fakeCoreDaemon{}), wire: wire, cleanup: wire.Cleanup}
+	}
+
+	for _, tc := range []struct {
+		name     string
+		wire     func(fail bool) *connect.Wiring
+		lookup   func(c *Client) (string, error) // returns handle path
+		wantPath string
+	}{
+		{
+			name: "Adapter",
+			wire: func(fail bool) *connect.Wiring {
+				return &connect.Wiring{Conn: &dbus.Conn{}, Cleanup: func() error { return nil },
+					AdapterFactory: func(ctx context.Context, path string) (core.AdapterIface, error) {
+						if fail {
+							return nil, errors.New("wire boom")
+						}
+						return &fakeCoreAdapter{}, nil
+					}}
+			},
+			lookup:   func(c *Client) (string, error) { a, err := c.Adapter(ctx, "/adapter/p"); return a.Path(), err },
+			wantPath: "/adapter/p",
+		},
+		{
+			name: "BasicServiceSet",
+			wire: func(fail bool) *connect.Wiring {
+				return &connect.Wiring{Conn: &dbus.Conn{}, Cleanup: func() error { return nil },
+					BasicServiceSetFactory: func(ctx context.Context, path string) (core.BasicServiceSetIface, error) {
+						if fail {
+							return nil, errors.New("wire boom")
+						}
+						return &fakeCoreBSS{}, nil
+					}}
+			},
+			lookup:   func(c *Client) (string, error) { b, err := c.BasicServiceSet(ctx, "/bss/p"); return b.Path(), err },
+			wantPath: "/bss/p",
+		},
+		{
+			name: "Network",
+			wire: func(fail bool) *connect.Wiring {
+				return &connect.Wiring{Conn: &dbus.Conn{}, ResolverOverride: connect.NoResolver{}, Cleanup: func() error { return nil },
+					NetworkFactory: func(ctx context.Context, path string) (core.NetworkIface, error) {
+						if fail {
+							return nil, errors.New("wire boom")
+						}
+						return &fakeCoreNetwork{}, nil
+					}}
+			},
+			lookup:   func(c *Client) (string, error) { n, err := c.Network(ctx, "/net/p"); return n.Path(), err },
+			wantPath: "/net/p",
+		},
+		{
+			name: "KnownNetwork",
+			wire: func(fail bool) *connect.Wiring {
+				return &connect.Wiring{Conn: &dbus.Conn{}, ResolverOverride: connect.NoResolver{}, Cleanup: func() error { return nil },
+					KnownNetworkFactory: func(ctx context.Context, path string) (core.KnownNetworkIface, error) {
+						if fail {
+							return nil, errors.New("wire boom")
+						}
+						return &fakeCoreKnownNetwork{}, nil
+					}}
+			},
+			lookup:   func(c *Client) (string, error) { k, err := c.KnownNetwork(ctx, "/known/p"); return k.Path(), err },
+			wantPath: "/known/p",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("Success", func(t *testing.T) {
+				path, err := tc.lookup(newClient(tc.wire(false)))
+				require.NoError(t, err)
+				require.Equal(t, tc.wantPath, path)
+			})
+
+			t.Run("WiringError", func(t *testing.T) {
+				_, err := tc.lookup(newClient(tc.wire(true)))
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInternal)
+			})
+
+			t.Run("Closed", func(t *testing.T) {
+				c := newClient(tc.wire(false))
+				require.NoError(t, c.Close())
+				_, err := tc.lookup(c)
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInvalidState)
+			})
+
+			t.Run("NilReceiver", func(t *testing.T) {
+				_, err := tc.lookup(nil)
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInternal)
+			})
+		})
+	}
+}
+
+func TestClient_ObjectWrapperNil(t *testing.T) {
+	ctx := context.Background()
+	// A factory that yields a nil core object makes the wrapper nil, which the
+	// shared clientObject helper reports as an internal error.
+	wire := &connect.Wiring{Conn: &dbus.Conn{}, Cleanup: func() error { return nil },
+		AdapterFactory: func(ctx context.Context, path string) (core.AdapterIface, error) {
+			return nil, nil
+		}}
+	c := &Client{daemon: newDaemon(&fakeCoreDaemon{}), wire: wire, cleanup: wire.Cleanup}
+
+	_, err := c.Adapter(ctx, "/p")
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrInternal)
+}
+
+func TestValidateClientWiring(t *testing.T) {
+	conn := &dbus.Conn{}
+	daemon := &fakeCoreDaemon{}
+	cleanup := func() error { return nil }
+
+	for _, tc := range []struct {
+		name    string
+		wire    *connect.Wiring
+		wantErr bool
+	}{
+		{"NilWiring", nil, true},
+		{"NilConn", &connect.Wiring{Daemon: daemon, Cleanup: cleanup}, true},
+		{"NilDaemon", &connect.Wiring{Conn: conn, Cleanup: cleanup}, true},
+		{"NilCleanup", &connect.Wiring{Conn: conn, Daemon: daemon}, true},
+		{"Valid", &connect.Wiring{Conn: conn, Daemon: daemon, Cleanup: cleanup}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateClientWiring("op", tc.wire)
+			if tc.wantErr {
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInternal)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestClient_CloseAndDaemonEdges(t *testing.T) {
+	t.Run("CloseWrapsPlainCleanupError", func(t *testing.T) {
+		c := &Client{cleanup: func() error { return errors.New("cleanup boom") }}
+		err := c.Close()
+		require.Error(t, err)
+		var pe *Error
+		require.ErrorAs(t, err, &pe)
+		require.Equal(t, "Client.Close", pe.Op)
+	})
+
+	t.Run("ClosePreservesPublicCleanupError", func(t *testing.T) {
+		sentinel := &Error{Kind: KindUnavailable, Resource: ResourceClient, Op: "cleanup", Err: ErrUnavailable}
+		c := &Client{cleanup: func() error { return sentinel }}
+		err := c.Close()
+		require.Same(t, sentinel, err)
+	})
+
+	t.Run("DaemonNilAfterClose", func(t *testing.T) {
+		c := &Client{daemon: newDaemon(&fakeCoreDaemon{}), cleanup: func() error { return nil }}
+		require.NotNil(t, c.Daemon())
+		require.NoError(t, c.Close())
+		require.Nil(t, c.Daemon())
+	})
+}
+
+func TestClient_RegisterAgentEdges(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("NilReceiver", func(t *testing.T) {
+		_, err := (*Client)(nil).RegisterAgent(ctx, validAgentConfig())
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+	})
+
+	t.Run("WireNil", func(t *testing.T) {
+		c := &Client{daemon: newDaemon(&fakeCoreDaemon{})}
+		_, err := c.RegisterAgent(ctx, validAgentConfig())
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+	})
+
+	t.Run("WrapperNilWhenFactoryYieldsNilCore", func(t *testing.T) {
+		c := newAgentTestClient(t, factoryReturning(nil))
+		defer func() { _ = c.Close() }()
+		_, err := c.RegisterAgent(ctx, validAgentConfig())
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInternal)
+	})
+}
+
+func TestClient_ResolveStationName(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("NilClientOrDaemon", func(t *testing.T) {
+		require.Equal(t, "", (*Client)(nil).resolveStationName(ctx, "/p"))
+		require.Equal(t, "", (&Client{}).resolveStationName(ctx, "/p"))
+	})
+
+	t.Run("EnumerationErrorYieldsEmpty", func(t *testing.T) {
+		fd := &fakeCoreDaemon{}
+		fd.setErr(errors.New("boom"))
+		c := &Client{daemon: newDaemon(fd)}
+		require.Equal(t, "", c.resolveStationName(ctx, "/p"))
+	})
+
+	t.Run("MatchAndMiss", func(t *testing.T) {
+		fd := &fakeCoreDaemon{}
+		fd.setStations([]core.StationRef{{Path: "/net/connman/iwd/phy0/wlan0", Name: "wlan0"}})
+		c := &Client{daemon: newDaemon(fd)}
+		require.Equal(t, "wlan0", c.resolveStationName(ctx, "/net/connman/iwd/phy0/wlan0"))
+		require.Equal(t, "", c.resolveStationName(ctx, "/net/connman/iwd/phy0/other"))
+	})
+}
+
+// TestClient_EnumeratorErrorPaths drives the error branches shared by every
+// Client.AllX enumerator: a nil wiring, a daemon enumeration failure, a
+// per-object wiring failure, and a nil constructed wrapper.
+func TestClient_EnumeratorErrorPaths(t *testing.T) {
+	ctx := context.Background()
+	boom := errors.New("boom")
+
+	for _, e := range []struct {
+		name       string
+		makeClient func(daemonErr, factoryErr error, nilCore bool) *Client
+		call       func(*Client) error
+	}{
+		{
+			name: "AllAdapters",
+			makeClient: func(daemonErr, factoryErr error, nilCore bool) *Client {
+				fd := &fakeCoreDaemon{}
+				fd.setAdapters([]core.AdapterRef{{Path: "/a"}})
+				if daemonErr != nil {
+					fd.setErr(daemonErr)
+				}
+				wire := &connect.Wiring{Conn: &dbus.Conn{}, Daemon: fd, Cleanup: func() error { return nil },
+					AdapterFactory: func(ctx context.Context, path string) (core.AdapterIface, error) {
+						if factoryErr != nil {
+							return nil, factoryErr
+						}
+						if nilCore {
+							return nil, nil
+						}
+						return &fakeCoreAdapter{}, nil
+					}}
+				return &Client{daemon: newDaemon(fd), wire: wire, cleanup: wire.Cleanup}
+			},
+			call: func(c *Client) error { _, err := c.AllAdapters(ctx); return err },
+		},
+		{
+			name: "AllDevices",
+			makeClient: func(daemonErr, factoryErr error, nilCore bool) *Client {
+				fd := &fakeCoreDaemon{}
+				fd.setDevices([]core.DeviceRef{{Path: "/d"}})
+				if daemonErr != nil {
+					fd.setErr(daemonErr)
+				}
+				wire := &connect.Wiring{Conn: &dbus.Conn{}, Daemon: fd, Cleanup: func() error { return nil },
+					DeviceFactory: func(ctx context.Context, path string) (core.DeviceIface, error) {
+						if factoryErr != nil {
+							return nil, factoryErr
+						}
+						if nilCore {
+							return nil, nil
+						}
+						return &fakeCoreDevice{}, nil
+					}}
+				return &Client{daemon: newDaemon(fd), wire: wire, cleanup: wire.Cleanup}
+			},
+			call: func(c *Client) error { _, err := c.AllDevices(ctx); return err },
+		},
+		{
+			name: "AllStations",
+			makeClient: func(daemonErr, factoryErr error, nilCore bool) *Client {
+				fd := &fakeCoreDaemon{}
+				fd.setStations([]core.StationRef{{Path: "/s"}})
+				if daemonErr != nil {
+					fd.setErr(daemonErr)
+				}
+				wire := &connect.Wiring{Conn: &dbus.Conn{}, Daemon: fd, Cleanup: func() error { return nil },
+					StationFactory: func(ctx context.Context, path string) (core.StationIface, error) {
+						if factoryErr != nil {
+							return nil, factoryErr
+						}
+						if nilCore {
+							return nil, nil
+						}
+						return &fakeCoreStation{}, nil
+					}}
+				return &Client{daemon: newDaemon(fd), wire: wire, cleanup: wire.Cleanup}
+			},
+			call: func(c *Client) error { _, err := c.AllStations(ctx); return err },
+		},
+		{
+			name: "AllBasicServiceSets",
+			makeClient: func(daemonErr, factoryErr error, nilCore bool) *Client {
+				fd := &fakeCoreDaemon{}
+				fd.setBasicServiceSets([]core.BasicServiceSetRef{{Path: "/b"}})
+				if daemonErr != nil {
+					fd.setErr(daemonErr)
+				}
+				wire := &connect.Wiring{Conn: &dbus.Conn{}, Daemon: fd, Cleanup: func() error { return nil },
+					BasicServiceSetFactory: func(ctx context.Context, path string) (core.BasicServiceSetIface, error) {
+						if factoryErr != nil {
+							return nil, factoryErr
+						}
+						if nilCore {
+							return nil, nil
+						}
+						return &fakeCoreBSS{}, nil
+					}}
+				return &Client{daemon: newDaemon(fd), wire: wire, cleanup: wire.Cleanup}
+			},
+			call: func(c *Client) error { _, err := c.AllBasicServiceSets(ctx); return err },
+		},
+		{
+			name: "AllNetworks",
+			makeClient: func(daemonErr, factoryErr error, nilCore bool) *Client {
+				fd := &fakeCoreDaemon{}
+				fd.setNetworks([]core.NetworkRef{{Path: "/n"}})
+				if daemonErr != nil {
+					fd.setErr(daemonErr)
+				}
+				wire := &connect.Wiring{Conn: &dbus.Conn{}, Daemon: fd, Cleanup: func() error { return nil },
+					NetworkFactory: func(ctx context.Context, path string) (core.NetworkIface, error) {
+						if factoryErr != nil {
+							return nil, factoryErr
+						}
+						if nilCore {
+							return nil, nil
+						}
+						return &fakeCoreNetwork{}, nil
+					}}
+				return &Client{daemon: newDaemon(fd), wire: wire, cleanup: wire.Cleanup}
+			},
+			call: func(c *Client) error { _, err := c.AllNetworks(ctx); return err },
+		},
+		{
+			name: "AllKnownNetworks",
+			makeClient: func(daemonErr, factoryErr error, nilCore bool) *Client {
+				fd := &fakeCoreDaemon{}
+				fd.setKnownNetworks([]core.KnownNetworkRef{{Path: "/k"}})
+				if daemonErr != nil {
+					fd.setErr(daemonErr)
+				}
+				wire := &connect.Wiring{Conn: &dbus.Conn{}, Daemon: fd, Cleanup: func() error { return nil },
+					KnownNetworkFactory: func(ctx context.Context, path string) (core.KnownNetworkIface, error) {
+						if factoryErr != nil {
+							return nil, factoryErr
+						}
+						if nilCore {
+							return nil, nil
+						}
+						return &fakeCoreKnownNetwork{}, nil
+					}}
+				return &Client{daemon: newDaemon(fd), wire: wire, cleanup: wire.Cleanup}
+			},
+			call: func(c *Client) error { _, err := c.AllKnownNetworks(ctx); return err },
+		},
+	} {
+		t.Run(e.name, func(t *testing.T) {
+			t.Run("NilReceiver", func(t *testing.T) {
+				err := e.call(nil)
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInternal)
+			})
+
+			t.Run("Closed", func(t *testing.T) {
+				c := e.makeClient(nil, nil, false)
+				require.NoError(t, c.Close())
+				err := e.call(c)
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInvalidState)
+			})
+
+			t.Run("WireNil", func(t *testing.T) {
+				c := &Client{daemon: newDaemon(&fakeCoreDaemon{})}
+				err := e.call(c)
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInternal)
+			})
+
+			t.Run("EnumerationError", func(t *testing.T) {
+				err := e.call(e.makeClient(boom, nil, false))
+				require.Error(t, err)
+			})
+
+			t.Run("WiringError", func(t *testing.T) {
+				err := e.call(e.makeClient(nil, boom, false))
+				require.Error(t, err)
+			})
+
+			t.Run("WrapperNil", func(t *testing.T) {
+				err := e.call(e.makeClient(nil, nil, true))
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInternal)
+			})
+		})
+	}
+}
+
 func TestClient(t *testing.T) {
 	t.Run("NewClient", func(t *testing.T) {
 		type busCase struct {
@@ -258,7 +664,7 @@ func TestClient(t *testing.T) {
 	})
 }
 
-func TestClientAllAdapters(t *testing.T) {
+func TestClient_AllAdapters(t *testing.T) {
 	ctx := context.Background()
 
 	// newAllAdaptersClient builds a Client whose daemon enumerates the supplied
@@ -466,7 +872,7 @@ func TestClientDevice(t *testing.T) {
 	})
 }
 
-func TestClientAllDevices(t *testing.T) {
+func TestClient_AllDevices(t *testing.T) {
 	ctx := context.Background()
 
 	// newAllDevicesClient builds a Client whose daemon enumerates the supplied

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -284,4 +285,32 @@ func TestDeviceStatusResult_String_UnnamedAndEmptyFields(t *testing.T) {
 	// Empty Address/Mode/Adapter render as "-".
 	require.Contains(t, out, "Address:")
 	require.Contains(t, out, "-")
+}
+
+// TestPrintDeviceLines covers the monitor output helpers directly (the monitor
+// command blocks on an OS signal and is not driveable in-process).
+func TestPrintDeviceLines(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+
+	t.Run("Powered_Human", func(t *testing.T) {
+		app, buf := appWithBuffer(false)
+		require.NoError(t, printDevicePoweredLine(app, "wlan0", false, &mu))
+		require.Equal(t, "powered=false\n", buf.String())
+	})
+	t.Run("Powered_JSON", func(t *testing.T) {
+		app, buf := appWithBuffer(true)
+		require.NoError(t, printDevicePoweredLine(app, "wlan0", true, &mu))
+		require.Contains(t, buf.String(), `"Powered":true`)
+	})
+	t.Run("Mode_Human", func(t *testing.T) {
+		app, buf := appWithBuffer(false)
+		require.NoError(t, printDeviceModeLine(app, "wlan0", "ap", &mu))
+		require.Equal(t, "mode=ap\n", buf.String())
+	})
+	t.Run("Mode_JSON", func(t *testing.T) {
+		app, buf := appWithBuffer(true)
+		require.NoError(t, printDeviceModeLine(app, "wlan0", "station", &mu))
+		require.Contains(t, buf.String(), `"Mode":"station"`)
+	})
 }

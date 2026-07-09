@@ -46,6 +46,17 @@ func (f *fakeIwdbusNetwork) setConnectedEvent(connected bool) *fakeIwdbusNetwork
 	return f
 }
 
+// setErr makes every property getter (and GetProperties) return err, so the
+// core layer's backend-error wrapping can be exercised.
+func (f *fakeIwdbusNetwork) setErr(err error) *fakeIwdbusNetwork {
+	if err == nil {
+		f.err.Store(nil)
+		return f
+	}
+	f.err.Store(&fakeNetworkError{err: err})
+	return f
+}
+
 func (f *fakeIwdbusNetwork) loadErr() error {
 	if box := f.err.Load(); box != nil {
 		return box.err
@@ -102,7 +113,10 @@ func (f *fakeIwdbusNetwork) SubscribePropertiesChanged(ctx context.Context, fn f
 		return nil, f.loadErr()
 	}
 	if ev := f.connectedEvnt.Load(); ev != nil {
-		fn(iwdbus.NetworkPropertiesChanged{Changed: map[string]dbus.Variant{"Connected": dbus.MakeVariant(*ev)}})
+		fn(iwdbus.NetworkPropertiesChanged{
+			Changed:     map[string]dbus.Variant{"Connected": dbus.MakeVariant(*ev)},
+			Invalidated: []string{"KnownNetwork"},
+		})
 	}
 	return func() error { return nil }, f.loadErr()
 }

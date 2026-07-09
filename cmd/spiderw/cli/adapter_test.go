@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -91,6 +92,63 @@ func TestAdapterCmd_SupportsMode(t *testing.T) {
 	out, code = driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "supports-ad-hoc")
 	require.Equal(t, 0, code, out)
 	require.Equal(t, "false\n", out)
+}
+
+func TestAdapterCmd_List(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "list")
+	require.Equal(t, 0, code, out)
+	require.Contains(t, out, "phy0")
+}
+
+func TestAdapterCmd_ScalarAccessors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Name", func(t *testing.T) {
+		out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "name")
+		require.Equal(t, 0, code, out)
+		require.Equal(t, "phy0\n", out)
+	})
+
+	t.Run("Model", func(t *testing.T) {
+		out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "model")
+		require.Equal(t, 0, code, out)
+		require.Equal(t, "MockModel\n", out)
+	})
+
+	t.Run("Vendor", func(t *testing.T) {
+		out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "vendor")
+		require.Equal(t, 0, code, out)
+		require.Equal(t, "MockVendor\n", out)
+	})
+
+	t.Run("SupportedModes", func(t *testing.T) {
+		out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "supported-modes")
+		require.Equal(t, 0, code, out)
+		require.Contains(t, out, "station")
+		require.Contains(t, out, "ap")
+	})
+}
+
+func TestAdapterCmd_ScalarAccessors_BackendError(t *testing.T) {
+	t.Parallel()
+
+	newFailing := func() *fakeClient {
+		ad := &fakeAdapter{path: "/net/connman/iwd/phy0", err: errors.New("backend boom")}
+		return &fakeClient{
+			daemon:   &fakeDaemon{adapters: []spiderw.AdapterRef{{Path: ad.path, Name: "phy0"}}},
+			adapters: map[string]adapterAPI{ad.path: ad},
+		}
+	}
+
+	for _, sub := range []string{"name", "model", "vendor", "supported-modes"} {
+		t.Run(sub, func(t *testing.T) {
+			out, code := driveCLI(newFailing(), nil, false, "adapter", "phy0", sub)
+			require.Equal(t, 1, code, out)
+			require.Contains(t, out, "backend boom")
+		})
+	}
 }
 
 func TestAdapterCmd_InvalidModeArg(t *testing.T) {
@@ -273,4 +331,20 @@ func TestAdapterStatusResult_String_UnnamedAndEmptyModes(t *testing.T) {
 	// No modes renders as "-".
 	require.Contains(t, out, "SupportedModes:")
 	require.Contains(t, out, "-")
+}
+
+// TestPrintAdapterPoweredLine covers the monitor output helper directly (the
+// monitor command itself blocks on an OS signal and is not driveable in-process).
+func TestPrintAdapterPoweredLine(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+
+	app, buf := appWithBuffer(false)
+	require.NoError(t, printAdapterPoweredLine(app, "phy0", true, &mu))
+	require.Equal(t, "powered=true\n", buf.String())
+
+	appJSON, bufJSON := appWithBuffer(true)
+	require.NoError(t, printAdapterPoweredLine(appJSON, "phy0", false, &mu))
+	require.Contains(t, bufJSON.String(), `"Powered":false`)
+	require.Contains(t, bufJSON.String(), `"phy0"`)
 }

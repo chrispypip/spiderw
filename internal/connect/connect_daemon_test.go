@@ -18,7 +18,55 @@ import (
 // NOTE: These tests intentionally do NOT run in parallel because they mutate
 // package-level seam variables in connect.
 
-func TestConnect_Daemon_CleanupCalledExactlyOnce_FailurePaths(t *testing.T) {
+func TestWiring_newConn_Success(t *testing.T) {
+	for _, bc := range []struct {
+		name   string
+		system bool
+		call   func(ctx context.Context) (*Wiring, error)
+	}{
+		{name: "system", system: true, call: System},
+		{name: "session", system: false, call: Session},
+	} {
+		t.Run(bc.name, func(t *testing.T) {
+			origConnectSystem := connectSystemBusFn
+			origConnectSession := connectSessionBusFn
+			origNewIwdDaemon := newIwdDaemonFn
+			origNewCoreDaemon := newCoreDaemonFn
+			origCloseConn := closeConnFn
+			t.Cleanup(func() {
+				connectSystemBusFn = origConnectSystem
+				connectSessionBusFn = origConnectSession
+				newIwdDaemonFn = origNewIwdDaemon
+				newCoreDaemonFn = origNewCoreDaemon
+				closeConnFn = origCloseConn
+			})
+
+			if bc.system {
+				connectSystemBusFn = func(opts ...dbus.ConnOption) (*dbus.Conn, error) { return nil, nil }
+			} else {
+				connectSessionBusFn = func(opts ...dbus.ConnOption) (*dbus.Conn, error) { return nil, nil }
+			}
+			newIwdDaemonFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.Daemon, error) {
+				return &iwdbus.Daemon{}, nil
+			}
+			newCoreDaemonFn = origNewCoreDaemon // exercise the real (default) core-daemon seam
+			var closeCalls atomic.Int64
+			closeConnFn = func(c *dbus.Conn) error { closeCalls.Add(1); return nil }
+
+			w, err := bc.call(context.Background())
+			require.NoError(t, err)
+			require.NotNil(t, w)
+			require.NotNil(t, w.Daemon)
+			require.NotNil(t, w.Cleanup)
+
+			// The returned cleanup is wired to the connection closer.
+			require.NoError(t, w.Cleanup())
+			require.Equal(t, int64(1), closeCalls.Load())
+		})
+	}
+}
+
+func TestWiring_Daemon_CleanupCalledExactlyOnce_FailurePaths(t *testing.T) {
 	type busCase struct {
 		name   string
 		system bool
@@ -71,6 +119,27 @@ func TestConnect_Daemon_CleanupCalledExactlyOnce_FailurePaths(t *testing.T) {
 			setup: func(t *testing.T, daemonErr error) {
 				newIwdDaemonFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.Daemon, error) {
 					return nil, daemonErr
+				}
+			},
+		},
+		{
+			name:       "iwd_daemon_nil_cleanup_error_joined",
+			cleanupErr: errors.New("cleanup failed"),
+			setup: func(t *testing.T, _ error) {
+				newIwdDaemonFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.Daemon, error) {
+					return nil, nil
+				}
+			},
+		},
+		{
+			name:       "core_daemon_nil_cleanup_error_joined",
+			cleanupErr: errors.New("cleanup failed"),
+			setup: func(t *testing.T, _ error) {
+				newIwdDaemonFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.Daemon, error) {
+					return &iwdbus.Daemon{}, nil
+				}
+				newCoreDaemonFn = func(raw *iwdbus.Daemon) *core.Daemon {
+					return nil
 				}
 			},
 		},

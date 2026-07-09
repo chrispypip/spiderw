@@ -28,7 +28,7 @@ func TestRace_Core_Adapter_SetPowered_ConcurrentWithGet(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRace_Core_Adapter_MixedCalls(t *testing.T) {
+func TestRace_Core_Adapter_MixedMethods(t *testing.T) {
 	adapter := newTestAdapter(t)
 
 	const N = 200
@@ -64,7 +64,7 @@ func TestRace_Core_Adapter_MixedCalls(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRace_Core_Adapter_SubscribePoweredChanged_ConcurrentCallbacks(t *testing.T) {
+func TestRace_Core_Adapter_SubscribePoweredChanged_Concurrent(t *testing.T) {
 	// This uses a fake raw that invokes the callback; we amplify concurrency
 	// at the call site to ensure the wrapper remains race-safe.
 	adapter := newTestAdapter(t)
@@ -86,7 +86,7 @@ func TestRace_Core_Adapter_SubscribePoweredChanged_ConcurrentCallbacks(t *testin
 	wg.Wait()
 }
 
-func TestRace_Core_Adapter_SubscribePropertiesChanged_ConcurrentCallbacks(t *testing.T) {
+func TestRace_Core_Adapter_SubscribePropertiesChanged_Concurrent(t *testing.T) {
 	adapter := newTestAdapter(t)
 
 	const N = 200

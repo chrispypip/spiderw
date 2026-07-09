@@ -165,3 +165,17 @@ func TestBSSMock_StatusJSON(t *testing.T) {
 		require.Equal(t, want.Address, jsonGetString(t, entry, "Address"))
 	}
 }
+
+// TestBSSMock_CLI_SingleAddress drives the single-BSS lookup path end-to-end
+// (`spiderw bss <ref> address`), which resolves a ref and constructs one handle
+// via Client.BasicServiceSet — the realClient shim not exercised by the
+// enumeration-based `bss status` smoke.
+func TestBSSMock_CLI_SingleAddress(t *testing.T) {
+	tmpDir := t.TempDir()
+	iwdmock.StartMockNormal(t, tmpDir)
+
+	ref := mockBSSes[0]
+	out, err := runSpider(t, "bss", ref.Address, "address")
+	require.NoError(t, err, "output:\n%s", out)
+	require.Contains(t, out, ref.Address)
+}

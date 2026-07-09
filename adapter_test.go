@@ -96,6 +96,18 @@ func TestAdapter_Public(t *testing.T) {
 					require.Error(t, err)
 					require.ErrorIs(t, err, ErrInternal)
 				})
+
+				t.Run("BackendError", func(t *testing.T) {
+					// A backend failure surfaces as a translated public *Error
+					// carrying ResourceAdapter for every accessor, not just Powered.
+					f := p.newBackend()
+					f.setErr(core.WrapAdapterUnavailable("op", "boom", errors.New("x")))
+					_, err := p.op(&Adapter{core: f})
+					require.Error(t, err)
+					var pe *Error
+					require.ErrorAs(t, err, &pe)
+					require.Equal(t, ResourceAdapter, pe.Resource)
+				})
 			})
 		}
 
@@ -403,6 +415,139 @@ func TestAdapter_SubscribePoweredChanged_Public_InvokesCallback(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, called)
 	require.True(t, got)
+}
+
+func TestAdapter_Coverage(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Unsubscribe", func(t *testing.T) {
+		t.Run("NilIsNoop", func(t *testing.T) {
+			var u UnsubscribeFunc
+			require.NoError(t, u.Unsubscribe())
+		})
+		t.Run("InvokesUnderlying", func(t *testing.T) {
+			sentinel := errors.New("unsub boom")
+			called := false
+			u := UnsubscribeFunc(func() error {
+				called = true
+				return sentinel
+			})
+			require.ErrorIs(t, u.Unsubscribe(), sentinel)
+			require.True(t, called)
+		})
+	})
+
+	t.Run("ModeString", func(t *testing.T) {
+		require.Equal(t, "station", ModeStation.String())
+		require.Equal(t, "ap", ModeAP.String())
+	})
+
+	t.Run("NewAdapter_NilCore", func(t *testing.T) {
+		require.Nil(t, newAdapter(nil, "/ignored"))
+	})
+
+	t.Run("Path", func(t *testing.T) {
+		require.Equal(t, "", (*Adapter)(nil).Path())
+		require.Equal(t, "/net/connman/iwd/phy0", newAdapter(&fakeCoreAdapter{}, "/net/connman/iwd/phy0").Path())
+	})
+
+	t.Run("SupportedModesBackendError", func(t *testing.T) {
+		f := &fakeCoreAdapter{}
+		f.setErr(core.WrapAdapterUnavailable("op", "boom", errors.New("x")))
+		_, err := (&Adapter{core: f}).SupportedModes(ctx)
+		require.Error(t, err)
+		var pe *Error
+		require.ErrorAs(t, err, &pe)
+		require.Equal(t, ResourceAdapter, pe.Resource)
+	})
+
+	t.Run("SetPowered", func(t *testing.T) {
+		t.Run("Success", func(t *testing.T) {
+			require.NoError(t, (&Adapter{core: &fakeCoreAdapter{}}).SetPowered(ctx, true))
+		})
+		t.Run("NilReceiver", func(t *testing.T) {
+			err := (*Adapter)(nil).SetPowered(ctx, true)
+			require.ErrorIs(t, err, ErrInternal)
+		})
+		t.Run("BackendError", func(t *testing.T) {
+			f := &fakeCoreAdapter{}
+			f.setErr(core.WrapAdapterUnavailable("op", "boom", errors.New("x")))
+			err := (&Adapter{core: f}).SetPowered(ctx, true)
+			require.Error(t, err)
+			var pe *Error
+			require.ErrorAs(t, err, &pe)
+			require.Equal(t, ResourceAdapter, pe.Resource)
+		})
+	})
+
+	t.Run("ParseMode", func(t *testing.T) {
+		t.Run("Valid", func(t *testing.T) {
+			mode, err := ParseMode("station")
+			require.NoError(t, err)
+			require.Equal(t, ModeStation, mode)
+		})
+		t.Run("Invalid", func(t *testing.T) {
+			mode, err := ParseMode("bogus")
+			require.Error(t, err)
+			require.Equal(t, ModeUnknown, mode)
+			require.ErrorIs(t, err, ErrInvalidArgument)
+
+			var pe *Error
+			require.ErrorAs(t, err, &pe)
+			require.Equal(t, ResourceAdapter, pe.Resource)
+		})
+	})
+
+	// The mode-conversion helpers reject values the lower layers should never
+	// deliver (read side) or the caller supplies (write side).
+	t.Run("SupportedModesInvalidRejected", func(t *testing.T) {
+		f := &fakeCoreAdapter{}
+		f.modes.Store([]core.Mode{core.Mode("garbage")})
+		_, err := (&Adapter{core: f}).SupportedModes(ctx)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidArgument)
+	})
+
+	t.Run("PropertiesInvalidModeRejected", func(t *testing.T) {
+		f := &fakeCoreAdapter{}
+		f.name.Store("phy0")
+		f.modes.Store([]core.Mode{core.Mode("garbage")})
+		_, err := (&Adapter{core: f}).Properties(ctx)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidArgument)
+	})
+
+	t.Run("SupportsModeInvalidArgumentRejected", func(t *testing.T) {
+		// The public boundary rejects an unrecognized mode before the backend.
+		_, err := (&Adapter{core: &fakeCoreAdapter{}}).SupportsMode(ctx, Mode("garbage"))
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidArgument)
+
+		var pe *Error
+		require.ErrorAs(t, err, &pe)
+		require.Equal(t, ResourceAdapter, pe.Resource)
+	})
+
+	t.Run("SubscribeBackendErrors", func(t *testing.T) {
+		t.Run("PropertiesChanged", func(t *testing.T) {
+			f := &fakeCoreAdapter{}
+			f.setErr(core.WrapAdapterUnavailable("op", "boom", errors.New("x")))
+			_, err := (&Adapter{core: f}).SubscribePropertiesChanged(ctx, func(AdapterPropertiesChanged) {})
+			require.Error(t, err)
+			var pe *Error
+			require.ErrorAs(t, err, &pe)
+			require.Equal(t, ResourceAdapter, pe.Resource)
+		})
+		t.Run("PoweredChanged", func(t *testing.T) {
+			f := &fakeCoreAdapter{}
+			f.setErr(core.WrapAdapterUnavailable("op", "boom", errors.New("x")))
+			_, err := (&Adapter{core: f}).SubscribePoweredChanged(ctx, func(bool) {})
+			require.Error(t, err)
+			var pe *Error
+			require.ErrorAs(t, err, &pe)
+			require.Equal(t, ResourceAdapter, pe.Resource)
+		})
+	})
 }
 
 func TestAdapter_Properties(t *testing.T) {

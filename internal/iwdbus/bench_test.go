@@ -4,6 +4,7 @@ package iwdbus
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
@@ -189,5 +190,99 @@ func benchSignal() *dbus.Signal {
 		Name: "iface.member",
 		Path: dbus.ObjectPath("/bench"),
 		Body: []interface{}{int64(1)},
+	}
+}
+
+// Data-path benchmarks: these measure the in-process CPU/allocation cost of the
+// parse and resolution work that runs per status-read (GetProperties, the
+// documented batched "one GetAll" optimization) and per enumeration/resolution
+// (object-path list decoding, ObjectTree lookups). They avoid real DBus and
+// scale their inputs so a regression in the parse/lookup logic is visible.
+
+func benchObjectPaths(n int) []dbus.ObjectPath {
+	paths := make([]dbus.ObjectPath, n)
+	for i := range paths {
+		paths[i] = dbus.ObjectPath(fmt.Sprintf("/net/connman/iwd/0/3/ssid_psk/%012x", i))
+	}
+	return paths
+}
+
+func Benchmark_Iwdbus_Station_GetProperties(b *testing.B) {
+	affinities := benchObjectPaths(8)
+	props := map[string]dbus.Variant{
+		"State":                dbus.MakeVariant("connected"),
+		"Scanning":             dbus.MakeVariant(false),
+		"ConnectedNetwork":     dbus.MakeVariant(dbus.ObjectPath("/net/connman/iwd/0/3/ssid_psk")),
+		"ConnectedAccessPoint": dbus.MakeVariant(affinities[0]),
+		"Affinities":           dbus.MakeVariant(affinities),
+	}
+	s := &Station{call: &fakeCaller{
+		getAllFn: func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {
+			return props, nil
+		},
+	}}
+	ctx := context.Background()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := s.GetProperties(ctx); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func Benchmark_Iwdbus_ParseObjectPathList(b *testing.B) {
+	// A busy network's ExtendedServiceSet / a post-scan result set.
+	raw := benchObjectPaths(64)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := parseObjectPathList(raw); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func Benchmark_Iwdbus_ParseStationAffinities(b *testing.B) {
+	raw := benchObjectPaths(32)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := parseStationAffinities(raw); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func Benchmark_Iwdbus_ObjectTree_Lookups(b *testing.B) {
+	// A tree the size of a busy multi-radio host after a scan: many network and
+	// BSS objects, resolved per-ref during Properties() bundle enrichment.
+	const n = 128
+	objects := make(map[dbus.ObjectPath]map[string]map[string]dbus.Variant, 2*n)
+	netPaths := make([]string, n)
+	bssPaths := make([]string, n)
+	for i := range n {
+		np := fmt.Sprintf("/net/connman/iwd/0/3/ssid_%04x", i)
+		bp := fmt.Sprintf("%s/%012x", np, i)
+		netPaths[i] = np
+		bssPaths[i] = bp
+		objects[dbus.ObjectPath(np)] = map[string]map[string]dbus.Variant{
+			IwdNetworkIface: {"Name": dbus.MakeVariant(fmt.Sprintf("SSID-%d", i))},
+		}
+		objects[dbus.ObjectPath(bp)] = map[string]map[string]dbus.Variant{
+			IwdBasicServiceSetIface: {"Address": dbus.MakeVariant(fmt.Sprintf("%012x", i))},
+		}
+	}
+	tree := &ObjectTree{objects: objects}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; b.Loop(); i++ {
+		idx := i % n
+		_, _ = tree.NetworkName(netPaths[idx])
+		_, _ = tree.BSSAddress(bssPaths[idx])
 	}
 }

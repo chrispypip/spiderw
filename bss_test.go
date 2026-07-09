@@ -30,7 +30,7 @@ func (f *fakeCoreBSS) Properties(ctx context.Context) (*core.BasicServiceSetProp
 	return &core.BasicServiceSetProperties{Address: f.address}, nil
 }
 
-func TestBasicServiceSet(t *testing.T) {
+func TestBasicServiceSet_Public(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -51,15 +51,39 @@ func TestBasicServiceSet(t *testing.T) {
 		require.Equal(t, "11:22:33:44:55:66", props.Address)
 	})
 
+	t.Run("AddressBackendError", func(t *testing.T) {
+		t.Parallel()
+
+		b := newBasicServiceSet(&fakeCoreBSS{err: core.WrapBasicServiceSetUnavailable("op", "boom", errors.New("x"))}, "/path")
+		_, err := b.Address(ctx)
+		require.Error(t, err)
+		var pe *Error
+		require.ErrorAs(t, err, &pe)
+		require.Equal(t, ResourceBasicServiceSet, pe.Resource)
+	})
+
+	t.Run("PropertiesBackendError", func(t *testing.T) {
+		t.Parallel()
+
+		b := newBasicServiceSet(&fakeCoreBSS{err: core.WrapBasicServiceSetUnavailable("op", "boom", errors.New("x"))}, "/path")
+		_, err := b.Properties(ctx)
+		require.Error(t, err)
+		var pe *Error
+		require.ErrorAs(t, err, &pe)
+		require.Equal(t, ResourceBasicServiceSet, pe.Resource)
+	})
+
 	t.Run("NilReceiverMapsToInternal", func(t *testing.T) {
 		t.Parallel()
 
 		var b *BasicServiceSet
 		require.Equal(t, "", b.Path())
-
-		_, err := b.Address(ctx)
-		require.Error(t, err)
-		require.ErrorIs(t, err, ErrInternal)
+		for _, call := range []func() error{
+			func() error { _, err := b.Address(ctx); return err },
+			func() error { _, err := b.Properties(ctx); return err },
+		} {
+			require.ErrorIs(t, call(), ErrInternal)
+		}
 	})
 
 	t.Run("NewNilCore", func(t *testing.T) {
@@ -68,7 +92,7 @@ func TestBasicServiceSet(t *testing.T) {
 	})
 }
 
-func TestClientAllBasicServiceSets(t *testing.T) {
+func TestClient_AllBasicServiceSets(t *testing.T) {
 	ctx := context.Background()
 
 	newClient := func(

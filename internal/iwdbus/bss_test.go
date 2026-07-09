@@ -16,11 +16,10 @@ func TestBasicServiceSet_Iwdbus(t *testing.T) {
 
 	t.Run("GetAddress", testBSS_GetAddress)
 	t.Run("GetAddress_WrongType", testBSS_GetAddress_WrongType)
-	t.Run("GetAddress_NoIntro", testBSS_GetAddress_NoIntro)
 	t.Run("GetAddress_Err", testBSS_GetAddress_Err)
 	t.Run("GetProperties", testBSS_GetProperties)
 	t.Run("GetProperties_Errors", testBSS_GetProperties_Errors)
-	t.Run("GetProperties_NoIntro", testBSS_GetProperties_NoIntro)
+	t.Run("NotInitialized", testBSS_NoIntro)
 }
 
 func testBSS_GetAddress(t *testing.T) {
@@ -51,16 +50,6 @@ func testBSS_GetAddress_WrongType(t *testing.T) {
 	_, err := b.GetAddress(context.Background())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "expected string")
-}
-
-func testBSS_GetAddress_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	b := &BasicServiceSet{call: nil}
-
-	_, err := b.GetAddress(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "basic service set is not initialized")
 }
 
 func testBSS_GetAddress_Err(t *testing.T) {
@@ -128,12 +117,24 @@ func testBSS_GetProperties_Errors(t *testing.T) {
 	}
 }
 
-func testBSS_GetProperties_NoIntro(t *testing.T) {
+// testBSS_NoIntro checks every init-guarded method reports a clean
+// "basic service set is not initialized" error when the BSS has no caller.
+func testBSS_NoIntro(t *testing.T) {
 	t.Parallel()
 
-	b := &BasicServiceSet{call: nil}
-
-	_, err := b.GetProperties(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "basic service set is not initialized")
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name string
+		call func(*BasicServiceSet) error
+	}{
+		{"GetAddress", func(b *BasicServiceSet) error { _, err := b.GetAddress(ctx); return err }},
+		{"GetProperties", func(b *BasicServiceSet) error { _, err := b.GetProperties(ctx); return err }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.call(&BasicServiceSet{call: nil})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "basic service set is not initialized")
+		})
+	}
 }

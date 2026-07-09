@@ -28,6 +28,7 @@ func TestAgent_Public(t *testing.T) {
 	t.Run("Unregister", func(t *testing.T) {
 		t.Parallel()
 		t.Run("CallsCore", testAgentPublic_Unregister_CallsCore)
+		t.Run("BackendError", testAgentPublic_Unregister_BackendError)
 		t.Run("NilReceiver", testAgentPublic_Unregister_NilReceiver)
 	})
 
@@ -140,6 +141,22 @@ func testAgentPublic_Unregister_CallsCore(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, agent.Unregister(context.Background()))
 	require.Equal(t, 1, fake.calls())
+}
+
+func testAgentPublic_Unregister_BackendError(t *testing.T) {
+	t.Parallel()
+	fake := &fakeCoreAgent{unregisterErr: core.WrapAgentUnavailable("op", "boom", errors.New("x"))}
+	c := newAgentTestClient(t, factoryReturning(fake))
+	defer func() { _ = c.Close() }()
+
+	agent, err := c.RegisterAgent(context.Background(), validAgentConfig())
+	require.NoError(t, err)
+
+	err = agent.Unregister(context.Background())
+	require.Error(t, err)
+	var pe *Error
+	require.ErrorAs(t, err, &pe)
+	require.Equal(t, ResourceAgent, pe.Resource)
 }
 
 func testAgentPublic_Unregister_NilReceiver(t *testing.T) {

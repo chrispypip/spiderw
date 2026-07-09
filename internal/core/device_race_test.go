@@ -48,7 +48,7 @@ func TestRace_Core_Device_SetMode_ConcurrentWithGet(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRace_Core_Device_MixedCalls(t *testing.T) {
+func TestRace_Core_Device_MixedMethods(t *testing.T) {
 	device := newTestDevice(t)
 
 	const N = 200
@@ -82,7 +82,7 @@ func TestRace_Core_Device_MixedCalls(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRace_Core_Device_SubscribePoweredChanged_ConcurrentCallbacks(t *testing.T) {
+func TestRace_Core_Device_SubscribePoweredChanged_Concurrent(t *testing.T) {
 	device := newTestDevice(t)
 
 	const N = 200
@@ -100,7 +100,7 @@ func TestRace_Core_Device_SubscribePoweredChanged_ConcurrentCallbacks(t *testing
 	wg.Wait()
 }
 
-func TestRace_Core_Device_SubscribeModeChanged_ConcurrentCallbacks(t *testing.T) {
+func TestRace_Core_Device_SubscribeModeChanged_Concurrent(t *testing.T) {
 	device := newTestDevice(t)
 
 	const N = 200
@@ -118,7 +118,7 @@ func TestRace_Core_Device_SubscribeModeChanged_ConcurrentCallbacks(t *testing.T)
 	wg.Wait()
 }
 
-func TestRace_Core_Device_SubscribePropertiesChanged_ConcurrentCallbacks(t *testing.T) {
+func TestRace_Core_Device_SubscribePropertiesChanged_Concurrent(t *testing.T) {
 	device := newTestDevice(t)
 
 	const N = 200

@@ -19,24 +19,17 @@ func TestStation_Iwdbus(t *testing.T) {
 		t.Parallel()
 		t.Run("Station_GetState", testStation_GetState)
 		t.Run("Station_GetState_Invalid", testStation_GetState_Invalid)
-		t.Run("Station_GetState_WrongType", testStation_GetState_WrongType)
-		t.Run("Station_GetState_NoIntro", testStation_GetState_NoIntro)
-		t.Run("Station_GetState_Err", testStation_GetState_Err)
 		t.Run("Station_GetScanning", testStation_GetScanning)
-		t.Run("Station_GetScanning_WrongType", testStation_GetScanning_WrongType)
-		t.Run("Station_GetScanning_NoIntro", testStation_GetScanning_NoIntro)
 		t.Run("Station_GetConnectedNetwork", testStation_GetConnectedNetwork)
 		t.Run("Station_GetConnectedNetwork_Absent", testStation_GetConnectedNetwork_Absent)
 		t.Run("Station_GetConnectedNetwork_RootPath", testStation_GetConnectedNetwork_RootPath)
-		t.Run("Station_GetConnectedNetwork_Err", testStation_GetConnectedNetwork_Err)
-		t.Run("Station_GetConnectedNetwork_NoIntro", testStation_GetConnectedNetwork_NoIntro)
 		t.Run("Station_GetConnectedAccessPoint", testStation_GetConnectedAccessPoint)
 		t.Run("Station_GetConnectedAccessPoint_Absent", testStation_GetConnectedAccessPoint_Absent)
-		t.Run("Station_GetConnectedAccessPoint_Err", testStation_GetConnectedAccessPoint_Err)
 		t.Run("Station_GetAffinities", testStation_GetAffinities)
 		t.Run("Station_GetAffinities_Empty", testStation_GetAffinities_Empty)
 		t.Run("Station_GetAffinities_Absent", testStation_GetAffinities_Absent)
-		t.Run("Station_GetAffinities_WrongType", testStation_GetAffinities_WrongType)
+		t.Run("Station_GetterWrongTypes", testStation_GetterWrongTypes)
+		t.Run("Station_GetterBackendErrors", testStation_GetterBackendErrors)
 	})
 
 	t.Run("Properties", func(t *testing.T) {
@@ -44,34 +37,29 @@ func TestStation_Iwdbus(t *testing.T) {
 		t.Run("Station_GetProperties", testStation_GetProperties)
 		t.Run("Station_GetProperties_Disconnected", testStation_GetProperties_Disconnected)
 		t.Run("Station_GetProperties_Errors", testStation_GetProperties_Errors)
-		t.Run("Station_GetProperties_NoIntro", testStation_GetProperties_NoIntro)
 	})
 
 	t.Run("Operations", func(t *testing.T) {
 		t.Parallel()
 		t.Run("Station_Scan", testStation_Scan)
 		t.Run("Station_Scan_Err", testStation_Scan_Err)
-		t.Run("Station_Scan_NoIntro", testStation_Scan_NoIntro)
 		t.Run("Station_GetOrderedNetworks", testStation_GetOrderedNetworks)
 		t.Run("Station_GetOrderedNetworks_Empty", testStation_GetOrderedNetworks_Empty)
 		t.Run("Station_GetOrderedNetworks_Err", testStation_GetOrderedNetworks_Err)
-		t.Run("Station_GetOrderedNetworks_NoIntro", testStation_GetOrderedNetworks_NoIntro)
 		t.Run("Station_SetAffinities", testStation_SetAffinities)
 		t.Run("Station_SetAffinities_Err", testStation_SetAffinities_Err)
 		t.Run("Station_SetAffinities_NotSupportedMatchable", testStation_SetAffinities_NotSupportedMatchable)
-		t.Run("Station_SetAffinities_NoIntro", testStation_SetAffinities_NoIntro)
 		t.Run("Station_Disconnect", testStation_Disconnect)
 		t.Run("Station_Disconnect_Err", testStation_Disconnect_Err)
-		t.Run("Station_Disconnect_NoIntro", testStation_Disconnect_NoIntro)
 		t.Run("Station_ConnectHiddenNetwork", testStation_ConnectHiddenNetwork)
 		t.Run("Station_ConnectHiddenNetwork_NotFoundMatchable", testStation_ConnectHiddenNetwork_NotFoundMatchable)
-		t.Run("Station_ConnectHiddenNetwork_NoIntro", testStation_ConnectHiddenNetwork_NoIntro)
 		t.Run("Station_GetHiddenAccessPoints", testStation_GetHiddenAccessPoints)
 		t.Run("Station_GetHiddenAccessPoints_Empty", testStation_GetHiddenAccessPoints_Empty)
 		t.Run("Station_GetHiddenAccessPoints_BadType", testStation_GetHiddenAccessPoints_BadType)
 		t.Run("Station_GetHiddenAccessPoints_Err", testStation_GetHiddenAccessPoints_Err)
-		t.Run("Station_GetHiddenAccessPoints_NoIntro", testStation_GetHiddenAccessPoints_NoIntro)
 	})
+
+	t.Run("NotInitialized", testStation_NoIntro)
 
 	t.Run("Subscribe", func(t *testing.T) {
 		t.Parallel()
@@ -119,42 +107,65 @@ func testStation_GetState_Invalid(t *testing.T) {
 	require.Contains(t, err.Error(), "invalid station state")
 }
 
-func testStation_GetState_WrongType(t *testing.T) {
+// testStation_GetterWrongTypes checks that every scalar property getter reports a
+// type-specific conversion error when the backend returns the wrong Go type.
+func testStation_GetterWrongTypes(t *testing.T) {
 	t.Parallel()
 
-	s := &Station{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return 123, nil
-		},
-	}}
+	for _, tc := range []struct {
+		name     string
+		badValue interface{}
+		call     func(context.Context, *Station) error
+		wantHint string
+	}{
+		{"GetState", 123, func(ctx context.Context, s *Station) error { _, err := s.GetState(ctx); return err }, "expected string"},
+		{"GetScanning", "nope", func(ctx context.Context, s *Station) error { _, err := s.GetScanning(ctx); return err }, "expected bool"},
+		{"GetAffinities", "not-an-array", func(ctx context.Context, s *Station) error { _, err := s.GetAffinities(ctx); return err }, "expected object path array"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	_, err := s.GetState(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "expected string")
+			s := &Station{call: &fakeCaller{
+				getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
+					return tc.badValue, nil
+				},
+			}}
+
+			err := tc.call(context.Background(), s)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.wantHint)
+		})
+	}
 }
 
-func testStation_GetState_NoIntro(t *testing.T) {
+// testStation_GetterBackendErrors checks that a generic backend read failure
+// (distinct from the "unknown property" absence case) surfaces as an error.
+func testStation_GetterBackendErrors(t *testing.T) {
 	t.Parallel()
 
-	s := &Station{call: nil}
+	newFailing := func() *Station {
+		return &Station{call: &fakeCaller{
+			getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
+				return nil, fmt.Errorf("dbus failure")
+			},
+		}}
+	}
 
-	_, err := s.GetState(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "station is not initialized")
-}
-
-func testStation_GetState_Err(t *testing.T) {
-	t.Parallel()
-
-	s := &Station{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return nil, fmt.Errorf("dbus failure")
-		},
-	}}
-
-	_, err := s.GetState(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
+	for _, tc := range []struct {
+		name string
+		call func(context.Context, *Station) error
+	}{
+		{"GetState", func(ctx context.Context, s *Station) error { _, err := s.GetState(ctx); return err }},
+		{"GetConnectedNetwork", func(ctx context.Context, s *Station) error { _, err := s.GetConnectedNetwork(ctx); return err }},
+		{"GetConnectedAccessPoint", func(ctx context.Context, s *Station) error { _, err := s.GetConnectedAccessPoint(ctx); return err }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.call(context.Background(), newFailing())
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "dbus failure")
+		})
+	}
 }
 
 func testStation_GetScanning(t *testing.T) {
@@ -171,30 +182,6 @@ func testStation_GetScanning(t *testing.T) {
 	scanning, err := s.GetScanning(context.Background())
 	require.NoError(t, err)
 	require.True(t, scanning)
-}
-
-func testStation_GetScanning_WrongType(t *testing.T) {
-	t.Parallel()
-
-	s := &Station{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return "nope", nil
-		},
-	}}
-
-	_, err := s.GetScanning(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "expected bool")
-}
-
-func testStation_GetScanning_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	s := &Station{call: nil}
-
-	_, err := s.GetScanning(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "station is not initialized")
 }
 
 func testStation_GetConnectedNetwork(t *testing.T) {
@@ -246,31 +233,6 @@ func testStation_GetConnectedNetwork_RootPath(t *testing.T) {
 	require.Nil(t, got)
 }
 
-func testStation_GetConnectedNetwork_Err(t *testing.T) {
-	t.Parallel()
-
-	// A generic (non-"unknown property") failure surfaces as an error.
-	s := &Station{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return nil, fmt.Errorf("dbus failure")
-		},
-	}}
-
-	_, err := s.GetConnectedNetwork(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
-}
-
-func testStation_GetConnectedNetwork_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	s := &Station{call: nil}
-
-	_, err := s.GetConnectedNetwork(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "station is not initialized")
-}
-
 func testStation_GetConnectedAccessPoint(t *testing.T) {
 	t.Parallel()
 
@@ -303,20 +265,6 @@ func testStation_GetConnectedAccessPoint_Absent(t *testing.T) {
 	got, err := s.GetConnectedAccessPoint(context.Background())
 	require.NoError(t, err)
 	require.Nil(t, got)
-}
-
-func testStation_GetConnectedAccessPoint_Err(t *testing.T) {
-	t.Parallel()
-
-	s := &Station{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return nil, fmt.Errorf("dbus failure")
-		},
-	}}
-
-	_, err := s.GetConnectedAccessPoint(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dbus failure")
 }
 
 func testStation_GetAffinities(t *testing.T) {
@@ -372,20 +320,6 @@ func testStation_GetAffinities_Absent(t *testing.T) {
 	got, err := s.GetAffinities(context.Background())
 	require.NoError(t, err)
 	require.Nil(t, got)
-}
-
-func testStation_GetAffinities_WrongType(t *testing.T) {
-	t.Parallel()
-
-	s := &Station{call: &fakeCaller{
-		getPropFn: func(ctx context.Context, iface, prop string) (interface{}, error) {
-			return "not-an-array", nil
-		},
-	}}
-
-	_, err := s.GetAffinities(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "expected object path array")
 }
 
 func testStation_GetProperties(t *testing.T) {
@@ -495,16 +429,6 @@ func testStation_GetProperties_Errors(t *testing.T) {
 	}
 }
 
-func testStation_GetProperties_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	s := &Station{call: nil}
-
-	_, err := s.GetProperties(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "station is not initialized")
-}
-
 func testStation_Scan(t *testing.T) {
 	t.Parallel()
 
@@ -534,16 +458,6 @@ func testStation_Scan_Err(t *testing.T) {
 	err := s.Scan(context.Background())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "dbus failure")
-}
-
-func testStation_Scan_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	s := &Station{call: nil}
-
-	err := s.Scan(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "station is not initialized")
 }
 
 func testStation_GetOrderedNetworks(t *testing.T) {
@@ -598,16 +512,6 @@ func testStation_GetOrderedNetworks_Err(t *testing.T) {
 	_, err := s.GetOrderedNetworks(context.Background())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "dbus failure")
-}
-
-func testStation_GetOrderedNetworks_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	s := &Station{call: nil}
-
-	_, err := s.GetOrderedNetworks(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "station is not initialized")
 }
 
 func testStation_SetAffinities(t *testing.T) {
@@ -668,16 +572,6 @@ func testStation_SetAffinities_NotSupportedMatchable(t *testing.T) {
 	require.True(t, errors.Is(err, ErrDBusProperty), "should still classify as a property error")
 }
 
-func testStation_SetAffinities_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	s := &Station{call: nil}
-
-	err := s.SetAffinities(context.Background(), []string{"/x"})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "station is not initialized")
-}
-
 func testStation_Disconnect(t *testing.T) {
 	t.Parallel()
 
@@ -707,14 +601,6 @@ func testStation_Disconnect_Err(t *testing.T) {
 	err := s.Disconnect(context.Background())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "dbus failure")
-}
-
-func testStation_Disconnect_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	err := (&Station{call: nil}).Disconnect(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "station is not initialized")
 }
 
 func testStation_ConnectHiddenNetwork(t *testing.T) {
@@ -747,14 +633,6 @@ func testStation_ConnectHiddenNetwork_NotFoundMatchable(t *testing.T) {
 	err := s.ConnectHiddenNetwork(context.Background(), "Nope")
 	require.Error(t, err)
 	require.True(t, errors.Is(err, ErrNotFound))
-}
-
-func testStation_ConnectHiddenNetwork_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	err := (&Station{call: nil}).ConnectHiddenNetwork(context.Background(), "x")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "station is not initialized")
 }
 
 func testStation_GetHiddenAccessPoints(t *testing.T) {
@@ -826,14 +704,6 @@ func testStation_GetHiddenAccessPoints_Err(t *testing.T) {
 	_, err := s.GetHiddenAccessPoints(context.Background())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "dbus failure")
-}
-
-func testStation_GetHiddenAccessPoints_NoIntro(t *testing.T) {
-	t.Parallel()
-
-	_, err := (&Station{call: nil}).GetHiddenAccessPoints(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "station is not initialized")
 }
 
 func testStation_SubscribePropertiesChanged(t *testing.T) {
@@ -1013,4 +883,36 @@ func testStation_FirehoseReceivesAll(t *testing.T) {
 
 func newGetAllStation(fn func(ctx context.Context, iface string) (map[string]dbus.Variant, error)) *Station {
 	return &Station{call: &fakeCaller{getAllFn: fn}}
+}
+
+// testStation_NoIntro checks that every init-guarded method reports a clean
+// "not initialized" error (rather than panicking) when the Station has no caller.
+func testStation_NoIntro(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name string
+		call func(*Station) error
+	}{
+		{"GetState", func(s *Station) error { _, err := s.GetState(ctx); return err }},
+		{"GetScanning", func(s *Station) error { _, err := s.GetScanning(ctx); return err }},
+		{"GetConnectedNetwork", func(s *Station) error { _, err := s.GetConnectedNetwork(ctx); return err }},
+		{"GetConnectedAccessPoint", func(s *Station) error { _, err := s.GetConnectedAccessPoint(ctx); return err }},
+		{"GetAffinities", func(s *Station) error { _, err := s.GetAffinities(ctx); return err }},
+		{"GetProperties", func(s *Station) error { _, err := s.GetProperties(ctx); return err }},
+		{"Scan", func(s *Station) error { return s.Scan(ctx) }},
+		{"GetOrderedNetworks", func(s *Station) error { _, err := s.GetOrderedNetworks(ctx); return err }},
+		{"SetAffinities", func(s *Station) error { return s.SetAffinities(ctx, []string{"/x"}) }},
+		{"Disconnect", func(s *Station) error { return s.Disconnect(ctx) }},
+		{"ConnectHiddenNetwork", func(s *Station) error { return s.ConnectHiddenNetwork(ctx, "x") }},
+		{"GetHiddenAccessPoints", func(s *Station) error { _, err := s.GetHiddenAccessPoints(ctx); return err }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.call(&Station{call: nil})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "station is not initialized")
+		})
+	}
 }
