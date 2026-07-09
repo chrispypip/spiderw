@@ -47,10 +47,11 @@ RESET := \033[0m
 # -----------------------------------------------------------------------------------
 # PHONY targets
 # -----------------------------------------------------------------------------------
-.PHONY: help bootstrap dev image rebuild-image up down logs shell lint lint-check
-.PHONY: fmt fmt-check check-fmt test test-unit test-regression test-stress test-race
-.PHONY: test-stress-race test-race-stress test-bench test-mock test-integration
-.PHONY: test-all preflight check
+.PHONY: help
+.PHONY: bootstrap preflight dev image rebuild-image up down logs shell
+.PHONY: lint lint-check fmt fmt-check check-fmt check
+.PHONY: test test-unit test-regression test-stress test-race test-stress-race
+.PHONY: test-race-stress test-bench test-mock test-integration test-all
 .PHONY: build amd64 arm64
 .PHONY: clean all
 
