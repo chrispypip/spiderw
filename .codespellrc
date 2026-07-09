@@ -1,0 +1,5 @@
+[codespell]
+# Skip generated/binary/vendored paths that would produce noise or false hits.
+skip = .git,go.sum,dist,tools/test-mocks/*/go.sum,*.svg,*.png,*.jpg
+# To silence a legitimate term that gets flagged, add:
+#   ignore-words-list = word1,word2

@@ -49,7 +49,7 @@ RESET := \033[0m
 # -----------------------------------------------------------------------------------
 .PHONY: help
 .PHONY: bootstrap preflight dev image rebuild-image up down logs shell
-.PHONY: lint lint-check fmt fmt-check check-fmt check
+.PHONY: lint lint-check codespell fmt fmt-check check-fmt check
 .PHONY: test test-unit test-regression test-stress test-race test-stress-race
 .PHONY: test-race-stress test-bench test-mock test-integration test-all
 .PHONY: build amd64 arm64
@@ -163,6 +163,10 @@ lint: ## Run Go linting (golangci-lint) inside container
 
 lint-check: lint
 
+codespell: ## Run codespell spell-check inside container
+	@echo -e "$(BLUE)[ codespell ]$(RESET) Running codespell..."
+	@$(RUN) bash -lc "codespell"
+
 fmt: ## Run gofmt/goimports inside container
 	@echo -e "$(BLUE)[ fmt ]$(RESET) Formatting..."
 	@$(RUN) bash -lc "git ls-files -z '*.go' | xargs -0 gofmt -s -w && \
@@ -242,7 +246,7 @@ preflight: ## Validate container environment
 # -----------------------------------------------------------------------------------
 # Check code quality
 # -----------------------------------------------------------------------------------
-check: fmt-check lint-check test-unit ## Check for code quality (formatting, linting, tests)
+check: fmt-check lint-check codespell test-unit ## Check for code quality (formatting, linting, tests)
 
 
 # -----------------------------------------------------------------------------------

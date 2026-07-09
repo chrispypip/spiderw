@@ -28,6 +28,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
   bash \
   build-essential \
   ca-certificates \
+  codespell \
   curl \
   dbus \
   dbus-x11 \

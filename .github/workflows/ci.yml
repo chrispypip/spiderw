@@ -53,6 +53,18 @@ jobs:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
   # ---------------------------------------------------------------------------
+  # Spell-check comments, strings, and Markdown docs with codespell. Complements
+  # the golangci-lint `misspell` linter (Go files only) by also covering the
+  # docs. Configuration (skip list, ignore words) lives in .codespellrc.
+  # ---------------------------------------------------------------------------
+  spell:
+    name: spell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: codespell-project/actions-codespell@v2
+
+  # ---------------------------------------------------------------------------
   # Native test suites that do NOT require D-Bus. One matrix leg per build tag
   # so each suite reports independently. (The `race` tag is intentionally not
   # here: internal/connect/race_test.go drives the iwd mock over a session bus,
@@ -143,7 +155,7 @@ jobs:
   mock-gates:
     name: mock gates green
     if: always()
-    needs: [build, lint, test, dbus, cross-compile]
+    needs: [build, lint, spell, test, dbus, cross-compile]
     runs-on: ubuntu-latest
     steps:
       - name: Fail unless every gate passed
