@@ -18,6 +18,7 @@ const (
 
 // requireFired asserts that ch receives a value within signalTimeout.
 func requireFired(t *testing.T, ch <-chan struct{}) {
+	t.Helper()
 	require.Eventually(t, func() bool {
 		select {
 		case <-ch:
@@ -30,6 +31,7 @@ func requireFired(t *testing.T, ch <-chan struct{}) {
 
 // requireNotFired asserts that ch stays empty for the duration of signalTimeout.
 func requireNotFired(t *testing.T, ch <-chan struct{}) {
+	t.Helper()
 	require.Eventually(t, func() bool {
 		select {
 		case <-ch:
@@ -45,6 +47,7 @@ type fakeSignalSource struct {
 }
 
 func newFakeSignalSource(t *testing.T) *fakeSignalSource {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 

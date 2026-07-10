@@ -21,9 +21,17 @@ linters:
   # `standard` enables errcheck, govet, ineffassign, staticcheck, unused.
   default: standard
   enable:
-    - errorlint   # correct error wrapping / comparison (errors.Is/As, %w)
-    - misspell    # commonly misspelled English in comments and strings
-    - unconvert   # unnecessary type conversions
+    - durationcheck             # suspicious time.Duration arithmetic
+    - errname                   # error vars are ErrXxx, error types are XxxError
+    - errorlint                 # correct error wrapping / comparison (errors.Is/As, %w)
+    - gocheckcompilerdirectives # valid //go: directives (catches build-tag typos)
+    - makezero                  # append to a slice made with a non-zero length
+    - misspell                  # commonly misspelled English in comments and strings
+    - nilerr                    # returning nil after a non-nil error check
+    - thelper                   # test helpers start with t.Helper()
+    - unconvert                 # unnecessary type conversions
+    - unparam                   # unused function parameters and results
+    - wastedassign              # assignments overwritten before being read
   settings:
     errcheck:
       # Writes to CLI output streams: a failed stdout/stderr write is not
@@ -40,6 +48,19 @@ linters:
           - errcheck
         path: _test\.go
         text: "Error return value of `.*\\.Close` is not checked"
+      # Test fakes and helpers routinely accept interface-required parameters
+      # (ctx, sender, ...) they do not use, so scope unparam to non-test code
+      # where an unused parameter is a real smell.
+      - linters:
+          - unparam
+        path: _test\.go
+
+issues:
+  # Show every finding rather than golangci-lint's default truncated subset
+  # (50 per linter, 3 per identical message), so neither `make lint` nor the CI
+  # lint job hides findings behind the caps.
+  max-issues-per-linter: 0
+  max-same-issues: 0
 
 formatters:
   enable:

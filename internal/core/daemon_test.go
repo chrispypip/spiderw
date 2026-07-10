@@ -645,6 +645,7 @@ func TestDaemon_Core(t *testing.T) {
 				name: "Version",
 				info: &iwdbus.DaemonInfo{Version: "2.3.4", StateDirectory: "/tmp"},
 				run: func(t *testing.T, d *Daemon) {
+					t.Helper()
 					v, err := d.Version(context.Background())
 					require.NoError(t, err)
 					require.Equal(t, "2.3.4", v)
@@ -654,6 +655,7 @@ func TestDaemon_Core(t *testing.T) {
 				name: "StateDirectory",
 				info: &iwdbus.DaemonInfo{Version: "1", StateDirectory: "/abc"},
 				run: func(t *testing.T, d *Daemon) {
+					t.Helper()
 					s, err := d.StateDirectory(context.Background())
 					require.NoError(t, err)
 					require.Equal(t, "/abc", s)
@@ -663,6 +665,7 @@ func TestDaemon_Core(t *testing.T) {
 				name: "NetworkConfigurationEnabled",
 				info: &iwdbus.DaemonInfo{Version: "1", StateDirectory: "/dir", NetworkConfigurationEnabled: false},
 				run: func(t *testing.T, d *Daemon) {
+					t.Helper()
 					b, err := d.NetworkConfigurationEnabled(context.Background())
 					require.NoError(t, err)
 					require.False(t, b)

@@ -36,7 +36,7 @@ type runningMock struct {
 var (
 	mockBinOnce sync.Once
 	mockBinPath string
-	mockBinErr  error
+	errMockBin  error
 )
 
 // ensureMockBinary builds the iwd mock binary once and returns its path.
@@ -48,17 +48,17 @@ func ensureMockBinary() (string, error) {
 	mockBinOnce.Do(func() {
 		dir, err := os.MkdirTemp("", "iwdmock-bin-")
 		if err != nil {
-			mockBinErr = err
+			errMockBin = err
 			return
 		}
 		path := filepath.Join(dir, "iwdmock-bin")
 		if out, err := exec.Command("go", "build", "-o", path, mockImportPath).CombinedOutput(); err != nil {
-			mockBinErr = fmt.Errorf("building iwd mock: %w: %s", err, out)
+			errMockBin = fmt.Errorf("building iwd mock: %w: %s", err, out)
 			return
 		}
 		mockBinPath = path
 	})
-	return mockBinPath, mockBinErr
+	return mockBinPath, errMockBin
 }
 
 func waitForBusName(conn *dbus.Conn, name string, timeout time.Duration) error {
@@ -221,6 +221,7 @@ func startMockNoT(args []string) error {
 
 // StartMockNormal starts the default iwd mock for tests.
 func StartMockNormal(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{})
 }
 
@@ -231,16 +232,19 @@ func StartMockNormalNoT() error {
 
 // StartMockWithOmittedOptionals starts an iwd mock that omits optional daemon fields.
 func StartMockWithOmittedOptionals(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--omit-optionals"})
 }
 
 // StartMockFirehose starts an iwd mock that emits high-frequency signals.
 func StartMockFirehose(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--firehose-signals"})
 }
 
 // StartMockWithoutDaemon starts an iwd mock without exporting the daemon object.
 func StartMockWithoutDaemon(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--omit-daemon"})
 }
 
@@ -251,6 +255,7 @@ func StartMockWithoutDaemonNoT() error {
 
 // StartMockWithMissingDaemonInfoFields starts a mock with incomplete daemon info.
 func StartMockWithMissingDaemonInfoFields(t *testing.T, version, statedir, netconf bool) {
+	t.Helper()
 	args := make([]string, 0)
 	if version {
 		args = append(args, "--omit-daemon-version")
@@ -266,6 +271,7 @@ func StartMockWithMissingDaemonInfoFields(t *testing.T, version, statedir, netco
 
 // StartMockWithBadDaemonInfoFields starts a mock with invalid daemon info field types.
 func StartMockWithBadDaemonInfoFields(t *testing.T, version, statedir, netconf bool) {
+	t.Helper()
 	args := make([]string, 0)
 	if version {
 		args = append(args, "--daemon-bad-version")
@@ -281,51 +287,60 @@ func StartMockWithBadDaemonInfoFields(t *testing.T, version, statedir, netconf b
 
 // StartMockWithExtraDaemonInfoFields starts a mock with extra daemon info fields.
 func StartMockWithExtraDaemonInfoFields(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--daemon-extra-field"})
 }
 
 // StartMockWithDaemonGetInfoReturningBadType starts a mock whose GetInfo returns an invalid type.
 func StartMockWithDaemonGetInfoReturningBadType(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--daemon-bad-payload"})
 }
 
 // StartMockWithDaemonFailingCalls starts a mock whose daemon methods fail.
 func StartMockWithDaemonFailingCalls(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--daemon-fail-calls"})
 }
 
 // StartMockAdapterWithBadModes starts a mock adapter with invalid SupportedModes data.
 func StartMockAdapterWithBadModes(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--adapter-bad-modes"})
 }
 
 // StartMockWithoutDevice starts an iwd mock that does not export a device object,
 // which exercises empty device enumeration.
 func StartMockWithoutDevice(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--omit-device"})
 }
 
 // StartMockWithoutBSS starts an iwd mock that does not export a basic service set
 // object, which exercises empty BSS enumeration.
 func StartMockWithoutBSS(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--omit-bss"})
 }
 
 // StartMockWithoutNetwork starts an iwd mock that does not export any network
 // objects, which exercises empty network enumeration.
 func StartMockWithoutNetwork(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--omit-network"})
 }
 
 // StartMockWithoutKnownNetwork starts an iwd mock that does not export any
 // known-network objects, which exercises empty known-network enumeration.
 func StartMockWithoutKnownNetwork(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--omit-knownnetwork"})
 }
 
 // StartMockWithoutAgent starts an iwd mock that does not export the AgentManager
 // interface, which exercises the client's "agent manager unavailable" path.
 func StartMockWithoutAgent(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--omit-agent"})
 }
 
@@ -333,5 +348,6 @@ func StartMockWithoutAgent(t *testing.T) {
 // interface on the station-mode device, which exercises the client's "station
 // unavailable" and empty station-enumeration paths.
 func StartMockWithoutStation(t *testing.T) {
+	t.Helper()
 	startMockWithT(t, []string{"--omit-station"})
 }

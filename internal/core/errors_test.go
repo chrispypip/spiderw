@@ -12,10 +12,10 @@ import (
 	"github.com/chrispypip/spiderw/internal/iwdbus"
 )
 
-// fakeErr simulates non-core errors.
-type fakeErr struct{ msg string }
+// fakeError simulates non-core errors.
+type fakeError struct{ msg string }
 
-func (e fakeErr) Error() string { return e.msg }
+func (e fakeError) Error() string { return e.msg }
 
 // Tests in this file are organized using a subset subtest structure.
 // This keeps related table-driven cases grouped under stable headings.
@@ -34,9 +34,9 @@ func TestErrors_Core(t *testing.T) {
 					err: &Error{
 						Kind: KindOperationFailed,
 						Op:   "OpX",
-						Err:  fakeErr{"x"},
+						Err:  fakeError{"x"},
 					},
-					wantIs: []error{ErrCore, fakeErr{"x"}},
+					wantIs: []error{ErrCore, fakeError{"x"}},
 				},
 				{
 					name: "message contains kind/op/details/underlying",
@@ -45,7 +45,7 @@ func TestErrors_Core(t *testing.T) {
 						Resource: ResourceAdapter,
 						Op:       "InitAdapter",
 						Details:  "failed to talk to adapter",
-						Err:      fakeErr{"boom"},
+						Err:      fakeError{"boom"},
 					},
 					wantSubs: []string{"adapter unavailable", "Op=InitAdapter", "failed to talk to adapter", "boom"},
 				},
@@ -76,7 +76,7 @@ func TestErrors_Core(t *testing.T) {
 		})
 
 		t.Run("ErrorAsSelf", func(t *testing.T) {
-			ce := &Error{Kind: KindUnavailable, Resource: ResourceAdapter, Op: "OpX", Err: fakeErr{"boom"}}
+			ce := &Error{Kind: KindUnavailable, Resource: ResourceAdapter, Op: "OpX", Err: fakeError{"boom"}}
 
 			var out *Error
 			require.ErrorAs(t, ce, &out)
@@ -179,7 +179,7 @@ func TestErrors_Core(t *testing.T) {
 
 			for _, tc := range tests {
 				t.Run(tc.name, func(t *testing.T) {
-					base := fakeErr{"boom"}
+					base := fakeError{"boom"}
 					err := tc.fn("OpX", "details", base)
 					require.Error(t, err)
 
@@ -265,7 +265,7 @@ func TestErrors_Core(t *testing.T) {
 		})
 
 		t.Run("WithNestedIwdBus", func(t *testing.T) {
-			low := fakeErr{"boom"}
+			low := fakeError{"boom"}
 			inner := &iwdbus.Error{
 				Kind:    iwdbus.ErrDBusConnection,
 				Context: "iface=X method=Y",

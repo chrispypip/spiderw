@@ -88,6 +88,7 @@ func TestWiring_Daemon_CleanupCalledExactlyOnce_FailurePaths(t *testing.T) {
 		{
 			name: "new_iwd_daemon_error_calls_cleanup_once",
 			setup: func(t *testing.T, daemonErr error) {
+				t.Helper()
 				newIwdDaemonFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.Daemon, error) {
 					return nil, daemonErr
 				}
@@ -96,6 +97,7 @@ func TestWiring_Daemon_CleanupCalledExactlyOnce_FailurePaths(t *testing.T) {
 		{
 			name: "new_iwd_daemon_nil_calls_cleanup_once",
 			setup: func(t *testing.T, cleanupErr error) {
+				t.Helper()
 				newIwdDaemonFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.Daemon, error) {
 					return nil, nil
 				}
@@ -104,6 +106,7 @@ func TestWiring_Daemon_CleanupCalledExactlyOnce_FailurePaths(t *testing.T) {
 		{
 			name: "new_core_daemon_nil_calls_cleanup_once",
 			setup: func(t *testing.T, cleanupErr error) {
+				t.Helper()
 				newIwdDaemonFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.Daemon, error) {
 					return &iwdbus.Daemon{}, nil
 				}
@@ -117,6 +120,7 @@ func TestWiring_Daemon_CleanupCalledExactlyOnce_FailurePaths(t *testing.T) {
 			cleanupErr:   errors.New("cleanup failed"),
 			assertJoined: true,
 			setup: func(t *testing.T, daemonErr error) {
+				t.Helper()
 				newIwdDaemonFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.Daemon, error) {
 					return nil, daemonErr
 				}
@@ -126,6 +130,7 @@ func TestWiring_Daemon_CleanupCalledExactlyOnce_FailurePaths(t *testing.T) {
 			name:       "iwd_daemon_nil_cleanup_error_joined",
 			cleanupErr: errors.New("cleanup failed"),
 			setup: func(t *testing.T, _ error) {
+				t.Helper()
 				newIwdDaemonFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.Daemon, error) {
 					return nil, nil
 				}
@@ -135,6 +140,7 @@ func TestWiring_Daemon_CleanupCalledExactlyOnce_FailurePaths(t *testing.T) {
 			name:       "core_daemon_nil_cleanup_error_joined",
 			cleanupErr: errors.New("cleanup failed"),
 			setup: func(t *testing.T, _ error) {
+				t.Helper()
 				newIwdDaemonFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.Daemon, error) {
 					return &iwdbus.Daemon{}, nil
 				}
