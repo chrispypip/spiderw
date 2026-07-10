@@ -4,7 +4,6 @@ package core
 
 import (
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -56,7 +55,7 @@ func TestErrors_Core(t *testing.T) {
 					require.NotNil(t, tc.err)
 
 					for _, w := range tc.wantIs {
-						require.True(t, errors.Is(tc.err, w), "expected errors.Is(...)")
+						require.ErrorIs(t, tc.err, w, "expected errors.Is(...)")
 					}
 					for _, sub := range tc.wantSubs {
 						require.Contains(t, tc.err.Error(), sub)
@@ -154,8 +153,8 @@ func TestErrors_Core(t *testing.T) {
 					require.Equal(t, tc.wantKind, ce.Kind)
 					require.Equal(t, tc.wantRes, ce.Resource)
 
-					require.True(t, errors.Is(err, ErrCore))
-					require.True(t, errors.Is(err, tc.inputErr))
+					require.ErrorIs(t, err, ErrCore)
+					require.ErrorIs(t, err, tc.inputErr)
 				})
 			}
 		})
@@ -188,8 +187,8 @@ func TestErrors_Core(t *testing.T) {
 					require.Equal(t, tc.wantKind, ce.Kind)
 					require.Equal(t, tc.wantRes, ce.Resource)
 
-					require.True(t, errors.Is(err, ErrCore))
-					require.True(t, errors.Is(err, base))
+					require.ErrorIs(t, err, ErrCore)
+					require.ErrorIs(t, err, base)
 					require.Contains(t, err.Error(), "Op=OpX")
 				})
 			}
@@ -205,8 +204,8 @@ func TestErrors_Core(t *testing.T) {
 			require.ErrorAs(t, e2, &ce)
 			require.Equal(t, KindUnavailable, ce.Kind)
 			require.Equal(t, ResourceAdapter, ce.Resource)
-			require.True(t, errors.Is(e2, ErrCore))
-			require.True(t, errors.Is(e2, iwdbus.ErrDBusConnection))
+			require.ErrorIs(t, e2, ErrCore)
+			require.ErrorIs(t, e2, iwdbus.ErrDBusConnection)
 		})
 
 		t.Run("NilErrorsReturnNil", func(t *testing.T) {
@@ -233,10 +232,10 @@ func TestErrors_Core(t *testing.T) {
 			err := WrapAdapterUnavailable("Op", "details", base)
 
 			msg := err.Error()
-			require.True(t, strings.Contains(msg, "adapter unavailable"))
-			require.True(t, strings.Contains(msg, "Op=Op"))
-			require.True(t, strings.Contains(msg, "details"))
-			require.True(t, strings.Contains(msg, "dbus property error"))
+			require.Contains(t, msg, "adapter unavailable")
+			require.Contains(t, msg, "Op=Op")
+			require.Contains(t, msg, "details")
+			require.Contains(t, msg, "dbus property error")
 		})
 
 		t.Run("MessageWithoutDetails", func(t *testing.T) {
@@ -273,8 +272,8 @@ func TestErrors_Core(t *testing.T) {
 			}
 
 			err := WrapAdapterUnavailable("Op", "details", inner)
-			require.True(t, errors.Is(err, iwdbus.ErrDBusConnection))
-			require.True(t, errors.Is(err, low))
+			require.ErrorIs(t, err, iwdbus.ErrDBusConnection)
+			require.ErrorIs(t, err, low)
 		})
 	})
 }

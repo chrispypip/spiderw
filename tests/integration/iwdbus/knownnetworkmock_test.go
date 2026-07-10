@@ -207,5 +207,5 @@ func TestKnownNetworkMock_StatusJSON(t *testing.T) {
 	known := byName["KnownNet"]
 	require.NotNil(t, known, "KnownNet missing:\n%s", out)
 	require.Equal(t, "psk", jsonGetString(t, known, "Type"))
-	require.Equal(t, true, jsonGetBool(t, known, "AutoConnect"))
+	require.True(t, jsonGetBool(t, known, "AutoConnect"))
 }

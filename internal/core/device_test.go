@@ -64,7 +64,7 @@ func TestDevice_Core(t *testing.T) {
 					require.ErrorAs(t, err, &ce)
 					require.Equal(t, tc.wantKind, ce.Kind)
 					require.Equal(t, ResourceDevice, ce.Resource)
-					require.True(t, errors.Is(err, tc.dbusErr))
+					require.ErrorIs(t, err, tc.dbusErr)
 				})
 			}
 		})
@@ -124,7 +124,7 @@ func TestDevice_Core(t *testing.T) {
 			f.setErr(iwdbus.ErrDBusMethod)
 			_, err := NewDevice(f).Powered(ctx)
 			require.Error(t, err)
-			require.True(t, errors.Is(err, iwdbus.ErrDBusMethod))
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
 		})
 
 		t.Run("Success", func(t *testing.T) {

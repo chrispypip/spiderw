@@ -207,7 +207,7 @@ func TestAdapterMock_SubscribePropertiesChanged(t *testing.T) {
 
 	m, out, err := runSpiderAdapterJSON(t, "phy0", "powered", "false")
 	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, false, jsonGetBool(t, m, "Powered"))
+	require.False(t, jsonGetBool(t, m, "Powered"))
 
 	requireFired(t, fired)
 
@@ -235,11 +235,11 @@ func TestAdapterMock_SubscribePoweredChanged(t *testing.T) {
 
 	m, out, err := runSpiderAdapterJSON(t, "phy0", "powered", "disable")
 	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, false, jsonGetBool(t, m, "Powered"))
+	require.False(t, jsonGetBool(t, m, "Powered"))
 
 	requireFired(t, fired)
 
-	require.Equal(t, false, recv)
+	require.False(t, recv)
 }
 
 func TestAdapterMock_Firehose(t *testing.T) {
@@ -259,7 +259,7 @@ func TestAdapterMock_Firehose(t *testing.T) {
 
 	m, out, err := runSpiderAdapterJSON(t, "phy0", "powered", "disabled")
 	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, false, jsonGetBool(t, m, "Powered"))
+	require.False(t, jsonGetBool(t, m, "Powered"))
 
 	changed := map[string]dbus.Variant{"Powered": dbus.MakeVariant(false)}
 
@@ -346,7 +346,7 @@ func TestAdapterMock_ScopedStatusJSON(t *testing.T) {
 	entry := list[0]
 	require.Equal(t, "/net/connman/iwd/0", jsonGetString(t, entry, "Path"))
 	require.Equal(t, "phy0", jsonGetString(t, entry, "Name"))
-	require.Equal(t, true, jsonGetBool(t, entry, "Powered"))
+	require.True(t, jsonGetBool(t, entry, "Powered"))
 	require.Equal(t, "MockModel", jsonGetString(t, entry, "Model"))
 	require.Equal(t, "MockVendor", jsonGetString(t, entry, "Vendor"))
 }

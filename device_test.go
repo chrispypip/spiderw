@@ -26,8 +26,8 @@ func TestDevice_Public(t *testing.T) {
 	}
 
 	t.Run("Path", func(t *testing.T) {
-		require.Equal(t, "", (*Device)(nil).Path())
-		require.Equal(t, "", newDevice(nil, "/ignored").Path())
+		require.Empty(t, (*Device)(nil).Path())
+		require.Empty(t, newDevice(nil, "/ignored").Path())
 		require.Equal(t, "/net/connman/iwd/phy0/wlan0", newDevice(newFullBackend(), "/net/connman/iwd/phy0/wlan0").Path())
 	})
 
@@ -56,7 +56,7 @@ func TestDevice_Public(t *testing.T) {
 			t.Run("NilReceiver", func(t *testing.T) {
 				_, err := r.op((*Device)(nil))
 				require.Error(t, err)
-				require.True(t, errors.Is(err, ErrInternal))
+				require.ErrorIs(t, err, ErrInternal)
 			})
 
 			t.Run("BackendError", func(t *testing.T) {
@@ -114,7 +114,7 @@ func TestDevice_Public(t *testing.T) {
 		t.Run("NilReceiver", func(t *testing.T) {
 			err := (*Device)(nil).SetPowered(ctx, true)
 			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrInternal))
+			require.ErrorIs(t, err, ErrInternal)
 		})
 	})
 
@@ -129,14 +129,14 @@ func TestDevice_Public(t *testing.T) {
 		t.Run("NilReceiver", func(t *testing.T) {
 			err := (*Device)(nil).SetMode(ctx, ModeAP)
 			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrInternal))
+			require.ErrorIs(t, err, ErrInternal)
 		})
 
 		t.Run("InvalidModeRejectedAtBoundary", func(t *testing.T) {
 			f := &fakeCoreDevice{}
 			err := (&Device{core: f}).SetMode(ctx, Mode("garbage"))
 			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrInvalidArgument))
+			require.ErrorIs(t, err, ErrInvalidArgument)
 
 			var pe *Error
 			require.ErrorAs(t, err, &pe)
@@ -154,7 +154,7 @@ func TestDevice_Public(t *testing.T) {
 		f.mode.Store(core.Mode("garbage"))
 		_, err := (&Device{core: f}).Mode(ctx)
 		require.Error(t, err)
-		require.True(t, errors.Is(err, ErrInvalidArgument))
+		require.ErrorIs(t, err, ErrInvalidArgument)
 	})
 
 	t.Run("SubscribePropertiesChanged", func(t *testing.T) {
@@ -170,7 +170,7 @@ func TestDevice_Public(t *testing.T) {
 		t.Run("NilReceiver", func(t *testing.T) {
 			_, err := (*Device)(nil).SubscribePropertiesChanged(ctx, func(DevicePropertiesChanged) {})
 			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrInternal))
+			require.ErrorIs(t, err, ErrInternal)
 		})
 
 		t.Run("DeliversEvent", func(t *testing.T) {
@@ -203,7 +203,7 @@ func TestDevice_Public(t *testing.T) {
 		t.Run("NilReceiver", func(t *testing.T) {
 			_, err := (*Device)(nil).SubscribePoweredChanged(ctx, func(bool) {})
 			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrInternal))
+			require.ErrorIs(t, err, ErrInternal)
 		})
 
 		t.Run("DeliversEvent", func(t *testing.T) {
@@ -236,7 +236,7 @@ func TestDevice_Public(t *testing.T) {
 		t.Run("NilReceiver", func(t *testing.T) {
 			_, err := (*Device)(nil).SubscribeModeChanged(ctx, func(Mode) {})
 			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrInternal))
+			require.ErrorIs(t, err, ErrInternal)
 		})
 
 		t.Run("DeliversEventConvertedToPublicMode", func(t *testing.T) {

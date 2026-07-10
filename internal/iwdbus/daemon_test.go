@@ -4,7 +4,6 @@ package iwdbus
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -211,7 +210,7 @@ func TestDaemon_Iwdbus(t *testing.T) {
 			d := &Daemon{intro: nil}
 			_, err := d.GetInfo(context.Background())
 			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrDaemonUninitialized))
+			require.ErrorIs(t, err, ErrDaemonUninitialized)
 		})
 	})
 
@@ -235,7 +234,7 @@ func TestDaemon_Iwdbus(t *testing.T) {
 					t.Parallel()
 					_, err := tc.fn()
 					require.Error(t, err)
-					require.True(t, errors.Is(err, ErrDaemonUninitialized))
+					require.ErrorIs(t, err, ErrDaemonUninitialized)
 				})
 			}
 		})
@@ -345,8 +344,8 @@ func TestDaemon_GetAdapters_Guards(t *testing.T) {
 		var d *Daemon
 		_, err := d.GetAdapters(context.Background())
 		require.Error(t, err)
-		require.True(t, errors.Is(err, ErrDBusConnection))
-		require.True(t, errors.Is(err, ErrDaemonUninitialized))
+		require.ErrorIs(t, err, ErrDBusConnection)
+		require.ErrorIs(t, err, ErrDaemonUninitialized)
 	})
 
 	t.Run("NilConn", func(t *testing.T) {
@@ -355,8 +354,8 @@ func TestDaemon_GetAdapters_Guards(t *testing.T) {
 		d := &Daemon{conn: nil}
 		_, err := d.GetAdapters(context.Background())
 		require.Error(t, err)
-		require.True(t, errors.Is(err, ErrDBusConnection))
-		require.True(t, errors.Is(err, ErrDaemonUninitialized))
+		require.ErrorIs(t, err, ErrDBusConnection)
+		require.ErrorIs(t, err, ErrDaemonUninitialized)
 	})
 }
 
@@ -369,8 +368,8 @@ func TestDaemon_GetDevices_Guards(t *testing.T) {
 		var d *Daemon
 		_, err := d.GetDevices(context.Background())
 		require.Error(t, err)
-		require.True(t, errors.Is(err, ErrDBusConnection))
-		require.True(t, errors.Is(err, ErrDaemonUninitialized))
+		require.ErrorIs(t, err, ErrDBusConnection)
+		require.ErrorIs(t, err, ErrDaemonUninitialized)
 	})
 
 	t.Run("NilConn", func(t *testing.T) {
@@ -379,8 +378,8 @@ func TestDaemon_GetDevices_Guards(t *testing.T) {
 		d := &Daemon{conn: nil}
 		_, err := d.GetDevices(context.Background())
 		require.Error(t, err)
-		require.True(t, errors.Is(err, ErrDBusConnection))
-		require.True(t, errors.Is(err, ErrDaemonUninitialized))
+		require.ErrorIs(t, err, ErrDBusConnection)
+		require.ErrorIs(t, err, ErrDaemonUninitialized)
 	})
 }
 
@@ -406,16 +405,16 @@ func TestDaemon_GetEnumerators_Guards(t *testing.T) {
 				t.Parallel()
 				err := tc.call(nil)
 				require.Error(t, err)
-				require.True(t, errors.Is(err, ErrDBusConnection))
-				require.True(t, errors.Is(err, ErrDaemonUninitialized))
+				require.ErrorIs(t, err, ErrDBusConnection)
+				require.ErrorIs(t, err, ErrDaemonUninitialized)
 			})
 
 			t.Run("NilConn", func(t *testing.T) {
 				t.Parallel()
 				err := tc.call(&Daemon{conn: nil})
 				require.Error(t, err)
-				require.True(t, errors.Is(err, ErrDBusConnection))
-				require.True(t, errors.Is(err, ErrDaemonUninitialized))
+				require.ErrorIs(t, err, ErrDBusConnection)
+				require.ErrorIs(t, err, ErrDaemonUninitialized)
 			})
 		})
 	}
@@ -481,7 +480,7 @@ func TestBSSAddressFromManagedObject(t *testing.T) {
 			got, err := bssAddressFromManagedObject(tc.path, tc.props)
 			if len(tc.wantErrContains) > 0 {
 				require.Error(t, err)
-				require.True(t, errors.Is(err, ErrDBusVariant))
+				require.ErrorIs(t, err, ErrDBusVariant)
 				for _, sub := range tc.wantErrContains {
 					require.Contains(t, err.Error(), sub)
 				}
@@ -607,7 +606,7 @@ func TestObjectNameFromManagedObject(t *testing.T) {
 			got, err := objectNameFromManagedObject(tc.label, tc.path, tc.props)
 			if len(tc.wantErrContains) > 0 {
 				require.Error(t, err)
-				require.True(t, errors.Is(err, ErrDBusVariant))
+				require.ErrorIs(t, err, ErrDBusVariant)
 				for _, sub := range tc.wantErrContains {
 					require.Contains(t, err.Error(), sub)
 				}

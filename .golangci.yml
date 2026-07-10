@@ -28,11 +28,19 @@ linters:
     - makezero                  # append to a slice made with a non-zero length
     - misspell                  # commonly misspelled English in comments and strings
     - nilerr                    # returning nil after a non-nil error check
+    - testifylint               # correct/idiomatic testify assertions
     - thelper                   # test helpers start with t.Helper()
+    - tparallel                 # correct t.Parallel() usage
     - unconvert                 # unnecessary type conversions
     - unparam                   # unused function parameters and results
     - wastedassign              # assignments overwritten before being read
   settings:
+    testifylint:
+      # Signal strengths and similar exact dBm literals are compared with
+      # require.Equal; they are not computed values, so InDelta/InEpsilon would
+      # be wrong here.
+      disable:
+        - float-compare
     errcheck:
       # Writes to CLI output streams: a failed stdout/stderr write is not
       # actionable, and checking every Fprint call adds noise without value.

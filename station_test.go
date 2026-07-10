@@ -484,7 +484,7 @@ func TestStation_Public(t *testing.T) {
 	})
 
 	t.Run("Path", func(t *testing.T) {
-		require.Equal(t, "", (*Station)(nil).Path())
+		require.Empty(t, (*Station)(nil).Path())
 		require.Equal(t, "/p", newStation(&fakeCoreStation{}, "/p", "").Path())
 	})
 

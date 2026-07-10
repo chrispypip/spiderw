@@ -4,7 +4,6 @@ package core
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"testing"
 
@@ -54,8 +53,8 @@ func TestDaemon_Core(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					_, err := tc.daemon.Info(context.Background())
 					require.Error(t, err)
-					require.True(t, errors.Is(err, ErrDaemonNotInitialized))
-					require.True(t, errors.Is(err, ErrCore))
+					require.ErrorIs(t, err, ErrDaemonNotInitialized)
+					require.ErrorIs(t, err, ErrCore)
 				})
 			}
 		})
@@ -91,8 +90,8 @@ func TestDaemon_Core(t *testing.T) {
 					require.Equal(t, tc.wantKind, ce.Kind)
 					require.Equal(t, ResourceDaemon, ce.Resource)
 
-					require.True(t, errors.Is(err, ErrCore))
-					require.True(t, errors.Is(err, tc.dbusErr))
+					require.ErrorIs(t, err, ErrCore)
+					require.ErrorIs(t, err, tc.dbusErr)
 				})
 			}
 		})
@@ -170,8 +169,8 @@ func TestDaemon_Core(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					_, err := tc.daemon.Adapters(context.Background())
 					require.Error(t, err)
-					require.True(t, errors.Is(err, ErrDaemonNotInitialized))
-					require.True(t, errors.Is(err, ErrCore))
+					require.ErrorIs(t, err, ErrDaemonNotInitialized)
+					require.ErrorIs(t, err, ErrCore)
 				})
 			}
 		})
@@ -188,8 +187,8 @@ func TestDaemon_Core(t *testing.T) {
 			require.ErrorAs(t, err, &ce)
 			require.Equal(t, KindUnavailable, ce.Kind)
 			require.Equal(t, ResourceDaemon, ce.Resource)
-			require.True(t, errors.Is(err, ErrCore))
-			require.True(t, errors.Is(err, iwdbus.ErrDBusIntrospection))
+			require.ErrorIs(t, err, ErrCore)
+			require.ErrorIs(t, err, iwdbus.ErrDBusIntrospection)
 		})
 
 		t.Run("InvalidFields", func(t *testing.T) {
@@ -259,8 +258,8 @@ func TestDaemon_Core(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					_, err := tc.daemon.Devices(context.Background())
 					require.Error(t, err)
-					require.True(t, errors.Is(err, ErrDaemonNotInitialized))
-					require.True(t, errors.Is(err, ErrCore))
+					require.ErrorIs(t, err, ErrDaemonNotInitialized)
+					require.ErrorIs(t, err, ErrCore)
 				})
 			}
 		})
@@ -277,8 +276,8 @@ func TestDaemon_Core(t *testing.T) {
 			require.ErrorAs(t, err, &ce)
 			require.Equal(t, KindUnavailable, ce.Kind)
 			require.Equal(t, ResourceDaemon, ce.Resource)
-			require.True(t, errors.Is(err, ErrCore))
-			require.True(t, errors.Is(err, iwdbus.ErrDBusIntrospection))
+			require.ErrorIs(t, err, ErrCore)
+			require.ErrorIs(t, err, iwdbus.ErrDBusIntrospection)
 		})
 
 		t.Run("InvalidFields", func(t *testing.T) {
@@ -348,8 +347,8 @@ func TestDaemon_Core(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					_, err := tc.daemon.Stations(context.Background())
 					require.Error(t, err)
-					require.True(t, errors.Is(err, ErrDaemonNotInitialized))
-					require.True(t, errors.Is(err, ErrCore))
+					require.ErrorIs(t, err, ErrDaemonNotInitialized)
+					require.ErrorIs(t, err, ErrCore)
 				})
 			}
 		})
@@ -366,7 +365,7 @@ func TestDaemon_Core(t *testing.T) {
 			require.ErrorAs(t, err, &ce)
 			require.Equal(t, KindUnavailable, ce.Kind)
 			require.Equal(t, ResourceDaemon, ce.Resource)
-			require.True(t, errors.Is(err, iwdbus.ErrDBusIntrospection))
+			require.ErrorIs(t, err, iwdbus.ErrDBusIntrospection)
 		})
 
 		t.Run("InvalidPath", func(t *testing.T) {
@@ -426,8 +425,8 @@ func TestDaemon_Core(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					_, err := tc.daemon.BasicServiceSets(context.Background())
 					require.Error(t, err)
-					require.True(t, errors.Is(err, ErrDaemonNotInitialized))
-					require.True(t, errors.Is(err, ErrCore))
+					require.ErrorIs(t, err, ErrDaemonNotInitialized)
+					require.ErrorIs(t, err, ErrCore)
 				})
 			}
 		})
@@ -444,8 +443,8 @@ func TestDaemon_Core(t *testing.T) {
 			require.ErrorAs(t, err, &ce)
 			require.Equal(t, KindUnavailable, ce.Kind)
 			require.Equal(t, ResourceDaemon, ce.Resource)
-			require.True(t, errors.Is(err, ErrCore))
-			require.True(t, errors.Is(err, iwdbus.ErrDBusIntrospection))
+			require.ErrorIs(t, err, ErrCore)
+			require.ErrorIs(t, err, iwdbus.ErrDBusIntrospection)
 		})
 
 		t.Run("InvalidFields", func(t *testing.T) {

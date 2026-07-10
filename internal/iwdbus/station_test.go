@@ -4,7 +4,6 @@ package iwdbus
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -568,8 +567,8 @@ func testStation_SetAffinities_NotSupportedMatchable(t *testing.T) {
 
 	err := s.SetAffinities(context.Background(), []string{"/net/connman/iwd/0/3/net/a0b1c2d3e4f5"})
 	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrNotSupported), "expected ErrNotSupported, got %v", err)
-	require.True(t, errors.Is(err, ErrDBusProperty), "should still classify as a property error")
+	require.ErrorIs(t, err, ErrNotSupported, "expected ErrNotSupported, got %v", err)
+	require.ErrorIs(t, err, ErrDBusProperty, "should still classify as a property error")
 }
 
 func testStation_Disconnect(t *testing.T) {
@@ -632,7 +631,7 @@ func testStation_ConnectHiddenNetwork_NotFoundMatchable(t *testing.T) {
 
 	err := s.ConnectHiddenNetwork(context.Background(), "Nope")
 	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrNotFound))
+	require.ErrorIs(t, err, ErrNotFound)
 }
 
 func testStation_GetHiddenAccessPoints(t *testing.T) {

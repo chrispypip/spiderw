@@ -16,6 +16,7 @@ import (
 // This file mirrors device_test.go's grouped t.Run subtree structure.
 
 func TestStation_Core(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("NewStation", func(t *testing.T) {
@@ -64,7 +65,7 @@ func TestStation_Core(t *testing.T) {
 					require.ErrorAs(t, err, &ce)
 					require.Equal(t, tc.wantKind, ce.Kind)
 					require.Equal(t, ResourceStation, ce.Resource)
-					require.True(t, errors.Is(err, tc.dbusErr))
+					require.ErrorIs(t, err, tc.dbusErr)
 				})
 			}
 		})
@@ -94,7 +95,7 @@ func TestStation_Core(t *testing.T) {
 			f.setErr(iwdbus.ErrDBusMethod)
 			_, err := NewStation(f).Scanning(ctx)
 			require.Error(t, err)
-			require.True(t, errors.Is(err, iwdbus.ErrDBusMethod))
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
 		})
 
 		t.Run("Success", func(t *testing.T) {
@@ -243,7 +244,7 @@ func TestStation_Core(t *testing.T) {
 			f.setErr(iwdbus.ErrDBusMethod)
 			err := NewStation(f).Scan(ctx)
 			require.Error(t, err)
-			require.True(t, errors.Is(err, iwdbus.ErrDBusMethod))
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
 		})
 
 		t.Run("Success", func(t *testing.T) {
@@ -356,7 +357,7 @@ func TestStation_Core(t *testing.T) {
 			f.setErr(iwdbus.ErrNoAgent)
 			err := NewStation(f).ConnectHiddenNetwork(ctx, "HiddenSecured")
 			require.Error(t, err)
-			require.True(t, errors.Is(err, iwdbus.ErrNoAgent))
+			require.ErrorIs(t, err, iwdbus.ErrNoAgent)
 		})
 
 		t.Run("Success", func(t *testing.T) {

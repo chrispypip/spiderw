@@ -324,7 +324,7 @@ func TestAdapter_SubscribePropertiesChanged_Public_CopiesPayload(t *testing.T) {
 
 		// Contract: empty-but-non-nil remains non-nil and len==0
 		require.NotNil(t, got.Invalidated)
-		require.Len(t, got.Invalidated, 0)
+		require.Empty(t, got.Invalidated)
 	})
 
 	t.Run("Invalidated_NonEmptyCopied", func(t *testing.T) {
@@ -447,7 +447,7 @@ func TestAdapter_Coverage(t *testing.T) {
 	})
 
 	t.Run("Path", func(t *testing.T) {
-		require.Equal(t, "", (*Adapter)(nil).Path())
+		require.Empty(t, (*Adapter)(nil).Path())
 		require.Equal(t, "/net/connman/iwd/phy0", newAdapter(&fakeCoreAdapter{}, "/net/connman/iwd/phy0").Path())
 	})
 

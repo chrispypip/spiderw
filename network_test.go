@@ -83,7 +83,7 @@ func TestNetwork_Public(t *testing.T) {
 	t.Run("NilReceiver", func(t *testing.T) {
 		t.Parallel()
 		var n *Network
-		require.Equal(t, "", n.Path())
+		require.Empty(t, n.Path())
 		_, err := n.Name(ctx)
 		require.ErrorIs(t, err, ErrInternal)
 	})

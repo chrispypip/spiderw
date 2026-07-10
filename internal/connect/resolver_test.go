@@ -19,15 +19,18 @@ func TestWiring_Resolver(t *testing.T) {
 	t.Parallel()
 
 	t.Run("NilWiring", func(t *testing.T) {
+		t.Parallel()
 		require.Nil(t, (*Wiring)(nil).Resolver())
 	})
 
 	t.Run("NilConnYieldsNilResolver", func(t *testing.T) {
+		t.Parallel()
 		// No connection => nil resolver, so callers stay nil-safe.
 		require.Nil(t, (&Wiring{}).Resolver())
 	})
 
 	t.Run("OverrideWins", func(t *testing.T) {
+		t.Parallel()
 		// A test override is returned verbatim, even alongside a connection,
 		// bypassing the conn-backed resolver entirely.
 		w := &Wiring{Conn: &dbus.Conn{}, ResolverOverride: NoResolver{}}
@@ -35,6 +38,7 @@ func TestWiring_Resolver(t *testing.T) {
 	})
 
 	t.Run("ConnBacked", func(t *testing.T) {
+		t.Parallel()
 		// A connection (and no override) yields a non-nil conn-backed resolver. We
 		// deliberately do not call Resolve: it would dial the placeholder Conn.
 		r := (&Wiring{Conn: &dbus.Conn{}}).Resolver()

@@ -58,8 +58,8 @@ func TestAdapter_Core(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					_, err := tc.adapter.Powered(ctx)
 					require.Error(t, err)
-					require.True(t, errors.Is(err, ErrAdapterNotInitialized))
-					require.True(t, errors.Is(err, ErrCore))
+					require.ErrorIs(t, err, ErrAdapterNotInitialized)
+					require.ErrorIs(t, err, ErrCore)
 				})
 			}
 		})
@@ -89,8 +89,8 @@ func TestAdapter_Core(t *testing.T) {
 					require.Equal(t, tc.wantKind, ce.Kind)
 					require.Equal(t, ResourceAdapter, ce.Resource)
 
-					require.True(t, errors.Is(err, ErrCore))
-					require.True(t, errors.Is(err, tc.dbusErr))
+					require.ErrorIs(t, err, ErrCore)
+					require.ErrorIs(t, err, tc.dbusErr)
 				})
 			}
 		})
@@ -118,8 +118,8 @@ func TestAdapter_Core(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					err := tc.adapter.SetPowered(ctx, true)
 					require.Error(t, err)
-					require.True(t, errors.Is(err, ErrAdapterNotInitialized))
-					require.True(t, errors.Is(err, ErrCore))
+					require.ErrorIs(t, err, ErrAdapterNotInitialized)
+					require.ErrorIs(t, err, ErrCore)
 				})
 			}
 		})
@@ -135,7 +135,7 @@ func TestAdapter_Core(t *testing.T) {
 			require.ErrorAs(t, err, &ce)
 			require.Equal(t, KindUnavailable, ce.Kind)
 			require.Equal(t, ResourceAdapter, ce.Resource)
-			require.True(t, errors.Is(err, iwdbus.ErrDBusMethod))
+			require.ErrorIs(t, err, iwdbus.ErrDBusMethod)
 		})
 
 		t.Run("Success", func(t *testing.T) {
@@ -339,7 +339,7 @@ func TestAdapter_Core(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					_, err := tc.adapter.SubscribePropertiesChanged(ctx, func(AdapterPropertiesChanged) {})
 					require.Error(t, err)
-					require.True(t, errors.Is(err, ErrAdapterNotInitialized))
+					require.ErrorIs(t, err, ErrAdapterNotInitialized)
 				})
 			}
 		})
@@ -389,7 +389,7 @@ func TestAdapter_Core(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					_, err := tc.adapter.SubscribePoweredChanged(ctx, func(bool) {})
 					require.Error(t, err)
-					require.True(t, errors.Is(err, ErrAdapterNotInitialized))
+					require.ErrorIs(t, err, ErrAdapterNotInitialized)
 				})
 			}
 		})

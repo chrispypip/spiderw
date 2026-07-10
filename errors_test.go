@@ -51,7 +51,7 @@ func TestErrors_Public(t *testing.T) {
 
 		for _, s := range sentinels {
 			t.Run(s.Error(), func(t *testing.T) {
-				require.ErrorIs(t, s, s, "sentinel must compare to itself")
+				require.Error(t, s, "sentinel must be a non-nil error")
 			})
 		}
 	})

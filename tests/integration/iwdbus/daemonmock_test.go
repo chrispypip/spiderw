@@ -130,7 +130,7 @@ func TestDaemonMock_CLI_Info(t *testing.T) {
 	require.NoError(t, err, "output:\n%s", out)
 	require.Equal(t, "1.0.0", jsonGetString(t, m, "Version"))
 	require.Equal(t, "/test/iwd/state", jsonGetString(t, m, "StateDirectory"))
-	require.Equal(t, true, jsonGetBool(t, m, "NetworkConfigurationEnabled"))
+	require.True(t, jsonGetBool(t, m, "NetworkConfigurationEnabled"))
 }
 
 func runSpiderDaemon(t *testing.T, args ...string) (string, error) {

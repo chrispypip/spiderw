@@ -93,6 +93,7 @@ func TestKnownNetworkCmd_SingleStatus(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Human", func(t *testing.T) {
+		t.Parallel()
 		out, code := driveCLI(fakeWithKnownNetwork(), nil, false, "known-network", "KnownNet", "status")
 		require.Equal(t, 0, code, out)
 		require.Contains(t, out, "KnownNet")
@@ -100,6 +101,7 @@ func TestKnownNetworkCmd_SingleStatus(t *testing.T) {
 	})
 
 	t.Run("JSON", func(t *testing.T) {
+		t.Parallel()
 		out, code := driveCLI(fakeWithKnownNetwork(), nil, true, "known-network", "KnownNet", "status")
 		require.Equal(t, 0, code, out)
 		var entries []knownNetworkStatusEntry

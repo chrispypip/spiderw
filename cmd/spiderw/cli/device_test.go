@@ -294,21 +294,25 @@ func TestPrintDeviceLines(t *testing.T) {
 	var mu sync.Mutex
 
 	t.Run("Powered_Human", func(t *testing.T) {
+		t.Parallel()
 		app, buf := appWithBuffer(false)
 		require.NoError(t, printDevicePoweredLine(app, "wlan0", false, &mu))
 		require.Equal(t, "powered=false\n", buf.String())
 	})
 	t.Run("Powered_JSON", func(t *testing.T) {
+		t.Parallel()
 		app, buf := appWithBuffer(true)
 		require.NoError(t, printDevicePoweredLine(app, "wlan0", true, &mu))
 		require.Contains(t, buf.String(), `"Powered":true`)
 	})
 	t.Run("Mode_Human", func(t *testing.T) {
+		t.Parallel()
 		app, buf := appWithBuffer(false)
 		require.NoError(t, printDeviceModeLine(app, "wlan0", "ap", &mu))
 		require.Equal(t, "mode=ap\n", buf.String())
 	})
 	t.Run("Mode_JSON", func(t *testing.T) {
+		t.Parallel()
 		app, buf := appWithBuffer(true)
 		require.NoError(t, printDeviceModeLine(app, "wlan0", "station", &mu))
 		require.Contains(t, buf.String(), `"Mode":"station"`)

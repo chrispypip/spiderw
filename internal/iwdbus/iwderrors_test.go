@@ -66,8 +66,8 @@ func TestIwdErrorMapping(t *testing.T) {
 func TestIwdErrorSentinel_Unrecognized(t *testing.T) {
 	t.Parallel()
 
-	require.Nil(t, iwdErrorSentinel(dbus.Error{Name: "net.connman.iwd.Unheard"}))
-	require.Nil(t, iwdErrorSentinel(context.Canceled))
+	require.NoError(t, iwdErrorSentinel(dbus.Error{Name: "net.connman.iwd.Unheard"}))
+	require.NoError(t, iwdErrorSentinel(context.Canceled))
 }
 
 func TestWrapIwd_NilErrorReturnsNil(t *testing.T) {

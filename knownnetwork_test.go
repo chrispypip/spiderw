@@ -68,7 +68,7 @@ func TestKnownNetwork_Public(t *testing.T) {
 	t.Run("NilReceiver", func(t *testing.T) {
 		t.Parallel()
 		var k *KnownNetwork
-		require.Equal(t, "", k.Path())
+		require.Empty(t, k.Path())
 		_, err := k.Name(ctx)
 		require.ErrorIs(t, err, ErrInternal)
 	})

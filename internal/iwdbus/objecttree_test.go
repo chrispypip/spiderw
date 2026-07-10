@@ -42,6 +42,7 @@ func TestObjectTree_Lookups(t *testing.T) {
 	tree := testTree()
 
 	t.Run("hits", func(t *testing.T) {
+		t.Parallel()
 		cases := []struct {
 			got  func() (string, bool)
 			want string
@@ -62,27 +63,32 @@ func TestObjectTree_Lookups(t *testing.T) {
 	})
 
 	t.Run("missing path", func(t *testing.T) {
+		t.Parallel()
 		_, ok := tree.NetworkName("/nope")
 		require.False(t, ok)
 	})
 
 	t.Run("wrong interface on path", func(t *testing.T) {
+		t.Parallel()
 		// A device path is not a network.
 		_, ok := tree.NetworkName("/net/connman/iwd/0/3")
 		require.False(t, ok)
 	})
 
 	t.Run("wrong property type", func(t *testing.T) {
+		t.Parallel()
 		_, ok := tree.NetworkName("/net/connman/iwd/0/3/badtype")
 		require.False(t, ok)
 	})
 
 	t.Run("interface present but property absent", func(t *testing.T) {
+		t.Parallel()
 		_, ok := tree.NetworkName("/net/connman/iwd/0/3/noname")
 		require.False(t, ok)
 	})
 
 	t.Run("nil tree", func(t *testing.T) {
+		t.Parallel()
 		var nilTree *ObjectTree
 		_, ok := nilTree.DeviceName("/x")
 		require.False(t, ok)

@@ -106,24 +106,28 @@ func TestAdapterCmd_ScalarAccessors(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Name", func(t *testing.T) {
+		t.Parallel()
 		out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "name")
 		require.Equal(t, 0, code, out)
 		require.Equal(t, "phy0\n", out)
 	})
 
 	t.Run("Model", func(t *testing.T) {
+		t.Parallel()
 		out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "model")
 		require.Equal(t, 0, code, out)
 		require.Equal(t, "MockModel\n", out)
 	})
 
 	t.Run("Vendor", func(t *testing.T) {
+		t.Parallel()
 		out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "vendor")
 		require.Equal(t, 0, code, out)
 		require.Equal(t, "MockVendor\n", out)
 	})
 
 	t.Run("SupportedModes", func(t *testing.T) {
+		t.Parallel()
 		out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", "supported-modes")
 		require.Equal(t, 0, code, out)
 		require.Contains(t, out, "station")
@@ -144,6 +148,7 @@ func TestAdapterCmd_ScalarAccessors_BackendError(t *testing.T) {
 
 	for _, sub := range []string{"name", "model", "vendor", "supported-modes"} {
 		t.Run(sub, func(t *testing.T) {
+			t.Parallel()
 			out, code := driveCLI(newFailing(), nil, false, "adapter", "phy0", sub)
 			require.Equal(t, 1, code, out)
 			require.Contains(t, out, "backend boom")
@@ -233,6 +238,7 @@ func TestParseModeArg(t *testing.T) {
 	}
 	for in, want := range valid {
 		t.Run("valid/"+in, func(t *testing.T) {
+			t.Parallel()
 			got, err := parseModeArg(in)
 			require.NoError(t, err)
 			require.Equal(t, want, got)
@@ -241,6 +247,7 @@ func TestParseModeArg(t *testing.T) {
 
 	for _, in := range []string{"", "42", "monitor", "p2p"} {
 		t.Run("invalid/"+in, func(t *testing.T) {
+			t.Parallel()
 			got, err := parseModeArg(in)
 			require.Error(t, err)
 			require.Equal(t, spiderw.ModeUnknown, got)
@@ -270,7 +277,7 @@ func TestAdapterScalarResults_String(t *testing.T) {
 	require.Equal(t, "phy0", adapterStringResult{Value: "phy0"}.String())
 
 	require.Equal(t, "Intel", adapterOptionalStringResult{Value: new("Intel")}.String())
-	require.Equal(t, "", adapterOptionalStringResult{Value: nil}.String())
+	require.Empty(t, adapterOptionalStringResult{Value: nil}.String())
 
 	require.Equal(t, "station\nap", adapterSupportedModesResult{SupportedModes: []string{"station", "ap"}}.String())
 }

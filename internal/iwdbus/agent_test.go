@@ -124,7 +124,7 @@ func testAgentObject_RequestPassphrase_NilDeclines(t *testing.T) {
 	t.Parallel()
 	a := &agentObject{handler: AgentHandler{}}
 	secret, derr := a.RequestPassphrase(testNetworkPath)
-	require.Equal(t, "", secret)
+	require.Empty(t, secret)
 	require.NotNil(t, derr)
 	require.Equal(t, IwdAgentErrorCanceled, derr.Name)
 }
@@ -137,7 +137,7 @@ func testAgentObject_RequestPassphrase_ErrorDeclines(t *testing.T) {
 		},
 	}}
 	secret, derr := a.RequestPassphrase(testNetworkPath)
-	require.Equal(t, "", secret)
+	require.Empty(t, secret)
 	require.NotNil(t, derr)
 	require.Equal(t, IwdAgentErrorCanceled, derr.Name)
 }
@@ -171,8 +171,8 @@ func testAgentObject_RequestUserNameAndPassword_NilDeclines(t *testing.T) {
 	t.Parallel()
 	a := &agentObject{handler: AgentHandler{}}
 	user, password, derr := a.RequestUserNameAndPassword(testNetworkPath)
-	require.Equal(t, "", user)
-	require.Equal(t, "", password)
+	require.Empty(t, user)
+	require.Empty(t, password)
 	require.NotNil(t, derr)
 	require.Equal(t, IwdAgentErrorCanceled, derr.Name)
 }

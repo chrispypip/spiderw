@@ -65,7 +65,7 @@ func testAgentPublic_Register_NoCallbacks(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrInvalidArgument)
 	var pe *Error
-	require.True(t, errors.As(err, &pe))
+	require.ErrorAs(t, err, &pe)
 	require.Equal(t, ResourceAgent, pe.Resource)
 }
 
@@ -81,7 +81,7 @@ func testAgentPublic_Register_AlreadyRegistered(t *testing.T) {
 	require.Nil(t, agent)
 	require.ErrorIs(t, err, ErrInvalidState)
 	var pe *Error
-	require.True(t, errors.As(err, &pe))
+	require.ErrorAs(t, err, &pe)
 	require.Equal(t, ResourceAgent, pe.Resource)
 }
 

@@ -77,7 +77,7 @@ func TestBasicServiceSet_Public(t *testing.T) {
 		t.Parallel()
 
 		var b *BasicServiceSet
-		require.Equal(t, "", b.Path())
+		require.Empty(t, b.Path())
 		for _, call := range []func() error{
 			func() error { _, err := b.Address(ctx); return err },
 			func() error { _, err := b.Properties(ctx); return err },

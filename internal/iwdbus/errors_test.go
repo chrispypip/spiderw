@@ -4,7 +4,6 @@ package iwdbus
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,6 +17,7 @@ func TestErrors_Iwdbus(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Wrap", func(t *testing.T) {
+		t.Parallel()
 		t.Run("NilError_ReturnsNil", func(t *testing.T) {
 			t.Parallel()
 
@@ -90,8 +90,8 @@ func TestErrors_Iwdbus(t *testing.T) {
 
 					err := tc.makeErr()
 					require.Error(t, err)
-					require.True(t, errors.Is(err, tc.sentinel))
-					require.True(t, errors.Is(err, tc.base))
+					require.ErrorIs(t, err, tc.sentinel)
+					require.ErrorIs(t, err, tc.base)
 				})
 			}
 		})
@@ -144,7 +144,7 @@ func TestErrors_Iwdbus(t *testing.T) {
 					t.Parallel()
 
 					require.Error(t, tc.err)
-					require.True(t, errors.Is(tc.err, tc.sentinel))
+					require.ErrorIs(t, tc.err, tc.sentinel)
 
 					msg := tc.err.Error()
 					for _, sub := range tc.wantContains {
@@ -168,7 +168,7 @@ func TestErrors_Iwdbus(t *testing.T) {
 
 			for _, err := range errs {
 				require.Error(t, err)
-				require.True(t, errors.Is(err, base), fmt.Sprintf("expected base error %q to be in error chain: %v", base, err))
+				require.ErrorIs(t, err, base, "expected base error %q to be in error chain: %v", base, err)
 			}
 		})
 
@@ -187,8 +187,8 @@ func TestErrors_Iwdbus(t *testing.T) {
 
 			base := fakeError{"base"}
 			err := WrapMethod("iface", "Method", base)
-			require.True(t, errors.Is(err, ErrDBusMethod))
-			require.True(t, errors.Is(err, base))
+			require.ErrorIs(t, err, ErrDBusMethod)
+			require.ErrorIs(t, err, base)
 		})
 
 		t.Run("ExactFormatContainsStablePrefix", func(t *testing.T) {
@@ -205,8 +205,8 @@ func TestErrors_Iwdbus(t *testing.T) {
 
 			err := WrapMethod("iface", "Method", fakeError{"boom"})
 			//nolint:errorlint // intentionally asserts the wrapped error is not == the sentinel; errors.Is is verified on the next line.
-			require.False(t, err == ErrDBusMethod)
-			require.True(t, errors.Is(err, ErrDBusMethod))
+			require.NotEqual(t, err, ErrDBusMethod)
+			require.ErrorIs(t, err, ErrDBusMethod)
 		})
 
 		t.Run("NestedWrapping_StillFindsSentinel", func(t *testing.T) {
@@ -215,8 +215,8 @@ func TestErrors_Iwdbus(t *testing.T) {
 			base := fakeError{"boom"}
 			e1 := WrapMethod("iface", "Method", base)
 			e2 := WrapMethod("iface", "Method", e1)
-			require.True(t, errors.Is(e2, ErrDBusMethod))
-			require.True(t, errors.Is(e2, base))
+			require.ErrorIs(t, e2, ErrDBusMethod)
+			require.ErrorIs(t, e2, base)
 		})
 
 		t.Run("WrapIdempotence", func(t *testing.T) {
@@ -225,8 +225,8 @@ func TestErrors_Iwdbus(t *testing.T) {
 			base := fakeError{"boom"}
 			original := WrapMethod("iface", "Method", base)
 			wrapped := WrapMethod("iface", "Method", original)
-			require.True(t, errors.Is(wrapped, ErrDBusMethod))
-			require.True(t, errors.Is(wrapped, base))
+			require.ErrorIs(t, wrapped, ErrDBusMethod)
+			require.ErrorIs(t, wrapped, base)
 		})
 	})
 }

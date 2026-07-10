@@ -188,7 +188,7 @@ func TestDeviceMock_Firehose(t *testing.T) {
 
 	m, out, err := runSpiderDeviceJSON(t, "wlan0", "powered", "off")
 	require.NoError(t, err, "output:\n%s", out)
-	require.Equal(t, false, jsonGetBool(t, m, "Powered"))
+	require.False(t, jsonGetBool(t, m, "Powered"))
 
 	changed := map[string]dbus.Variant{"Powered": dbus.MakeVariant(false)}
 
@@ -362,7 +362,7 @@ func TestDeviceMock_StatusJSON(t *testing.T) {
 	entry := findDeviceStatusEntry(t, list, devicePath)
 	require.Equal(t, "wlan0", jsonGetString(t, entry, "Name"))
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", jsonGetString(t, entry, "Address"))
-	require.Equal(t, true, jsonGetBool(t, entry, "Powered"))
+	require.True(t, jsonGetBool(t, entry, "Powered"))
 	require.Equal(t, "station", jsonGetString(t, entry, "Mode"))
 	adapter, ok := entry["Adapter"].(map[string]any)
 	require.True(t, ok, "Adapter should be a resolved ref object")
@@ -384,7 +384,7 @@ func TestDeviceMock_ScopedStatusJSON(t *testing.T) {
 	require.Equal(t, devicePath, jsonGetString(t, entry, "Path"))
 	require.Equal(t, "wlan0", jsonGetString(t, entry, "Name"))
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", jsonGetString(t, entry, "Address"))
-	require.Equal(t, true, jsonGetBool(t, entry, "Powered"))
+	require.True(t, jsonGetBool(t, entry, "Powered"))
 	require.Equal(t, "station", jsonGetString(t, entry, "Mode"))
 	adapter, ok := entry["Adapter"].(map[string]any)
 	require.True(t, ok, "Adapter should be a resolved ref object")

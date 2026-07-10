@@ -45,7 +45,7 @@ func testAgentCore_Validate_NoCallbacks(t *testing.T) {
 	err := CredentialCallbacks{OnCancel: func(string) {}}.Validate("op")
 	require.Error(t, err)
 	var ce *Error
-	require.True(t, errors.As(err, &ce))
+	require.ErrorAs(t, err, &ce)
 	require.Equal(t, KindInvalidArgument, ce.Kind)
 	require.Equal(t, ResourceAgent, ce.Resource)
 }

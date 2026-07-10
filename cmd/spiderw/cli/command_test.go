@@ -15,6 +15,7 @@ func TestParseGlobalFlags(t *testing.T) {
 	t.Parallel()
 
 	t.Run("JSON", func(t *testing.T) {
+		t.Parallel()
 		for _, flag := range []string{"--json", "-json"} {
 			app, rest := parseGlobalFlags([]string{flag, "adapter", "status"})
 			require.True(t, app.Output.JSON)
@@ -25,6 +26,7 @@ func TestParseGlobalFlags(t *testing.T) {
 	})
 
 	t.Run("Session", func(t *testing.T) {
+		t.Parallel()
 		for _, flag := range []string{"--session", "-session"} {
 			app, rest := parseGlobalFlags([]string{flag, "daemon"})
 			require.True(t, app.Session)
@@ -33,6 +35,7 @@ func TestParseGlobalFlags(t *testing.T) {
 	})
 
 	t.Run("Help", func(t *testing.T) {
+		t.Parallel()
 		for _, flag := range []string{"--help", "-help", "-h"} {
 			app, _ := parseGlobalFlags([]string{"adapter", flag})
 			require.True(t, app.Help)
@@ -40,6 +43,7 @@ func TestParseGlobalFlags(t *testing.T) {
 	})
 
 	t.Run("NoGlobalFlagsPassThrough", func(t *testing.T) {
+		t.Parallel()
 		app, rest := parseGlobalFlags([]string{"adapter", "phy0", "status"})
 		require.False(t, app.Output.JSON)
 		require.False(t, app.Session)
@@ -48,6 +52,7 @@ func TestParseGlobalFlags(t *testing.T) {
 	})
 
 	t.Run("Combined", func(t *testing.T) {
+		t.Parallel()
 		app, rest := parseGlobalFlags([]string{"--json", "--session", "network", "status"})
 		require.True(t, app.Output.JSON)
 		require.True(t, app.Session)

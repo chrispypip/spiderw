@@ -217,15 +217,15 @@ func TestClient_ResolveStationName(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("NilClientOrDaemon", func(t *testing.T) {
-		require.Equal(t, "", (*Client)(nil).resolveStationName(ctx, "/p"))
-		require.Equal(t, "", (&Client{}).resolveStationName(ctx, "/p"))
+		require.Empty(t, (*Client)(nil).resolveStationName(ctx, "/p"))
+		require.Empty(t, (&Client{}).resolveStationName(ctx, "/p"))
 	})
 
 	t.Run("EnumerationErrorYieldsEmpty", func(t *testing.T) {
 		fd := &fakeCoreDaemon{}
 		fd.setErr(errors.New("boom"))
 		c := &Client{daemon: newDaemon(fd)}
-		require.Equal(t, "", c.resolveStationName(ctx, "/p"))
+		require.Empty(t, c.resolveStationName(ctx, "/p"))
 	})
 
 	t.Run("MatchAndMiss", func(t *testing.T) {
@@ -233,7 +233,7 @@ func TestClient_ResolveStationName(t *testing.T) {
 		fd.setStations([]core.StationRef{{Path: "/net/connman/iwd/phy0/wlan0", Name: "wlan0"}})
 		c := &Client{daemon: newDaemon(fd)}
 		require.Equal(t, "wlan0", c.resolveStationName(ctx, "/net/connman/iwd/phy0/wlan0"))
-		require.Equal(t, "", c.resolveStationName(ctx, "/net/connman/iwd/phy0/other"))
+		require.Empty(t, c.resolveStationName(ctx, "/net/connman/iwd/phy0/other"))
 	})
 }
 
