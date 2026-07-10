@@ -62,8 +62,7 @@ func newPublicMockDevice(t *testing.T, ctx context.Context, client *spiderw.Clie
 // -----------------------------------------------------------------------------
 
 func TestDeviceMock_Getters(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	device, _ := newTestDevice(t)
@@ -90,8 +89,7 @@ func TestDeviceMock_Getters(t *testing.T) {
 }
 
 func TestDeviceMock_GetProperties(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	device, _ := newTestDevice(t)
 
@@ -105,8 +103,7 @@ func TestDeviceMock_GetProperties(t *testing.T) {
 }
 
 func TestDeviceMock_SetPowered(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	device, _ := newTestDevice(t)
@@ -119,8 +116,7 @@ func TestDeviceMock_SetPowered(t *testing.T) {
 }
 
 func TestDeviceMock_SetMode(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	device, _ := newTestDevice(t)
@@ -133,8 +129,7 @@ func TestDeviceMock_SetMode(t *testing.T) {
 }
 
 func TestDeviceMock_SubscribePoweredChanged(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	device, _ := newTestDevice(t)
@@ -157,8 +152,7 @@ func TestDeviceMock_SubscribePoweredChanged(t *testing.T) {
 }
 
 func TestDeviceMock_SubscribeModeChanged(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	device, _ := newTestDevice(t)
@@ -179,8 +173,7 @@ func TestDeviceMock_SubscribeModeChanged(t *testing.T) {
 }
 
 func TestDeviceMock_Firehose(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	device, _ := newTestDevice(t)
 
@@ -224,8 +217,7 @@ func TestDeviceMock_Firehose(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestDeviceMock_DaemonDevices(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
@@ -241,8 +233,7 @@ func TestDeviceMock_DaemonDevices(t *testing.T) {
 }
 
 func TestDeviceMock_Properties(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
@@ -261,8 +252,7 @@ func TestDeviceMock_Properties(t *testing.T) {
 }
 
 func TestDeviceMock_AllDevices(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
@@ -286,8 +276,7 @@ func TestDeviceMock_AllDevices(t *testing.T) {
 }
 
 func TestDeviceMock_AllDevices_Empty(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockWithoutDevice(t, tmpDir)
+	iwdmock.StartMockWithoutDevice(t)
 
 	ctx := context.Background()
 	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
@@ -307,8 +296,7 @@ func TestDeviceMock_AllDevices_Empty(t *testing.T) {
 // second device (wlan1) lives on the second adapter, and its Adapter path
 // resolves to that adapter.
 func TestDeviceMock_SecondDeviceTopology(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
@@ -365,8 +353,7 @@ func runSpiderDeviceJSON(t *testing.T, args ...string) (map[string]any, string, 
 // output. Per-command behavior, output formatting, ref resolution, and error
 // mapping are covered by the fast in-process unit tests in cmd/spiderw/cli.
 func TestDeviceMock_StatusJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	list, out, err := runSpiderJSONArray(t, "device", "status")
 	require.NoError(t, err, "output:\n%s", out)
@@ -387,8 +374,7 @@ func TestDeviceMock_StatusJSON(t *testing.T) {
 // through the real D-Bus stack and verifies it keeps the same one-entry array
 // shape as aggregate `device status --json`.
 func TestDeviceMock_ScopedStatusJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	list, out, err := runSpiderJSONArray(t, "device", "wlan0", "status")
 	require.NoError(t, err, "output:\n%s", out)

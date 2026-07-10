@@ -51,8 +51,7 @@ func newPublicMockBSS(t *testing.T, ctx context.Context, client *spiderw.Client,
 // -----------------------------------------------------------------------------
 
 func TestBSSMock_DaemonBasicServiceSets(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
@@ -66,8 +65,7 @@ func TestBSSMock_DaemonBasicServiceSets(t *testing.T) {
 }
 
 func TestBSSMock_Properties(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
@@ -89,8 +87,7 @@ func TestBSSMock_Properties(t *testing.T) {
 }
 
 func TestBSSMock_AllBasicServiceSets(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
@@ -112,8 +109,7 @@ func TestBSSMock_AllBasicServiceSets(t *testing.T) {
 }
 
 func TestBSSMock_AllBasicServiceSets_Empty(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockWithoutBSS(t, tmpDir)
+	iwdmock.StartMockWithoutBSS(t)
 
 	ctx := context.Background()
 	client, err := spiderw.NewClient(ctx, spiderw.SessionBus)
@@ -153,8 +149,7 @@ func findBSSStatusEntry(t *testing.T, list []map[string]any, path string) map[st
 // resolution, and error mapping are covered by the fast in-process unit tests in
 // cmd/spiderw/cli.
 func TestBSSMock_StatusJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	list, out, err := runSpiderJSONArray(t, "bss", "status")
 	require.NoError(t, err, "output:\n%s", out)
@@ -171,8 +166,7 @@ func TestBSSMock_StatusJSON(t *testing.T) {
 // via Client.BasicServiceSet — the realClient shim not exercised by the
 // enumeration-based `bss status` smoke.
 func TestBSSMock_CLI_SingleAddress(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ref := mockBSSes[0]
 	out, err := runSpider(t, "bss", ref.Address, "address")

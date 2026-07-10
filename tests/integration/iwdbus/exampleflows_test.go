@@ -18,8 +18,7 @@ import (
 // they target the system bus and real iwd). Each subtest mirrors one Example*,
 // swapping SystemBus for SessionBus and log.Fatal for require assertions.
 func TestExampleFlowsMock(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 
 	// ExampleNewClient

@@ -173,12 +173,12 @@ func (i *IntrospectedObject) Close() error {
 			i.Conn.RemoveSignal(i.sigCh)
 		}
 
-		_ = waitWithTimeout(&i.dispatchWG, 100*time.Millisecond)
+		waitWithTimeout(&i.dispatchWG, 100*time.Millisecond)
 
 		i.handlerMu.Lock()
 		// Prevent any new handler goroutines and serialize wg.Wait with wg.Add.
 		i.closing = true
-		_ = waitWithTimeout(&i.wg, 100*time.Millisecond)
+		waitWithTimeout(&i.wg, 100*time.Millisecond)
 		i.handlerMu.Unlock()
 
 		// Give OS time to settle the socket.
@@ -450,7 +450,7 @@ func safeInvoke(fn func(*dbus.Signal), sig *dbus.Signal) {
 	fn(sig)
 }
 
-func waitWithTimeout(wg *sync.WaitGroup, d time.Duration) bool {
+func waitWithTimeout(wg *sync.WaitGroup, d time.Duration) {
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -458,8 +458,6 @@ func waitWithTimeout(wg *sync.WaitGroup, d time.Duration) bool {
 	}()
 	select {
 	case <-done:
-		return true
 	case <-time.After(d):
-		return false
 	}
 }

@@ -25,8 +25,7 @@ const (
 // connect the secured network, and confirm the mock called back for the
 // passphrase and the network became connected.
 func TestAgentMock_SecuredConnect(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -59,8 +58,7 @@ func TestAgentMock_SecuredConnect(t *testing.T) {
 // TestAgentMock_WrongPassphrase confirms a bad passphrase yields a connect
 // failure rather than a connection.
 func TestAgentMock_WrongPassphrase(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -77,8 +75,7 @@ func TestAgentMock_WrongPassphrase(t *testing.T) {
 // TestAgentMock_Decline confirms a declining callback (returns an error) maps to
 // a connect failure.
 func TestAgentMock_Decline(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -97,8 +94,7 @@ func TestAgentMock_Decline(t *testing.T) {
 // TestAgentMock_NoAgent confirms that connecting a secured, unknown network
 // without a registered agent surfaces ErrNoAgent.
 func TestAgentMock_NoAgent(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -112,8 +108,7 @@ func TestAgentMock_NoAgent(t *testing.T) {
 // TestAgentMock_DoubleRegisterRejected confirms the client rejects a second
 // agent while one is registered, and that unregistering frees the slot.
 func TestAgentMock_DoubleRegisterRejected(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -137,8 +132,7 @@ func TestAgentMock_DoubleRegisterRejected(t *testing.T) {
 // is surfaced when a second connection registers an agent while the first holds
 // the slot.
 func TestAgentMock_AlreadyExistsAcrossClients(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 
 	cfg := spiderw.AgentConfig{
@@ -158,8 +152,7 @@ func TestAgentMock_AlreadyExistsAcrossClients(t *testing.T) {
 // TestAgentMock_ManagerUnavailable confirms that registration fails when the mock
 // omits the AgentManager interface entirely.
 func TestAgentMock_ManagerUnavailable(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockWithoutAgent(t, tmpDir)
+	iwdmock.StartMockWithoutAgent(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -173,8 +166,7 @@ func TestAgentMock_ManagerUnavailable(t *testing.T) {
 // TestAgentMock_CLISecuredConnect drives the secured connect through the CLI with
 // a passphrase flag.
 func TestAgentMock_CLI_SecuredConnect(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	out, err := runSpiderNetwork(t, "SecuredNet", "connect", "--passphrase="+mockSecuredPassphrase)
 	require.NoError(t, err, out)
@@ -184,8 +176,7 @@ func TestAgentMock_CLI_SecuredConnect(t *testing.T) {
 // TestAgentMock_CLISecuredConnectStdin drives the secured connect through the CLI
 // reading the passphrase from stdin.
 func TestAgentMock_CLI_SecuredConnectWrong(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	out, err := runSpiderNetwork(t, "SecuredNet", "connect", "--passphrase=nope")
 	require.Error(t, err, out)

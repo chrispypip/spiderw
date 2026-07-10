@@ -16,18 +16,16 @@ import (
 )
 
 func TestIntrospectMock_NewIntrospectedObject(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd")
 	require.True(t, obj.HasInterface("net.connman.iwd.Daemon"))
 }
 
 func TestIntrospectMock_Call_GetInfo(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd")
@@ -41,9 +39,8 @@ func TestIntrospectMock_Call_GetInfo(t *testing.T) {
 }
 
 func TestIntrospectMock_GetProperty(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
@@ -60,9 +57,8 @@ func TestIntrospectMock_GetProperty(t *testing.T) {
 }
 
 func TestIntrospectMock_SetProperty(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
@@ -79,9 +75,8 @@ func TestIntrospectMock_SetProperty(t *testing.T) {
 }
 
 func TestIntrospectMock_SignalHandling(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
@@ -101,9 +96,8 @@ func TestIntrospectMock_SignalHandling(t *testing.T) {
 }
 
 func TestIntrospectMock_WildcardSignalHandling(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
@@ -120,9 +114,8 @@ func TestIntrospectMock_WildcardSignalHandling(t *testing.T) {
 }
 
 func TestIntrospectMock_CloseStopsSignals(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
@@ -145,9 +138,8 @@ func TestIntrospectMock_CloseStopsSignals(t *testing.T) {
 }
 
 func TestIntrospectMock_MultipleExactHandlers(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
@@ -172,9 +164,8 @@ func TestIntrospectMock_MultipleExactHandlers(t *testing.T) {
 }
 
 func TestIntrospectMock_WildcardIgnoresOtherMembers(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
@@ -192,9 +183,8 @@ func TestIntrospectMock_WildcardIgnoresOtherMembers(t *testing.T) {
 }
 
 func TestIntrospectMock_SignalBodyContent(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
@@ -213,9 +203,8 @@ func TestIntrospectMock_SignalBodyContent(t *testing.T) {
 }
 
 func TestIntrospectMock_PathMismatchDoesNotFire(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
@@ -237,9 +226,7 @@ func TestIntrospectMock_SignalStorm(t *testing.T) {
 	// NOTE: This test depends on the DBus daemon delivering all signals. This is
 	// true for our mock and small volumes, but not guaranteed by DBus spec.
 
-	tmpDir := t.TempDir()
-
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
@@ -264,9 +251,8 @@ func TestIntrospectMock_SignalStorm(t *testing.T) {
 }
 
 func TestIntrospectMock_ConcurrentRegistration(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	_, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 
@@ -286,9 +272,8 @@ func TestIntrospectMock_ConcurrentRegistration(t *testing.T) {
 }
 
 func TestIntrospectMock_HandlerPanicDoesNotCrashDispatcher(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	conn, obj := newTestDBus(t, "net.connman.iwd", "/net/connman/iwd/0")
 

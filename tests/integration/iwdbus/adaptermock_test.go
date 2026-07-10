@@ -96,8 +96,7 @@ func runSpiderAdapterJSON(t *testing.T, args ...string) (map[string]any, string,
 // path through the public API against the iwd mock. It is the baseline coverage
 // for every per-property getter (Powered/Name/Model/Vendor/SupportedModes).
 func TestAdapterMock_Properties(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	a := newPublicMockAdapter(t, ctx, newMockClient(t, ctx), "phy0")
@@ -132,8 +131,7 @@ func TestAdapterMock_PropertiesOmittedOptionals(t *testing.T) {
 // TestAdapterMock_SupportsMode covers the mode-support queries through the public
 // API; the mock advertises station + ap.
 func TestAdapterMock_SupportsMode(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	a := newPublicMockAdapter(t, ctx, newMockClient(t, ctx), "phy0")
@@ -152,9 +150,8 @@ func TestAdapterMock_SupportsMode(t *testing.T) {
 }
 
 func TestAdapterMock_SubscribePoweredChanged_UnsubscribeStopsCallbacks(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	adapter := newPublicMockAdapter(t, ctx, newMockClient(t, ctx), "phy0")
@@ -194,9 +191,8 @@ func TestAdapterMock_SubscribePoweredChanged_UnsubscribeStopsCallbacks(t *testin
 // -----------------------------------------------------------------------------
 
 func TestAdapterMock_SubscribePropertiesChanged(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	adapter, _ := newTestAdapter(t)
 
@@ -223,9 +219,8 @@ func TestAdapterMock_SubscribePropertiesChanged(t *testing.T) {
 }
 
 func TestAdapterMock_SubscribePoweredChanged(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	adapter, _ := newTestAdapter(t)
 
@@ -248,9 +243,8 @@ func TestAdapterMock_SubscribePoweredChanged(t *testing.T) {
 }
 
 func TestAdapterMock_Firehose(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	adapter, _ := newTestAdapter(t)
 
@@ -293,8 +287,7 @@ func TestAdapterMock_Firehose(t *testing.T) {
 // exports a second adapter (phy1) with a distinct supported-modes set, so it is
 // distinguishable from the primary phy0 (which also supports AP).
 func TestAdapterMock_SecondAdapter(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	phy1 := newPublicMockAdapter(t, ctx, newMockClient(t, ctx), "phy1")
@@ -316,9 +309,8 @@ func TestAdapterMock_SecondAdapter(t *testing.T) {
 // Client.AllAdapters: it constructs a handle per adapter and reports the full
 // per-adapter snapshot (path, name, powered, model, vendor, supported modes).
 func TestAdapterMock_Status(t *testing.T) {
-	tmpDir := t.TempDir()
 
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	out, err := runSpiderAdapter(t, "status")
 	require.NoError(t, err, "output:\n%s", out)
@@ -345,8 +337,7 @@ func TestAdapterMock_Status(t *testing.T) {
 // through the real D-Bus stack and verifies it keeps the same one-entry array
 // shape as aggregate `adapter status --json`.
 func TestAdapterMock_ScopedStatusJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	list, out, err := runSpiderJSONArray(t, "adapter", "phy0", "status")
 	require.NoError(t, err, "output:\n%s", out)

@@ -24,8 +24,7 @@ const (
 // real D-Bus (introspection + Properties.GetAll), including the optional
 // experimental ones (ConnectedAccessPoint, Affinities).
 func TestStationMock_Reads(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -76,8 +75,7 @@ func TestStationMock_Reads(t *testing.T) {
 // ObjectManager returns exactly the station-mode device (wlan0), not the
 // AP-mode device (wlan1).
 func TestStationMock_AllStations(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -97,8 +95,7 @@ func TestStationMock_AllStations(t *testing.T) {
 // Disconnect are later sub-slices), so this asserts clean registration and
 // teardown; the fires-and-maps behavior is covered by the unit suites.
 func TestStationMock_SubscribeRegisters(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -121,8 +118,7 @@ func TestStationMock_SubscribeRegisters(t *testing.T) {
 // exported (--omit-station), Client.Station fails cleanly and station
 // enumeration is empty, even though the device object still exists.
 func TestStationMock_Unavailable(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockWithoutStation(t, tmpDir)
+	iwdmock.StartMockWithoutStation(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -146,8 +142,7 @@ func TestStationMock_Unavailable(t *testing.T) {
 // TestStationMock_CLIStatus drives the `station status` CLI command in-process
 // against the mock, confirming the read path renders end to end.
 func TestStationMock_CLI_Status(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	out, err := runSpider(t, "station", "status")
 	require.NoError(t, err, out)
@@ -159,8 +154,7 @@ func TestStationMock_CLI_Status(t *testing.T) {
 
 // TestStationMock_CLIList drives `station list` against the mock.
 func TestStationMock_CLI_List(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	out, err := runSpider(t, "station", "list")
 	require.NoError(t, err, out)
@@ -171,8 +165,7 @@ func TestStationMock_CLI_List(t *testing.T) {
 // scan and observes the Scanning property transition true->false over live
 // PropertiesChanged signals -- the first end-to-end exercise of a subscription.
 func TestStationMock_ScanLiveTransition(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -203,8 +196,7 @@ func TestStationMock_ScanLiveTransition(t *testing.T) {
 // TestStationMock_OrderedNetworks reads the seeded scan results and confirms the
 // signal strength is converted from iwd's 100*dBm to dBm.
 func TestStationMock_OrderedNetworks(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -222,8 +214,7 @@ func TestStationMock_OrderedNetworks(t *testing.T) {
 // TestStationMock_CLIAffinitiesByMAC drives `affinities set <mac>`: the MAC
 // resolves device-wide to its BSS object path, and `affinities` then renders it.
 func TestStationMock_CLI_AffinitiesByMAC(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	out, err := runSpider(t, "station", devicePath, "affinities", "set", "77:88:99:aa:bb:cc")
 	require.NoError(t, err, out)
@@ -241,8 +232,7 @@ func TestStationMock_CLI_AffinitiesByMAC(t *testing.T) {
 // TestStationMock_SetAffinities round-trips: write affinities, then read them
 // back through the Affinities getter.
 func TestStationMock_SetAffinities(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -270,8 +260,7 @@ func TestStationMock_SetAffinities(t *testing.T) {
 // TestStationMock_CLIScan drives `station <path> scan` (wait mode) against the
 // mock: it waits for the scan to finish, then lists the networks.
 func TestStationMock_CLI_Scan(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	out, err := runSpider(t, "station", devicePath, "scan")
 	require.NoError(t, err, out)
@@ -281,8 +270,7 @@ func TestStationMock_CLI_Scan(t *testing.T) {
 
 // TestStationMock_CLINetworks drives `station <path> networks` against the mock.
 func TestStationMock_CLI_Networks(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	out, err := runSpider(t, "station", devicePath, "networks")
 	require.NoError(t, err, out)
@@ -294,8 +282,7 @@ func TestStationMock_CLI_Networks(t *testing.T) {
 // Name ("wlan0"), both from enumeration and a single lookup, and that the CLI
 // renders it.
 func TestStationMock_ResolvesName(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -316,8 +303,7 @@ func TestStationMock_ResolvesName(t *testing.T) {
 // TestStationMock_DisconnectLiveTransition drives a real disconnect and observes
 // the State property transition connected->disconnected over live signals.
 func TestStationMock_DisconnectLiveTransition(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
@@ -345,8 +331,7 @@ func TestStationMock_DisconnectLiveTransition(t *testing.T) {
 // without an agent) hidden-connect paths.
 func TestStationMock_ConnectHidden(t *testing.T) {
 	t.Run("Open", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		iwdmock.StartMockNormal(t, tmpDir)
+		iwdmock.StartMockNormal(t)
 		ctx := context.Background()
 		station, err := newMockClient(t, ctx).Station(ctx, devicePath)
 		require.NoError(t, err)
@@ -354,8 +339,7 @@ func TestStationMock_ConnectHidden(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		iwdmock.StartMockNormal(t, tmpDir)
+		iwdmock.StartMockNormal(t)
 		ctx := context.Background()
 		station, err := newMockClient(t, ctx).Station(ctx, devicePath)
 		require.NoError(t, err)
@@ -365,8 +349,7 @@ func TestStationMock_ConnectHidden(t *testing.T) {
 	})
 
 	t.Run("SecuredNoAgent", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		iwdmock.StartMockNormal(t, tmpDir)
+		iwdmock.StartMockNormal(t)
 		ctx := context.Background()
 		station, err := newMockClient(t, ctx).Station(ctx, devicePath)
 		require.NoError(t, err)
@@ -376,8 +359,7 @@ func TestStationMock_ConnectHidden(t *testing.T) {
 	})
 
 	t.Run("SecuredWithAgent", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		iwdmock.StartMockNormal(t, tmpDir)
+		iwdmock.StartMockNormal(t)
 		ctx := context.Background()
 		client := newMockClient(t, ctx)
 
@@ -398,8 +380,7 @@ func TestStationMock_ConnectHidden(t *testing.T) {
 // TestStationMock_HiddenAccessPoints reads the seeded hidden-AP list, confirming
 // the signal (100*dBm -> dBm) and type conversions.
 func TestStationMock_HiddenAccessPoints(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
 	station, err := newMockClient(t, ctx).Station(ctx, devicePath)
 	require.NoError(t, err)
@@ -417,24 +398,21 @@ func TestStationMock_HiddenAccessPoints(t *testing.T) {
 // hidden-aps CLI verbs against the mock.
 func TestStationMock_CLI_DisconnectHiddenAPs(t *testing.T) {
 	t.Run("disconnect", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		iwdmock.StartMockNormal(t, tmpDir)
+		iwdmock.StartMockNormal(t)
 		out, err := runSpider(t, "station", devicePath, "disconnect")
 		require.NoError(t, err, out)
 		require.Contains(t, out, "disconnected")
 	})
 
 	t.Run("connect-hidden secured", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		iwdmock.StartMockNormal(t, tmpDir)
+		iwdmock.StartMockNormal(t)
 		out, err := runSpider(t, "station", devicePath, "connect-hidden", "HiddenSecured", "--passphrase="+mockSecuredPassphrase)
 		require.NoError(t, err, out)
 		require.Contains(t, out, "connected to HiddenSecured")
 	})
 
 	t.Run("hidden-aps", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		iwdmock.StartMockNormal(t, tmpDir)
+		iwdmock.StartMockNormal(t)
 		out, err := runSpider(t, "station", devicePath, "hidden-aps")
 		require.NoError(t, err, out)
 		require.Contains(t, out, "de:ad:be:ef:00:01")

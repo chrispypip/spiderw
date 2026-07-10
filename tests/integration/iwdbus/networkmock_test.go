@@ -68,8 +68,7 @@ func newPublicMockNetwork(t *testing.T, ctx context.Context, client *spiderw.Cli
 // -----------------------------------------------------------------------------
 
 func TestNetworkMock_DaemonNetworks(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -80,8 +79,7 @@ func TestNetworkMock_DaemonNetworks(t *testing.T) {
 }
 
 func TestNetworkMock_Properties(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -105,8 +103,7 @@ func TestNetworkMock_Properties(t *testing.T) {
 // TestNetworkMock_ExtendedServiceSet verifies the BSS membership story: a
 // network's ExtendedServiceSet paths resolve to live BasicServiceSet handles.
 func TestNetworkMock_ExtendedServiceSet(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -128,8 +125,7 @@ func TestNetworkMock_ExtendedServiceSet(t *testing.T) {
 }
 
 func TestNetworkMock_Connect_Open(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -143,8 +139,7 @@ func TestNetworkMock_Connect_Open(t *testing.T) {
 }
 
 func TestNetworkMock_Connect_KnownPSK(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -155,8 +150,7 @@ func TestNetworkMock_Connect_KnownPSK(t *testing.T) {
 }
 
 func TestNetworkMock_Connect_SecuredNoAgent(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -172,8 +166,7 @@ func TestNetworkMock_Connect_SecuredNoAgent(t *testing.T) {
 // a Connect on the open network emits a Connected PropertiesChanged that the
 // subscription must deliver.
 func TestNetworkMock_SubscribeConnectedChanged(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	n := newRawMockNetwork(t, openNetworkPath)
@@ -196,8 +189,7 @@ func TestNetworkMock_SubscribeConnectedChanged(t *testing.T) {
 }
 
 func TestNetworkMock_AllNetworks_Empty(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockWithoutNetwork(t, tmpDir)
+	iwdmock.StartMockWithoutNetwork(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -220,8 +212,7 @@ func TestNetworkMock_AllNetworks_Empty(t *testing.T) {
 // (Client.AllNetworks + per-network Properties) and asserts the structured
 // output for every exported network.
 func TestNetworkMock_StatusJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	list, out, err := runSpiderJSONArray(t, "network", "status")
 	require.NoError(t, err, "output:\n%s", out)

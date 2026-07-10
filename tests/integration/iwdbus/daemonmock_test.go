@@ -33,8 +33,7 @@ func newMockClient(t *testing.T, ctx context.Context) *spiderw.Client {
 }
 
 func TestDaemonMock_Info(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	daemon := newMockClient(t, ctx).Daemon()
@@ -61,8 +60,7 @@ func TestDaemonMock_Info(t *testing.T) {
 }
 
 func TestDaemonMock_Adapters(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	refs, err := newMockClient(t, ctx).Daemon().Adapters(ctx)
@@ -91,8 +89,7 @@ func TestDaemonMock_MalformedReply(t *testing.T) {
 }
 
 func TestDaemonMock_NoDaemon(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockWithoutDaemon(t, tmpDir)
+	iwdmock.StartMockWithoutDaemon(t)
 
 	// With no daemon object exported, client construction itself fails.
 	_, err := spiderw.NewClient(context.Background(), spiderw.SessionBus)
@@ -104,8 +101,7 @@ func TestDaemonMock_NoDaemon(t *testing.T) {
 // against the real bus. (This replaces a former variant that spawned 100 CLI
 // subprocesses; one shared client is both cheaper and a more direct test.)
 func TestDaemonMock_ConcurrentInfo(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	daemon := newMockClient(t, ctx).Daemon()
@@ -128,8 +124,7 @@ func TestDaemonMock_ConcurrentInfo(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestDaemonMock_CLI_Info(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	m, out, err := runSpiderDaemonJSON(t, "info")
 	require.NoError(t, err, "output:\n%s", out)

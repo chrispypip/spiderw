@@ -61,8 +61,7 @@ func newPublicMockKnownNetwork(t *testing.T, ctx context.Context, client *spider
 // -----------------------------------------------------------------------------
 
 func TestKnownNetworkMock_DaemonKnownNetworks(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -73,8 +72,7 @@ func TestKnownNetworkMock_DaemonKnownNetworks(t *testing.T) {
 }
 
 func TestKnownNetworkMock_Properties(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -99,8 +97,7 @@ func TestKnownNetworkMock_Properties(t *testing.T) {
 // TestKnownNetworkMock_NetworkLinkage verifies a network's KnownNetwork path
 // resolves to a live KnownNetwork handle.
 func TestKnownNetworkMock_NetworkLinkage(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -118,8 +115,7 @@ func TestKnownNetworkMock_NetworkLinkage(t *testing.T) {
 }
 
 func TestKnownNetworkMock_SetAutoConnect(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -133,8 +129,7 @@ func TestKnownNetworkMock_SetAutoConnect(t *testing.T) {
 }
 
 func TestKnownNetworkMock_Forget(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -147,8 +142,7 @@ func TestKnownNetworkMock_Forget(t *testing.T) {
 // plumbing: setting AutoConnect emits a PropertiesChanged the subscription must
 // deliver.
 func TestKnownNetworkMock_SubscribeAutoConnectChanged(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	k := newRawMockKnownNetwork(t, knownNetworkPath)
@@ -171,8 +165,7 @@ func TestKnownNetworkMock_SubscribeAutoConnectChanged(t *testing.T) {
 }
 
 func TestKnownNetworkMock_AllKnownNetworks_Empty(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockWithoutKnownNetwork(t, tmpDir)
+	iwdmock.StartMockWithoutKnownNetwork(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
@@ -200,8 +193,7 @@ func runSpiderKnownNetwork(t *testing.T, args ...string) (string, error) {
 // real-D-Bus stack and asserts the structured output for every exported known
 // network.
 func TestKnownNetworkMock_StatusJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	iwdmock.StartMockNormal(t, tmpDir)
+	iwdmock.StartMockNormal(t)
 
 	list, out, err := runSpiderJSONArray(t, "known-network", "status")
 	require.NoError(t, err, "output:\n%s", out)

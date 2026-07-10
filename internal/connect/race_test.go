@@ -13,8 +13,7 @@ import (
 )
 
 func TestRace_Wiring_Session_Construct(t *testing.T) {
-	tmpDir := t.TempDir()
-	require.NoError(t, iwdmock.StartMockNormalNoT(tmpDir))
+	require.NoError(t, iwdmock.StartMockNormalNoT())
 
 	const N = 50
 	errCh := make(chan error, N)
@@ -32,8 +31,7 @@ func TestRace_Wiring_Session_Construct(t *testing.T) {
 }
 
 func TestRace_Wiring_Session_CleanupIdempotent(t *testing.T) {
-	tmpDir := t.TempDir()
-	require.NoError(t, iwdmock.StartMockNormalNoT(tmpDir))
+	require.NoError(t, iwdmock.StartMockNormalNoT())
 
 	w, err := newTestWiring(false)
 	require.NoError(t, err)
@@ -45,8 +43,7 @@ func TestRace_Wiring_Session_CleanupIdempotent(t *testing.T) {
 }
 
 func TestRace_Wiring_PartialFailure_CleanupSafeSession(t *testing.T) {
-	tmpDir := t.TempDir()
-	require.NoError(t, iwdmock.StartMockWithoutDaemonNoT(tmpDir))
+	require.NoError(t, iwdmock.StartMockWithoutDaemonNoT())
 
 	w, err := newTestWiring(false)
 	require.Error(t, err)
@@ -59,8 +56,7 @@ func TestRace_Wiring_PartialFailure_CleanupSafeSession(t *testing.T) {
 }
 
 func TestRace_Wiring_Session_ConstructAndCleanup(t *testing.T) {
-	tmpDir := t.TempDir()
-	require.NoError(t, iwdmock.StartMockNormalNoT(tmpDir))
+	require.NoError(t, iwdmock.StartMockNormalNoT())
 
 	const N = 25
 	errCh := make(chan error, N)
