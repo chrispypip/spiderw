@@ -9,7 +9,8 @@ useful, mock integration coverage, and race/stress testing where appropriate.
 
 ## Current Focus
 
-- Keep the daemon, adapter, device, and basic service set vertical slices stable.
+- Keep the implemented vertical slices (daemon, adapter, device, station,
+  network, known-network, basic service set, and the credentials agent) stable.
 - Improve documentation, contribution workflow, CI, and release hygiene.
 - Preserve a small, strongly typed public API while avoiding D-Bus details in
   user code.
@@ -72,23 +73,79 @@ The following areas are currently implemented and tested end to end:
 
 ## Near-Term Goals
 
-- Improve CI for formatting, linting, unit tests, race tests, and integration tests.
-- Decide what should be included in the first tagged release.
+- Continue the vertical-slice cadence through the remaining iwd interfaces (see
+  Future iwd Coverage), starting with the smaller station-adjacent slices
+  (`SignalLevelAgent`, `StationDiagnostic`) before the larger operating-mode and
+  P2P areas.
+- Promote the 802.1x credential-agent callbacks from experimental to tested with
+  a mock fixture that drives the username/password and private-key paths.
+- Formalize real-hardware validation (Raspberry Pi against real iwd) as a release
+  step, since mock and CI coverage cannot exercise driver-gated behavior such as
+  `SetAffinities`.
+- Keep the README, `examples/`, godoc, and release notes current as each slice
+  lands.
 
 ## Future iwd Coverage
 
-Likely future vertical slices include:
+The slices below map the remaining iwd D-Bus surface. spiderw currently
+implements the Daemon, Adapter, Device, Station, Network, KnownNetwork,
+BasicServiceSet, and credentials `Agent` / `AgentManager` interfaces; the intent
+is to eventually cover the rest of iwd. The areas are grouped by theme, not
+strictly ordered — priority is decided slice by slice.
 
-- The station `SignalLevelAgent` (`RegisterSignalLevelAgent` /
-  `UnregisterSignalLevelAgent`) — a second exported agent, building on the
+### Device operating modes
+
+iwd exposes a different interface depending on a device's mode, and spiderw only
+covers station mode today. `Device.SetMode` can already switch a device into
+these modes, but the mode-specific interfaces are unimplemented:
+
+- **Access Point** (`net.connman.iwd.AccessPoint`) — run an adapter as an AP:
+  start/stop a hosted network (open or PSK), scan, and list connected clients,
+  plus the companion `AccessPointDiagnostic` interface.
+- **Ad-Hoc / IBSS** (`net.connman.iwd.AdHoc`) — start/stop an ad-hoc network and
+  track connected peers.
+
+### Station-mode features not yet covered
+
+- **Signal-level monitoring** (`SignalLevelAgent`, via
+  `RegisterSignalLevelAgent` / `UnregisterSignalLevelAgent`) — a second exported
+  agent that reports RSSI threshold crossings, building on the existing
   credentials-agent machinery.
-- End-to-end test coverage for the 802.1x credential agent callbacks (a mock
-  fixture that drives `RequestUserNameAndPassword` / `RequestUserPassword` /
-  `RequestPrivateKeyPassphrase`), promoting them from experimental to tested.
-- Provisioning new networks, including the `NetworkConfigurationAgent` and full
-  802.1x/enterprise configuration (the credentials `Agent` is implemented, but
-  *configuring* a brand-new enterprise network is not).
-- Additional signal subscriptions for objects beyond adapters and networks.
+- **Connection diagnostics** (`net.connman.iwd.StationDiagnostic`,
+  `GetDiagnostics`) — read live link statistics (RSSI, TX/RX bitrate, frequency,
+  security) for the connected station.
+- **WPS / WiFi Simple Configuration** (`net.connman.iwd.SimpleConfiguration`) —
+  push-button and PIN enrollment (`PushButton`, `GeneratePin`, `StartPin`,
+  `Cancel`).
+
+### Provisioning and enterprise
+
+- **802.1x / enterprise** — end-to-end coverage for the enterprise credential
+  callbacks (`RequestUserNameAndPassword` / `RequestUserPassword` /
+  `RequestPrivateKeyPassphrase`) via a mock fixture that promotes them from
+  experimental to tested, plus *configuring* a brand-new enterprise network
+  (distinct from the already-implemented credentials `Agent`, which only supplies
+  secrets for connecting).
+- **Network configuration** (`net.connman.iwd.NetworkConfigurationAgent`) —
+  provisioning new network profiles and IP/DHCP configuration.
+- **DPP / Wi-Fi Easy Connect** (`net.connman.iwd.DeviceProvisioning` plus a
+  `SharedCodeAgent`) — QR-code / shared-code provisioning, acting as either
+  enrollee or configurator.
+
+### Wi-Fi Direct (P2P)
+
+- **P2P** (`net.connman.iwd.p2p.Device`, `p2p.Peer`, `p2p.ServiceManager`, and
+  `WiFiDisplay` / Miracast) — peer discovery and direct device-to-device
+  connections. A large, largely self-contained area; likely one of the last.
+
+### Cross-cutting
+
+- **Live object events** — react to `org.freedesktop.DBus.ObjectManager`
+  `InterfacesAdded` / `InterfacesRemoved` so adapters, devices, networks, and
+  BSSes appearing or disappearing surface as spiderw events, rather than only
+  point-in-time enumeration.
+- **Broader property subscriptions** — property-change subscriptions for object
+  types that do not yet expose them.
 
 Each new slice should follow the established pattern:
 
@@ -113,9 +170,10 @@ Each new slice should follow the established pattern:
   duplicating ordinary unit coverage.
 - Maintain benchmark coverage for important hot paths without optimizing before
   correctness is clear.
-- Add a runnable `example/` application demonstrating an end-to-end flow (such as
-  scanning and connecting) once the station and connection slices land. The
-  per-method examples in `example_test.go` cover the public API in the meantime.
+- Maintain the runnable programs under `examples/` (status, bring-up,
+  scan-and-connect, connect-hidden, monitor, known-networks) alongside the
+  per-method `Example*` functions in `example_test.go`, extending both as new
+  slices land.
 
 ## Out of Scope for Now
 
@@ -129,11 +187,20 @@ The following are not current goals:
 
 ## Release Direction
 
-Before the first tagged release, spiderw should have:
+spiderw tags releases regularly and is pre-1.0: while the public API is still
+maturing, a release that changes exported types or behavior bumps the minor
+version (for example the ref-type bundle changes in v0.10.0), and patch releases
+are reserved for fixes. A `1.0` release awaits the core slices proving stable
+across several releases with no further breaking changes anticipated.
 
-- A stable public API for the daemon, adapter, device, and basic service set slices.
-- Passing local and CI test suites.
-- Clear README examples.
-- Complete GoDoc for exported public API.
-- A documented support and security policy.
-- A small changelog or release note describing the initial supported surface.
+Each tagged release should have:
+
+- Passing local and CI gates: build, vet, gofmt/goimports, golangci-lint,
+  codespell, and the unit, race, stress, integration, and cross-compile suites.
+- Real-hardware validation for anything driver-dependent, or an explicit note in
+  the release notes when a feature could not be exercised on hardware.
+- Complete godoc for any new or changed exported API, with the README and
+  `examples/` updated to match.
+- A signed, annotated tag whose notes summarize the change and call out any
+  breaking changes.
+- A maintained support and security policy.
