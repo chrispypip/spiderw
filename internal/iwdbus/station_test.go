@@ -58,6 +58,16 @@ func TestStation_Iwdbus(t *testing.T) {
 		t.Run("Station_GetHiddenAccessPoints_Err", testStation_GetHiddenAccessPoints_Err)
 	})
 
+	t.Run("SignalLevelAgent", func(t *testing.T) {
+		t.Parallel()
+		t.Run("Station_RegisterSignalLevelAgent", testStation_RegisterSignalLevelAgent)
+		t.Run("Station_RegisterSignalLevelAgent_Err", testStation_RegisterSignalLevelAgent_Err)
+		t.Run("Station_RegisterSignalLevelAgent_Uninitialized", testStation_RegisterSignalLevelAgent_Uninitialized)
+		t.Run("Station_UnregisterSignalLevelAgent", testStation_UnregisterSignalLevelAgent)
+		t.Run("Station_UnregisterSignalLevelAgent_Err", testStation_UnregisterSignalLevelAgent_Err)
+		t.Run("Station_UnregisterSignalLevelAgent_Uninitialized", testStation_UnregisterSignalLevelAgent_Uninitialized)
+	})
+
 	t.Run("NotInitialized", testStation_NoIntro)
 
 	t.Run("Subscribe", func(t *testing.T) {
@@ -914,4 +924,87 @@ func testStation_NoIntro(t *testing.T) {
 			require.Contains(t, err.Error(), "station is not initialized")
 		})
 	}
+}
+
+func testStation_RegisterSignalLevelAgent(t *testing.T) {
+	t.Parallel()
+
+	var called bool
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			called = true
+			require.Equal(t, IwdStationIface, iface)
+			require.Equal(t, "RegisterSignalLevelAgent", method)
+			require.Len(t, args, 2)
+			require.Equal(t, dbus.ObjectPath("/spiderw/signalagent"), args[0])
+			require.Equal(t, []int16{-60, -70, -80}, args[1])
+			return nil, nil
+		},
+	}}
+
+	require.NoError(t, s.RegisterSignalLevelAgent(context.Background(), "/spiderw/signalagent", []int16{-60, -70, -80}))
+	require.True(t, called)
+}
+
+func testStation_RegisterSignalLevelAgent_Err(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			return nil, fmt.Errorf("dbus failure")
+		},
+	}}
+
+	err := s.RegisterSignalLevelAgent(context.Background(), "/spiderw/signalagent", []int16{-60})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "dbus failure")
+}
+
+func testStation_RegisterSignalLevelAgent_Uninitialized(t *testing.T) {
+	t.Parallel()
+
+	err := (&Station{}).RegisterSignalLevelAgent(context.Background(), "/spiderw/signalagent", []int16{-60})
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrStationUninitialized)
+}
+
+func testStation_UnregisterSignalLevelAgent(t *testing.T) {
+	t.Parallel()
+
+	var called bool
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			called = true
+			require.Equal(t, IwdStationIface, iface)
+			require.Equal(t, "UnregisterSignalLevelAgent", method)
+			require.Len(t, args, 1)
+			require.Equal(t, dbus.ObjectPath("/spiderw/signalagent"), args[0])
+			return nil, nil
+		},
+	}}
+
+	require.NoError(t, s.UnregisterSignalLevelAgent(context.Background(), "/spiderw/signalagent"))
+	require.True(t, called)
+}
+
+func testStation_UnregisterSignalLevelAgent_Err(t *testing.T) {
+	t.Parallel()
+
+	s := &Station{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			return nil, fmt.Errorf("dbus failure")
+		},
+	}}
+
+	err := s.UnregisterSignalLevelAgent(context.Background(), "/spiderw/signalagent")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "dbus failure")
+}
+
+func testStation_UnregisterSignalLevelAgent_Uninitialized(t *testing.T) {
+	t.Parallel()
+
+	err := (&Station{}).UnregisterSignalLevelAgent(context.Background(), "/spiderw/signalagent")
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrStationUninitialized)
 }

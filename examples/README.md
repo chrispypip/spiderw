@@ -20,6 +20,7 @@ there from a cold device.
 | [`scan-and-connect`](./scan-and-connect) | Scans, lists networks by signal, optionally connects to one | only with `-ssid` |
 | [`connect-hidden`](./connect-hidden) | Joins a non-broadcasting (hidden) network via a credentials agent | yes |
 | [`monitor`](./monitor) | Watches a station and prints state/scanning changes until Ctrl-C | no |
+| [`signal-monitor`](./signal-monitor) | Watches connected-network signal strength (RSSI band) until Ctrl-C | no |
 | [`known-networks`](./known-networks) | Lists stored networks; can toggle autoconnect or forget one | only with `-forget`/`-autoconnect` |
 
 ## Run against real iwd

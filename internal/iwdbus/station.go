@@ -333,6 +333,35 @@ func (s *Station) Disconnect(ctx context.Context) error {
 	return nil
 }
 
+// RegisterSignalLevelAgent calls Station.RegisterSignalLevelAgent, registering
+// the object at agentPath (which the caller must have already exported via
+// ExportSignalLevelAgent) to receive Changed notifications when the connected
+// network's signal crosses one of levels. levels are RSSI thresholds in dBm;
+// iwd requires them in descending order.
+func (s *Station) RegisterSignalLevelAgent(ctx context.Context, agentPath dbus.ObjectPath, levels []int16) error {
+	if err := s.ensureInitialized(); err != nil {
+		return WrapConnection("Station.ensureInitialized", err)
+	}
+
+	if _, err := s.call.Call(ctx, IwdStationIface, "RegisterSignalLevelAgent", agentPath, levels); err != nil {
+		return wrapIwdMethod(IwdStationIface, "RegisterSignalLevelAgent", err)
+	}
+	return nil
+}
+
+// UnregisterSignalLevelAgent calls Station.UnregisterSignalLevelAgent, removing
+// the previously registered signal-level agent at agentPath.
+func (s *Station) UnregisterSignalLevelAgent(ctx context.Context, agentPath dbus.ObjectPath) error {
+	if err := s.ensureInitialized(); err != nil {
+		return WrapConnection("Station.ensureInitialized", err)
+	}
+
+	if _, err := s.call.Call(ctx, IwdStationIface, "UnregisterSignalLevelAgent", agentPath); err != nil {
+		return wrapIwdMethod(IwdStationIface, "UnregisterSignalLevelAgent", err)
+	}
+	return nil
+}
+
 // ConnectHiddenNetwork connects to a hidden network by SSID. A secured hidden
 // network requires a registered credentials agent (as with Network.Connect). iwd
 // returns matchable errors: NotFound (no such hidden network in scan results),

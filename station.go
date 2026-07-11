@@ -88,6 +88,11 @@ type Station struct {
 	path     string
 	name     string
 	resolver connect.Resolver
+
+	// registerSignalAgent registers a signal-level agent for this station. The
+	// Client injects it (bound to the wiring); a station without it cannot
+	// monitor signal level. See MonitorSignalLevel.
+	registerSignalAgent func(ctx context.Context, stationPath string, cfg core.SignalLevelConfig) (core.SignalLevelAgentIface, error)
 }
 
 func newStation(c core.StationIface, path, name string) *Station {

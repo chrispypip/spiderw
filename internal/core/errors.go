@@ -119,6 +119,10 @@ var (
 	// ErrAgentNotInitialized indicates that an Agent wrapper has no backend.
 	ErrAgentNotInitialized = errors.New("agent not initialized")
 
+	// ErrSignalLevelAgentNotInitialized indicates that a SignalLevelAgent wrapper
+	// has no backend.
+	ErrSignalLevelAgentNotInitialized = errors.New("signal level agent not initialized")
+
 	// ErrNoAgent indicates that iwd rejected an operation because no credentials
 	// agent is registered. It is re-exported from the iwdbus layer so callers can
 	// match it with errors.Is through the core and public error chains.

@@ -10,6 +10,13 @@
     <method name="GetHiddenAccessPoints">
       <arg direction="out" name="accesspoints" type="a(sns)"/>
     </method>
+    <method name="RegisterSignalLevelAgent">
+      <arg direction="in" name="path" type="o"/>
+      <arg direction="in" name="levels" type="an"/>
+    </method>
+    <method name="UnregisterSignalLevelAgent">
+      <arg direction="in" name="path" type="o"/>
+    </method>
     <property name="State" type="s" access="read"/>
     <property name="Scanning" type="b" access="read"/>
     <property name="ConnectedNetwork" type="o" access="read"/>

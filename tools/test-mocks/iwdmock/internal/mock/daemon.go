@@ -40,6 +40,8 @@ func ExportDaemon(conn *dbus.Conn) error {
 		agents.bindConn(conn)
 	}
 
+	signalAgents.bindConn(conn)
+
 	// Export Introspectable interface
 	return exportDaemonIntrospection(conn)
 }

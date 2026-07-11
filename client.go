@@ -335,6 +335,7 @@ func (c *Client) Station(ctx context.Context, path string) (*Station, error) {
 	// enumerated one. Failure leaves Name() == "".
 	st.name = c.resolveStationName(ctx, path)
 	st.resolver = c.wire.Resolver()
+	st.registerSignalAgent = c.wire.NewSignalLevelAgent
 	return st, nil
 }
 
@@ -448,7 +449,7 @@ func (c *Client) AllStations(ctx context.Context) ([]*Station, error) {
 			log.Error(ctx, "station wiring failed", "op", op, "path", ref.Path, "err", err)
 			return nil, wrapPublicError(op, err)
 		}
-		pub := newStation(coreStation, ref.Path, ref.Name).withResolver(c.wire.Resolver())
+		pub := newStation(coreStation, ref.Path, ref.Name).withResolver(c.wire.Resolver()).withSignalMonitor(c.wire.NewSignalLevelAgent)
 		if pub == nil {
 			log.Error(ctx, "station wrapper unexpectedly nil", "op", op, "path", ref.Path)
 			return nil, wrapPublicError(op, ErrInternal)

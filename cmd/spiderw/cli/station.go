@@ -2,9 +2,15 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/chrispypip/spiderw"
@@ -625,6 +631,106 @@ func runStationHiddenAPs(app *App, ctx context.Context, stationRef string, args 
 	})
 }
 
+// runStationMonitorSignal registers a signal-level agent for the station and
+// prints a line each time the connected-network signal crosses one of the given
+// dBm thresholds, until interrupted with Ctrl-C. Like the device monitor, it
+// blocks on the signal-derived context.
+func runStationMonitorSignal(app *App, ctx context.Context, stationRef string, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: spiderw station <station> monitor-signal <dBm> [<dBm>...] (RSSI thresholds in dBm, descending)")
+	}
+	thresholds, err := parseSignalThresholds(args)
+	if err != nil {
+		return err
+	}
+
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	client, err := app.newClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = client.Close()
+	}()
+
+	s, err := stationByRef(ctx, client, stationRef)
+	if err != nil {
+		return err
+	}
+
+	var printMu sync.Mutex
+	agent, err := s.MonitorSignalLevel(ctx, spiderw.SignalLevelConfig{
+		Thresholds: thresholds,
+		Changed: func(level int) {
+			_ = printSignalLevelLine(app, stationRef, level, thresholds, &printMu)
+		},
+	})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// The monitor context is already canceled on exit, so unregister on a
+		// fresh one.
+		_ = agent.Unregister(context.Background())
+	}()
+
+	<-ctx.Done()
+	return nil
+}
+
+// parseSignalThresholds parses dBm threshold arguments into ints. Range and
+// descending-order validation is left to the public API.
+func parseSignalThresholds(args []string) ([]int, error) {
+	thresholds := make([]int, 0, len(args))
+	for _, a := range args {
+		v, err := strconv.Atoi(strings.TrimSpace(a))
+		if err != nil {
+			return nil, fmt.Errorf("invalid signal threshold %q: must be an integer dBm value", a)
+		}
+		thresholds = append(thresholds, v)
+	}
+	return thresholds, nil
+}
+
+type stationSignalLevelResult struct {
+	Station string `json:"Station"`
+	Level   int    `json:"Level"`
+	Range   string `json:"Range"`
+}
+
+// signalBandRange describes, in dBm, the RSSI range a band index covers given the
+// (descending) thresholds. iwd reports the band index, not the exact RSSI, so
+// this maps it back to the range that band represents. For N thresholds there are
+// N+1 bands: band 0 is above the first threshold, band N is below the last, and
+// band i in between spans [thresholds[i], thresholds[i-1]).
+func signalBandRange(level int, thresholds []int) string {
+	n := len(thresholds)
+	switch {
+	case level <= 0:
+		return fmt.Sprintf(">= %d dBm", thresholds[0])
+	case level >= n:
+		return fmt.Sprintf("< %d dBm", thresholds[n-1])
+	default:
+		return fmt.Sprintf("%d to %d dBm", thresholds[level], thresholds[level-1])
+	}
+}
+
+// printSignalLevelLine renders one signal-level change, honoring --json.
+func printSignalLevelLine(app *App, ref string, level int, thresholds []int, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	bandRange := signalBandRange(level, thresholds)
+	out := stationSignalLevelResult{Station: ref, Level: level, Range: bandRange}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	_, err := fmt.Fprintf(app.stdout(), "level=%d (%s)\n", level, bandRange)
+	return err
+}
+
 func runStationWithRef(app *App, args []string) error {
 	if len(args) < 2 {
 		printStationUsage(app)
@@ -651,6 +757,8 @@ func runStationWithRef(app *App, args []string) error {
 		return runStationConnectHidden(app, ctx, stationRef, rest)
 	case "hidden-aps":
 		return runStationHiddenAPs(app, ctx, stationRef, rest)
+	case "monitor-signal":
+		return runStationMonitorSignal(app, ctx, stationRef, rest)
 	default:
 		printStationUsage(app)
 		return fmt.Errorf("unknown station command %q for station %q", op, stationRef)
@@ -689,6 +797,11 @@ const stationHelpText = `Commands:
   <station> affinities                  Show the station's affinity BSSes (MACs)
   <station> affinities set <bss>...     Set affinities by BSS MAC or object path
   <station> affinities clear            Remove all affinities
+  <station> monitor-signal <dBm>...     Monitor connected-network signal. Args
+                                        are RSSI thresholds in dBm, highest
+                                        first (e.g. -60 -70 -80); prints the band
+                                        index (0 = strongest) and its dBm range on
+                                        each crossing, until Ctrl-C
 
 A station is a device in station mode. Connecting to a *visible* network is done
 via 'network <ssid> connect'.`

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -467,4 +468,35 @@ func TestStationCmd_HiddenAPs_Empty(t *testing.T) {
 	out, code := driveCLI(stationClient(st), nil, false, "station", testStationPath, "hidden-aps")
 	require.Equal(t, 0, code, out)
 	require.Contains(t, out, "no hidden access points available")
+}
+
+// TestPrintSignalLevelLine covers the monitor output helper directly (the
+// monitor-signal command blocks on an OS signal and is not driveable in-process).
+func TestPrintSignalLevelLine(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+
+	thresholds := []int{-60, -70, -80}
+
+	app, buf := appWithBuffer(false)
+	require.NoError(t, printSignalLevelLine(app, "wlan0", 2, thresholds, &mu))
+	require.Equal(t, "level=2 (-80 to -70 dBm)\n", buf.String())
+
+	appJSON, bufJSON := appWithBuffer(true)
+	require.NoError(t, printSignalLevelLine(appJSON, "wlan0", 0, thresholds, &mu))
+	var got stationSignalLevelResult
+	require.NoError(t, json.Unmarshal(bufJSON.Bytes(), &got))
+	require.Equal(t, stationSignalLevelResult{Station: "wlan0", Level: 0, Range: ">= -60 dBm"}, got)
+}
+
+func TestParseSignalThresholds(t *testing.T) {
+	t.Parallel()
+
+	got, err := parseSignalThresholds([]string{"-60", " -70 ", "-80"})
+	require.NoError(t, err)
+	require.Equal(t, []int{-60, -70, -80}, got)
+
+	_, err = parseSignalThresholds([]string{"-60", "notanumber"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid signal threshold")
 }

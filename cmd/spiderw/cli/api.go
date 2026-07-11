@@ -90,6 +90,7 @@ type stationAPI interface {
 	ConnectHiddenNetwork(ctx context.Context, name string) error
 	HiddenAccessPoints(ctx context.Context) ([]spiderw.HiddenAccessPoint, error)
 	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
+	MonitorSignalLevel(ctx context.Context, cfg spiderw.SignalLevelConfig) (*spiderw.SignalLevelAgent, error)
 }
 
 type bssAPI interface {

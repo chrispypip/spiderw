@@ -445,6 +445,12 @@ func (f *fakeStation) SubscribeScanningChanged(ctx context.Context, fn func(bool
 	return func() error { return nil }, nil
 }
 
+// MonitorSignalLevel satisfies stationAPI. The monitor command blocks on an OS
+// signal and is not exercised by the in-process CLI tests, so this is a stub.
+func (f *fakeStation) MonitorSignalLevel(ctx context.Context, cfg spiderw.SignalLevelConfig) (*spiderw.SignalLevelAgent, error) {
+	return nil, f.err
+}
+
 type fakeBSS struct {
 	path  string
 	props *spiderw.BasicServiceSetProperties
