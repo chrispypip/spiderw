@@ -246,7 +246,7 @@ type OrderedNetwork struct {
 // Scan schedules a network scan. It is asynchronous: the call returns once the
 // scan is scheduled, and the station's Scanning property tracks progress (true
 // while scanning, false when results are ready). iwd rejects a scan that is
-// already in progress with a matchable Busy/InProgress error.
+// already in progress with a matchable ErrInProgress error.
 func (s *Station) Scan(ctx context.Context) error {
 	if err := s.ensureInitialized(); err != nil {
 		return WrapConnection("Station.ensureInitialized", err)

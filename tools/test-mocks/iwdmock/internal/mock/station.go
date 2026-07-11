@@ -73,7 +73,9 @@ func (d *Device) Scan() *dbus.Error {
 	d.stationMu.Lock()
 	if d.StationScanning {
 		d.stationMu.Unlock()
-		return dbus.NewError(iwdbus.IwdErrorBusy, []interface{}{"scan already in progress"})
+		// Real iwd reports a scan-in-progress via net.connman.iwd.InProgress
+		// (its dbus_error_busy() helper emits the .InProgress name, not .Busy).
+		return dbus.NewError(iwdbus.IwdErrorInProgress, []interface{}{"scan already in progress"})
 	}
 	d.StationScanning = true
 	d.stationMu.Unlock()

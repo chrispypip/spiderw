@@ -148,6 +148,7 @@ var (
 	ErrAlreadyProvisioned = iwdbus.ErrAlreadyProvisioned
 	ErrNotHidden          = iwdbus.ErrNotHidden
 	ErrNotAvailable       = iwdbus.ErrNotAvailable
+	ErrPermissionDenied   = iwdbus.ErrPermissionDenied
 )
 
 func newError(kind Kind, resource Resource, op, details string, err error) error {

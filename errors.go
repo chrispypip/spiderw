@@ -112,8 +112,10 @@ var (
 
 	// The following sentinels match named iwd D-Bus errors surfaced by operations
 	// such as Network.Connect. Use errors.Is to react to a specific iwd outcome
-	// (for example, retry on ErrBusy or ErrInProgress, give up on
-	// ErrNotSupported) without parsing error text.
+	// (for example, retry on ErrInProgress, give up on ErrNotSupported) without
+	// parsing error text. Note: current iwd reports a busy/in-progress condition
+	// as ErrInProgress; ErrBusy and ErrTimeout are retained for compatibility but
+	// are not emitted by iwd today.
 	ErrAborted       = core.ErrAborted
 	ErrBusy          = core.ErrBusy
 	ErrFailed        = core.ErrFailed
@@ -138,6 +140,9 @@ var (
 	ErrAlreadyProvisioned = core.ErrAlreadyProvisioned
 	ErrNotHidden          = core.ErrNotHidden
 	ErrNotAvailable       = core.ErrNotAvailable
+	// ErrPermissionDenied matches iwd's net.connman.iwd.PermissionDenied, returned
+	// when the caller lacks permission for a privileged operation.
+	ErrPermissionDenied = core.ErrPermissionDenied
 )
 
 // -----------------------------------------------------------------------------

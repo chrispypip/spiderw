@@ -38,6 +38,7 @@ func TestIwdErrorMapping(t *testing.T) {
 		{name: IwdErrorAlreadyProvisioned, sentinel: ErrAlreadyProvisioned},
 		{name: IwdErrorNotHidden, sentinel: ErrNotHidden},
 		{name: IwdErrorNotAvailable, sentinel: ErrNotAvailable},
+		{name: IwdErrorPermissionDenied, sentinel: ErrPermissionDenied},
 	}
 
 	for _, tc := range cases {

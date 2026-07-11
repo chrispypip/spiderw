@@ -70,6 +70,10 @@ const (
 	// IwdErrorNotAvailable is returned when a requested operation is not
 	// currently available.
 	IwdErrorNotAvailable = IwdService + ".NotAvailable"
+
+	// IwdErrorPermissionDenied is returned when the caller lacks permission for a
+	// requested operation.
+	IwdErrorPermissionDenied = IwdService + ".PermissionDenied"
 )
 
 // Sentinels for iwd-reported failures. They remain matchable with errors.Is
@@ -129,6 +133,9 @@ var (
 
 	// ErrNotAvailable matches net.connman.iwd.NotAvailable.
 	ErrNotAvailable = errors.New("iwd operation not available")
+
+	// ErrPermissionDenied matches net.connman.iwd.PermissionDenied.
+	ErrPermissionDenied = errors.New("iwd permission denied")
 )
 
 // iwdErrorSentinels maps a recognized iwd D-Bus error name to its sentinel.
@@ -152,6 +159,7 @@ var iwdErrorSentinels = map[string]error{
 	IwdErrorAlreadyProvisioned: ErrAlreadyProvisioned,
 	IwdErrorNotHidden:          ErrNotHidden,
 	IwdErrorNotAvailable:       ErrNotAvailable,
+	IwdErrorPermissionDenied:   ErrPermissionDenied,
 }
 
 // iwdErrorSentinel returns the sentinel for a recognized iwd D-Bus error, or nil
