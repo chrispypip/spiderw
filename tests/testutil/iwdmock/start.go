@@ -351,3 +351,11 @@ func StartMockWithoutStation(t *testing.T) {
 	t.Helper()
 	startMockWithT(t, []string{"--omit-station"})
 }
+
+// StartMockWithoutWSC starts the mock with the SimpleConfiguration (WSC)
+// interface omitted from the station-mode device, so the station exists but WSC
+// is unavailable (as with a driver that does not support it).
+func StartMockWithoutWSC(t *testing.T) {
+	t.Helper()
+	startMockWithT(t, []string{"--omit-wsc"})
+}

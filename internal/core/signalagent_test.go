@@ -72,12 +72,12 @@ func testSignalLevelCore_Validate_EmptyThresholds(t *testing.T) {
 
 func testSignalLevelCore_Validate_NotDescending(t *testing.T) {
 	t.Parallel()
-	for _, thr := range [][]int{
+	for _, thresh := range [][]int{
 		{-70, -60},      // ascending
 		{-60, -60},      // equal (not strictly descending)
 		{-60, -80, -70}, // out of order
 	} {
-		err := SignalLevelConfig{Thresholds: thr, Changed: func(int) {}}.Validate("op")
+		err := SignalLevelConfig{Thresholds: thresh, Changed: func(int) {}}.Validate("op")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "strictly descending")
 	}
@@ -86,11 +86,11 @@ func testSignalLevelCore_Validate_NotDescending(t *testing.T) {
 func testSignalLevelCore_Validate_OutOfRange(t *testing.T) {
 	t.Parallel()
 	// iwd's thresholds are int16, so both overflow directions are rejected.
-	for _, thr := range [][]int{
+	for _, thresh := range [][]int{
 		{40000},  // above math.MaxInt16
 		{-40000}, // below math.MinInt16
 	} {
-		err := SignalLevelConfig{Thresholds: thr, Changed: func(int) {}}.Validate("op")
+		err := SignalLevelConfig{Thresholds: thresh, Changed: func(int) {}}.Validate("op")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "out of range")
 	}

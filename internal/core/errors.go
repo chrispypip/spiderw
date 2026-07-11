@@ -81,6 +81,11 @@ const (
 	// ResourceAgent identifies failures involving the iwd credentials agent or
 	// agent manager.
 	ResourceAgent = failure.ResourceAgent
+
+	// ResourceSimpleConfiguration identifies failures involving iwd's WSC
+	// (SimpleConfiguration) interface, used for both infrastructure and P2P-peer
+	// enrollment.
+	ResourceSimpleConfiguration = failure.ResourceSimpleConfiguration
 )
 
 // Error sentinels support errors.Is checks in core-layer errors.
@@ -123,6 +128,10 @@ var (
 	// has no backend.
 	ErrSignalLevelAgentNotInitialized = errors.New("signal level agent not initialized")
 
+	// ErrSimpleConfigurationNotInitialized indicates that a SimpleConfiguration
+	// (WSC) wrapper has no backend.
+	ErrSimpleConfigurationNotInitialized = errors.New("simple configuration not initialized")
+
 	// ErrNoAgent indicates that iwd rejected an operation because no credentials
 	// agent is registered. It is re-exported from the iwdbus layer so callers can
 	// match it with errors.Is through the core and public error chains.
@@ -149,6 +158,14 @@ var (
 	ErrNotHidden          = iwdbus.ErrNotHidden
 	ErrNotAvailable       = iwdbus.ErrNotAvailable
 	ErrPermissionDenied   = iwdbus.ErrPermissionDenied
+
+	// WSC (SimpleConfiguration) enrollment errors, re-exported so callers can
+	// match them with errors.Is.
+	ErrWSCSessionOverlap  = iwdbus.ErrWSCSessionOverlap
+	ErrWSCNoCredentials   = iwdbus.ErrWSCNoCredentials
+	ErrWSCNotReachable    = iwdbus.ErrWSCNotReachable
+	ErrWSCWalkTimeExpired = iwdbus.ErrWSCWalkTimeExpired
+	ErrWSCTimeExpired     = iwdbus.ErrWSCTimeExpired
 )
 
 func newError(kind Kind, resource Resource, op, details string, err error) error {
@@ -220,6 +237,9 @@ var (
 	// Agent operations are method calls (Register/Unregister) and object
 	// export/unexport, never property reads, so includeDBusProperty stays false.
 	agentUnavailablePolicy = unavailablePolicy{resource: ResourceAgent}
+	// WSC (SimpleConfiguration) operations are method calls only (no properties),
+	// so includeDBusProperty stays false.
+	simpleConfigurationUnavailablePolicy = unavailablePolicy{resource: ResourceSimpleConfiguration}
 )
 
 func wrapUnavailable(op, details string, err error, policy unavailablePolicy) error {
@@ -283,6 +303,12 @@ func WrapKnownNetworkUnavailable(op, details string, err error) error {
 // resource.
 func WrapAgentUnavailable(op, details string, err error) error {
 	return wrapUnavailable(op, details, err, agentUnavailablePolicy)
+}
+
+// WrapSimpleConfigurationUnavailable classifies D-Bus WSC (SimpleConfiguration)
+// failures by kind and resource.
+func WrapSimpleConfigurationUnavailable(op, details string, err error) error {
+	return wrapUnavailable(op, details, err, simpleConfigurationUnavailablePolicy)
 }
 
 // WrapInvalidState wraps invalid state issues for resource.

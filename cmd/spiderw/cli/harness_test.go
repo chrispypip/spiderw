@@ -371,6 +371,7 @@ type fakeStation struct {
 	scanCalled          bool
 	scanNeverCompletes  bool
 	disconnectCalled    bool
+	wscErr              error
 	err                 error
 }
 
@@ -449,6 +450,14 @@ func (f *fakeStation) SubscribeScanningChanged(ctx context.Context, fn func(bool
 // signal and is not exercised by the in-process CLI tests, so this is a stub.
 func (f *fakeStation) MonitorSignalLevel(ctx context.Context, cfg spiderw.SignalLevelConfig) (*spiderw.SignalLevelAgent, error) {
 	return nil, f.err
+}
+
+// SimpleConfiguration satisfies stationAPI. A real *spiderw.SimpleConfiguration
+// cannot be constructed with a fake backend from this package, so the fake only
+// drives the handle-unavailable path (wscErr); the wsc subcommand logic is
+// covered directly against a fake wscAPI in station_test.go.
+func (f *fakeStation) SimpleConfiguration(ctx context.Context) (*spiderw.SimpleConfiguration, error) {
+	return nil, f.wscErr
 }
 
 type fakeBSS struct {

@@ -112,12 +112,21 @@ func ExportDevice(conn *dbus.Conn) error {
 		}
 		// A station-mode device also carries the Station interface (gated by
 		// --omit-station); the Properties handler above serves its properties.
+		withWSC := d.HasStation && !*omitWSCFlag
 		if d.HasStation {
 			if err := conn.Export(d, d.Path, iwdbus.IwdStationIface); err != nil {
 				return err
 			}
+			// WSC (SimpleConfiguration) is exported on the same station-mode
+			// device object, mirroring iwd (gated by --omit-wsc so a station can
+			// exist without WSC, like a driver that does not support it).
+			if withWSC {
+				if err := conn.Export(d, d.Path, iwdbus.IwdSimpleConfigurationIface); err != nil {
+					return err
+				}
+			}
 		}
-		if err := exportDeviceIntrospection(conn, d.Path, d.HasStation); err != nil {
+		if err := exportDeviceIntrospection(conn, d.Path, d.HasStation, withWSC); err != nil {
 			return err
 		}
 		exportedDevices = append(exportedDevices, d)

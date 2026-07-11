@@ -143,6 +143,17 @@ var (
 	// ErrPermissionDenied matches iwd's net.connman.iwd.PermissionDenied, returned
 	// when the caller lacks permission for a privileged operation.
 	ErrPermissionDenied = core.ErrPermissionDenied
+
+	// The following match iwd's WSC (SimpleConfiguration) enrollment errors, so a
+	// caller can react to a specific WSC outcome with errors.Is. ErrWSCSessionOverlap
+	// means more than one access point was in PushButton mode; ErrWSCWalkTimeExpired
+	// and ErrWSCTimeExpired mean no access point was found in PushButton / PIN mode
+	// within the allotted time.
+	ErrWSCSessionOverlap  = core.ErrWSCSessionOverlap
+	ErrWSCNoCredentials   = core.ErrWSCNoCredentials
+	ErrWSCNotReachable    = core.ErrWSCNotReachable
+	ErrWSCWalkTimeExpired = core.ErrWSCWalkTimeExpired
+	ErrWSCTimeExpired     = core.ErrWSCTimeExpired
 )
 
 // -----------------------------------------------------------------------------

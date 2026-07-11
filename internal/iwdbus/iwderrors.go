@@ -74,6 +74,30 @@ const (
 	// IwdErrorPermissionDenied is returned when the caller lacks permission for a
 	// requested operation.
 	IwdErrorPermissionDenied = IwdService + ".PermissionDenied"
+
+	// The WSC (SimpleConfiguration) errors below are scoped to the WSC interface
+	// rather than the top-level iwd namespace, so they are distinct from
+	// same-named generic errors (e.g. ServiceSetOverlap).
+
+	// IwdErrorWSCSessionOverlap is returned when more than one access point is in
+	// WSC PushButton (PBC) mode, making the enrollment target ambiguous.
+	IwdErrorWSCSessionOverlap = IwdSimpleConfigurationIface + ".SessionOverlap"
+
+	// IwdErrorWSCNoCredentials is returned when WSC enrollment finished without
+	// obtaining usable credentials.
+	IwdErrorWSCNoCredentials = IwdSimpleConfigurationIface + ".NoCredentials"
+
+	// IwdErrorWSCNotReachable is returned when WSC obtained credentials but the
+	// network could not be reached.
+	IwdErrorWSCNotReachable = IwdSimpleConfigurationIface + ".NotReachable"
+
+	// IwdErrorWSCWalkTimeExpired is returned when no access point in PushButton
+	// mode was found within the WSC walk time.
+	IwdErrorWSCWalkTimeExpired = IwdSimpleConfigurationIface + ".WalkTimeExpired"
+
+	// IwdErrorWSCTimeExpired is returned when no access point in PIN mode was found
+	// within the allotted time.
+	IwdErrorWSCTimeExpired = IwdSimpleConfigurationIface + ".TimeExpired"
 )
 
 // Sentinels for iwd-reported failures. They remain matchable with errors.Is
@@ -136,6 +160,22 @@ var (
 
 	// ErrPermissionDenied matches net.connman.iwd.PermissionDenied.
 	ErrPermissionDenied = errors.New("iwd permission denied")
+
+	// ErrWSCSessionOverlap matches net.connman.iwd.SimpleConfiguration.SessionOverlap:
+	// more than one access point was in WSC PushButton mode.
+	ErrWSCSessionOverlap = errors.New("iwd WSC session overlap")
+
+	// ErrWSCNoCredentials matches net.connman.iwd.SimpleConfiguration.NoCredentials.
+	ErrWSCNoCredentials = errors.New("iwd WSC obtained no usable credentials")
+
+	// ErrWSCNotReachable matches net.connman.iwd.SimpleConfiguration.NotReachable.
+	ErrWSCNotReachable = errors.New("iwd WSC network not reachable")
+
+	// ErrWSCWalkTimeExpired matches net.connman.iwd.SimpleConfiguration.WalkTimeExpired.
+	ErrWSCWalkTimeExpired = errors.New("iwd WSC walk time expired")
+
+	// ErrWSCTimeExpired matches net.connman.iwd.SimpleConfiguration.TimeExpired.
+	ErrWSCTimeExpired = errors.New("iwd WSC time expired")
 )
 
 // iwdErrorSentinels maps a recognized iwd D-Bus error name to its sentinel.
@@ -160,6 +200,12 @@ var iwdErrorSentinels = map[string]error{
 	IwdErrorNotHidden:          ErrNotHidden,
 	IwdErrorNotAvailable:       ErrNotAvailable,
 	IwdErrorPermissionDenied:   ErrPermissionDenied,
+
+	IwdErrorWSCSessionOverlap:  ErrWSCSessionOverlap,
+	IwdErrorWSCNoCredentials:   ErrWSCNoCredentials,
+	IwdErrorWSCNotReachable:    ErrWSCNotReachable,
+	IwdErrorWSCWalkTimeExpired: ErrWSCWalkTimeExpired,
+	IwdErrorWSCTimeExpired:     ErrWSCTimeExpired,
 }
 
 // iwdErrorSentinel returns the sentinel for a recognized iwd D-Bus error, or nil

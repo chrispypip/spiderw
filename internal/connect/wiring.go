@@ -13,26 +13,30 @@ import (
 )
 
 var (
-	connectSystemBusFn       = dbus.ConnectSystemBus
-	connectSessionBusFn      = dbus.ConnectSessionBus
-	newIwdDaemonFn           = iwdbus.NewDaemon
-	newIwdAdapterFn          = iwdbus.NewAdapter
-	newIwdDeviceFn           = iwdbus.NewDevice
-	newIwdStationFn          = iwdbus.NewStation
-	newIwdBSSFn              = iwdbus.NewBasicServiceSet
-	newIwdNetworkFn          = iwdbus.NewNetwork
-	newIwdKnownNetworkFn     = iwdbus.NewKnownNetwork
-	newIwdAgentManagerFn     = iwdbus.NewAgentManager
-	exportAgentFn            = iwdbus.ExportAgent
-	exportSignalLevelAgentFn = iwdbus.ExportSignalLevelAgent
-	newCoreDaemonFn          = func(raw *iwdbus.Daemon) *core.Daemon { return core.NewDaemon(raw) }
-	newCoreAdapterFn         = func(raw *iwdbus.Adapter) *core.Adapter { return core.NewAdapter(raw) }
-	newCoreDeviceFn          = func(raw *iwdbus.Device) *core.Device { return core.NewDevice(raw) }
-	newCoreStationFn         = func(raw *iwdbus.Station) *core.Station { return core.NewStation(raw) }
-	newCoreBSSFn             = func(raw *iwdbus.BasicServiceSet) *core.BasicServiceSet { return core.NewBasicServiceSet(raw) }
-	newCoreNetworkFn         = func(raw *iwdbus.Network) *core.Network { return core.NewNetwork(raw) }
-	newCoreKnownNetworkFn    = func(raw *iwdbus.KnownNetwork) *core.KnownNetwork {
+	connectSystemBusFn          = dbus.ConnectSystemBus
+	connectSessionBusFn         = dbus.ConnectSessionBus
+	newIwdDaemonFn              = iwdbus.NewDaemon
+	newIwdAdapterFn             = iwdbus.NewAdapter
+	newIwdDeviceFn              = iwdbus.NewDevice
+	newIwdStationFn             = iwdbus.NewStation
+	newIwdBSSFn                 = iwdbus.NewBasicServiceSet
+	newIwdNetworkFn             = iwdbus.NewNetwork
+	newIwdKnownNetworkFn        = iwdbus.NewKnownNetwork
+	newIwdAgentManagerFn        = iwdbus.NewAgentManager
+	newIwdSimpleConfigurationFn = iwdbus.NewSimpleConfiguration
+	exportAgentFn               = iwdbus.ExportAgent
+	exportSignalLevelAgentFn    = iwdbus.ExportSignalLevelAgent
+	newCoreDaemonFn             = func(raw *iwdbus.Daemon) *core.Daemon { return core.NewDaemon(raw) }
+	newCoreAdapterFn            = func(raw *iwdbus.Adapter) *core.Adapter { return core.NewAdapter(raw) }
+	newCoreDeviceFn             = func(raw *iwdbus.Device) *core.Device { return core.NewDevice(raw) }
+	newCoreStationFn            = func(raw *iwdbus.Station) *core.Station { return core.NewStation(raw) }
+	newCoreBSSFn                = func(raw *iwdbus.BasicServiceSet) *core.BasicServiceSet { return core.NewBasicServiceSet(raw) }
+	newCoreNetworkFn            = func(raw *iwdbus.Network) *core.Network { return core.NewNetwork(raw) }
+	newCoreKnownNetworkFn       = func(raw *iwdbus.KnownNetwork) *core.KnownNetwork {
 		return core.NewKnownNetwork(raw)
+	}
+	newCoreSimpleConfigurationFn = func(raw *iwdbus.SimpleConfiguration) *core.SimpleConfiguration {
+		return core.NewSimpleConfiguration(raw)
 	}
 	closeConnFn = func(c *dbus.Conn) error { return c.Close() }
 )
@@ -125,6 +129,9 @@ type Wiring struct {
 	// SignalLevelAgentFactory optionally overrides signal-level agent
 	// registration for tests.
 	SignalLevelAgentFactory func(ctx context.Context, stationPath string, cfg core.SignalLevelConfig) (core.SignalLevelAgentIface, error)
+
+	// SimpleConfigurationFactory optionally overrides WSC construction for tests.
+	SimpleConfigurationFactory func(ctx context.Context, path string) (core.SimpleConfigurationIface, error)
 
 	// ResolverOverride optionally supplies the friendly-reference resolver,
 	// bypassing the Conn-backed one. Fake-backed tests set it (typically to
@@ -347,6 +354,45 @@ func (w *Wiring) NewKnownNetwork(ctx context.Context, path string) (core.KnownNe
 		return nil, core.WrapKnownNetworkUnavailable(op, "known network unavailable", fmt.Errorf("core known network interface not available"))
 	}
 	return coreKnownNetwork, nil
+}
+
+// NewSimpleConfiguration constructs a core WSC (SimpleConfiguration) wrapper for
+// the given iwd object path. The interface is exported on a station-mode device
+// object and on P2P peer objects, so path is that object's path (not a derived
+// spiderw path): unlike the credentials and signal-level agents, WSC is a plain
+// client binding on an existing iwd object, so there is nothing to export.
+func (w *Wiring) NewSimpleConfiguration(ctx context.Context, path string) (core.SimpleConfigurationIface, error) {
+	const op = "NewSimpleConfiguration"
+
+	if w == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "wiring cannot be nil", core.ErrCore)
+	}
+	if path == "" {
+		return nil, core.WrapInvalidArgument(core.ResourceSimpleConfiguration, op, "simple configuration path cannot be empty", core.ErrCore)
+	}
+	if path[0] != '/' {
+		return nil, core.WrapInvalidArgument(core.ResourceSimpleConfiguration, op, "simple configuration path must be absolute", core.ErrCore)
+	}
+	if w.SimpleConfigurationFactory != nil {
+		return w.SimpleConfigurationFactory(ctx, path)
+	}
+	if w.Conn == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "D-Bus conn cannot be nil", core.ErrCore)
+	}
+
+	iwdConfig, err := newIwdSimpleConfigurationFn(ctx, w.Conn, dbus.ObjectPath(path))
+	if err != nil {
+		return nil, core.WrapSimpleConfigurationUnavailable(op, "simple configuration unavailable", err)
+	}
+	if iwdConfig == nil {
+		return nil, core.WrapSimpleConfigurationUnavailable(op, "simple configuration unavailable", iwdbus.WrapIntrospection(path, fmt.Errorf("iwd simple configuration interface not available")))
+	}
+
+	coreConfig := newCoreSimpleConfigurationFn(iwdConfig)
+	if coreConfig == nil {
+		return nil, core.WrapSimpleConfigurationUnavailable(op, "simple configuration unavailable", fmt.Errorf("core simple configuration interface not available"))
+	}
+	return coreConfig, nil
 }
 
 // NewAgent exports a credentials agent built from cc and registers it with iwd,

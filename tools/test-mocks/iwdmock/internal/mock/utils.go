@@ -31,6 +31,8 @@ var (
 	omitAgentFlag = flag.Bool("omit-agent", false, "Don't export the AgentManager interface (so agent registration is unavailable)")
 
 	omitStationFlag = flag.Bool("omit-station", false, "Don't export the Station interface on the station-mode device (so station operations are unavailable)")
+
+	omitWSCFlag = flag.Bool("omit-wsc", false, "Don't export the SimpleConfiguration (WSC) interface on the station-mode device (so WSC is unavailable while the station remains)")
 )
 
 func emitPropertiesChanged(path dbus.ObjectPath, iface string, changed map[string]dbus.Variant, invalid []string) {

@@ -731,6 +731,128 @@ func printSignalLevelLine(app *App, ref string, level int, thresholds []int, mu 
 	return err
 }
 
+// wscAPI is the subset of *spiderw.SimpleConfiguration the wsc command drives. It
+// lets the subcommand logic (runWSCOp) be unit-tested against a fake handle,
+// since a real *spiderw.SimpleConfiguration cannot be built with a fake backend.
+type wscAPI interface {
+	PushButton(ctx context.Context) error
+	GeneratePin(ctx context.Context) (string, error)
+	StartPin(ctx context.Context, pin string) error
+	Cancel(ctx context.Context) error
+}
+
+type wscPinResult struct {
+	Station string `json:"Station"`
+	Pin     string `json:"Pin"`
+}
+
+func (r wscPinResult) String() string {
+	return fmt.Sprintf("WSC PIN %s (enter this at the access point within the WSC walk time)", r.Pin)
+}
+
+type wscPushButtonResult struct {
+	Station string `json:"Station"`
+}
+
+func (r wscPushButtonResult) String() string {
+	return fmt.Sprintf("station %q: press the WPS button on your access point now", r.Station)
+}
+
+type wscResult struct {
+	Station string `json:"Station"`
+	Action  string `json:"Action"`
+}
+
+func (r wscResult) String() string {
+	if r.Action == "cancel" {
+		return "WSC operation canceled"
+	}
+	return "connected via WSC"
+}
+
+// runStationWSC drives WSC (Wi-Fi Simple Configuration / WPS) enrollment for the
+// station: push-button (PBC), PIN, or cancel. Enrollment blocks until iwd reports
+// the outcome (up to the WPS walk time).
+func runStationWSC(app *App, ctx context.Context, stationRef string, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: spiderw station <station> wsc <push-button | pin [<pin>] | cancel>")
+	}
+	sub := args[0]
+	rest := args[1:]
+
+	// Reject an unknown subcommand before dialing iwd.
+	switch sub {
+	case "push-button", "pin", "cancel":
+	default:
+		return fmt.Errorf("unknown wsc subcommand %q (want push-button, pin, or cancel)", sub)
+	}
+
+	return withStation(app, ctx, stationRef, func(ctx context.Context, s stationAPI) error {
+		wsc, err := s.SimpleConfiguration(ctx)
+		if err != nil {
+			return err
+		}
+		return runWSCOp(app, ctx, stationRef, wsc, sub, rest)
+	})
+}
+
+// runWSCOp executes a validated wsc subcommand against wsc. It is separated from
+// runStationWSC so it can be unit-tested with a fake wscAPI.
+func runWSCOp(app *App, ctx context.Context, ref string, wsc wscAPI, sub string, rest []string) error {
+	switch sub {
+	case "push-button":
+		if len(rest) != 0 {
+			return fmt.Errorf("usage: spiderw station <station> wsc push-button")
+		}
+		// Signal that enrollment has started before PushButton blocks, prompting
+		// the user to press the WPS button.
+		if err := app.printOutput(wscPushButtonResult{Station: ref}); err != nil {
+			return err
+		}
+		if err := wsc.PushButton(ctx); err != nil {
+			return err
+		}
+		return app.printOutput(wscResult{Station: ref, Action: "push-button"})
+
+	case "pin":
+		if len(rest) > 1 {
+			return fmt.Errorf("usage: spiderw station <station> wsc pin [<pin>]")
+		}
+		var pin string
+		if len(rest) == 1 {
+			pin = rest[0]
+		} else {
+			generated, err := wsc.GeneratePin(ctx)
+			if err != nil {
+				return err
+			}
+			pin = generated
+		}
+		// Print the station and PIN before StartPin blocks, so it is clear
+		// enrollment is in progress and which PIN to enter at the access point
+		// (whether it was generated or supplied).
+		if err := app.printOutput(wscPinResult{Station: ref, Pin: pin}); err != nil {
+			return err
+		}
+		if err := wsc.StartPin(ctx, pin); err != nil {
+			return err
+		}
+		return app.printOutput(wscResult{Station: ref, Action: "pin"})
+
+	case "cancel":
+		if len(rest) != 0 {
+			return fmt.Errorf("usage: spiderw station <station> wsc cancel")
+		}
+		if err := wsc.Cancel(ctx); err != nil {
+			return err
+		}
+		return app.printOutput(wscResult{Station: ref, Action: "cancel"})
+
+	default:
+		return fmt.Errorf("unknown wsc subcommand %q (want push-button, pin, or cancel)", sub)
+	}
+}
+
 func runStationWithRef(app *App, args []string) error {
 	if len(args) < 2 {
 		printStationUsage(app)
@@ -759,6 +881,8 @@ func runStationWithRef(app *App, args []string) error {
 		return runStationHiddenAPs(app, ctx, stationRef, rest)
 	case "monitor-signal":
 		return runStationMonitorSignal(app, ctx, stationRef, rest)
+	case "wsc":
+		return runStationWSC(app, ctx, stationRef, rest)
 	default:
 		printStationUsage(app)
 		return fmt.Errorf("unknown station command %q for station %q", op, stationRef)
@@ -802,6 +926,12 @@ const stationHelpText = `Commands:
                                         first (e.g. -60 -70 -80); prints the band
                                         index (0 = strongest) and its dBm range on
                                         each crossing, until Ctrl-C
+  <station> wsc push-button             Join an access point via WSC (WPS)
+                                        push-button; press the AP's WPS button
+                                        first, then run this within ~2 minutes
+  <station> wsc pin [<pin>]             Join via WSC PIN; with no <pin> a PIN is
+                                        generated and printed to enter at the AP
+  <station> wsc cancel                  Cancel an in-progress WSC operation
 
 A station is a device in station mode. Connecting to a *visible* network is done
 via 'network <ssid> connect'.`

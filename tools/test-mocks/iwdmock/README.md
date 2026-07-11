@@ -253,6 +253,16 @@ secured `Network.Connect`, so it needs a registered agent supplying
 `NotHidden` and any other `NotFound`. `GetHiddenAccessPoints` returns two seeded
 hidden APs. Use `--omit-station` to drop the interface while keeping the device.
 
+### WSC (SimpleConfiguration)
+
+The station-mode device also exports `net.connman.iwd.SimpleConfiguration` (WSC /
+WPS) on the same object, again mirroring iwd. `PushButton` and `Cancel` succeed
+immediately; `GeneratePin` returns the fixed PIN `12345670`; `StartPin` succeeds
+for a normal PIN but returns the WSC `NoCredentials` error for the sentinel PIN
+`00000000`, so integration tests can assert that matchable sentinel end to end.
+`--omit-wsc` drops just this interface while keeping the station (as with a driver
+that does not support WSC); `--omit-station` drops the station and WSC together.
+
 ### Credentials agent (AgentManager)
 
 The mock daemon also hosts the `net.connman.iwd.AgentManager` interface

@@ -21,6 +21,8 @@ there from a cold device.
 | [`connect-hidden`](./connect-hidden) | Joins a non-broadcasting (hidden) network via a credentials agent | yes |
 | [`monitor`](./monitor) | Watches a station and prints state/scanning changes until Ctrl-C | no |
 | [`signal-monitor`](./signal-monitor) | Watches connected-network signal strength (RSSI band) until Ctrl-C | no |
+| [`wsc-push-button`](./wsc-push-button) | Joins an access point via WSC (WPS) push-button | yes |
+| [`wsc-pin`](./wsc-pin) | Joins an access point via WSC (WPS) PIN (generated or supplied) | yes |
 | [`known-networks`](./known-networks) | Lists stored networks; can toggle autoconnect or forget one | only with `-forget`/`-autoconnect` |
 
 ## Run against real iwd
@@ -57,4 +59,8 @@ go run ./examples/scan-and-connect -session -ssid OpenNet
 go run ./examples/scan-and-connect -session -ssid SecuredNet -passphrase mock-secret-passphrase
 go run ./examples/connect-hidden   -session -ssid HiddenSecured -passphrase mock-secret-passphrase
 go run ./examples/known-networks   -session
+go run ./examples/wsc-push-button  -session
+go run ./examples/wsc-pin          -session
 ```
+
+The mock accepts WSC enrollment and returns the PIN `12345670` for `wsc-pin`.

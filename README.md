@@ -419,9 +419,10 @@ Inspect, scan, and control stations (devices in station mode). `status` shows
 (waiting for it to finish, then listing results, unless `--no-wait`; `--timeout`
 bounds the wait); `networks` lists the last scan's results by signal; `disconnect`
 and `connect-hidden` control the connection (a secured hidden network prompts
-for, or takes, a passphrase); `hidden-aps` lists hidden access points. Networks
-render as their SSID and access points as their MAC (object paths are still
-available with `--json`). A station is referenced by its device name (e.g.
+for, or takes, a passphrase); `hidden-aps` lists hidden access points; `wsc`
+joins an access point without a passphrase via WSC (WPS) push-button or PIN.
+Networks render as their SSID and access points as their MAC (object paths are
+still available with `--json`). A station is referenced by its device name (e.g.
 `wlan0`) or object path:
 
 ```bash
@@ -436,6 +437,8 @@ spiderw station wlan0 hidden-aps
 spiderw station wlan0 affinities
 spiderw station wlan0 affinities set de:ad:be:ef:ca:fe   # a BSS MAC or object path
 spiderw station wlan0 affinities clear
+spiderw station wlan0 wsc push-button                    # press the AP's WPS button first
+spiderw station wlan0 wsc pin                            # generates and prints a PIN to enter at the AP
 ```
 
 List basic service sets (BSSes), or print a full snapshot for every BSS. A

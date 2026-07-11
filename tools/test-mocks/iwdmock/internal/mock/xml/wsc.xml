@@ -1,0 +1,10 @@
+  <interface name="net.connman.iwd.SimpleConfiguration">
+    <method name="PushButton"/>
+    <method name="GeneratePin">
+      <arg direction="out" name="pin" type="s"/>
+    </method>
+    <method name="StartPin">
+      <arg direction="in" name="pin" type="s"/>
+    </method>
+    <method name="Cancel"/>
+  </interface>

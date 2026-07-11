@@ -51,6 +51,10 @@ var (
 	// initialization.
 	ErrAgentManagerUninitialized = errors.New("agent manager is not initialized")
 
+	// ErrSimpleConfigurationUninitialized indicates that a SimpleConfiguration
+	// (WSC) was used before initialization.
+	ErrSimpleConfigurationUninitialized = errors.New("simple configuration is not initialized")
+
 	// ErrAgentCanceled is the value an AgentHandler callback returns to decline a
 	// credentials request. The exported agent maps it (and, defensively, any
 	// non-nil error) to the IwdAgentErrorCanceled D-Bus error returned to iwd.

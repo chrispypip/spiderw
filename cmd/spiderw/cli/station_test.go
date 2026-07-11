@@ -471,7 +471,7 @@ func TestStationCmd_HiddenAPs_Empty(t *testing.T) {
 }
 
 // TestPrintSignalLevelLine covers the monitor output helper directly (the
-// monitor-signal command blocks on an OS signal and is not driveable in-process).
+// monitor-signal command blocks on an OS signal and is not drivable in-process).
 func TestPrintSignalLevelLine(t *testing.T) {
 	t.Parallel()
 	var mu sync.Mutex
@@ -499,4 +499,177 @@ func TestParseSignalThresholds(t *testing.T) {
 	_, err = parseSignalThresholds([]string{"-60", "notanumber"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid signal threshold")
+}
+
+type fakeWSC struct {
+	pushErr   error
+	genPin    string
+	genErr    error
+	startErr  error
+	cancelErr error
+
+	startedPin string
+	calls      []string
+}
+
+func (f *fakeWSC) PushButton(ctx context.Context) error {
+	f.calls = append(f.calls, "PushButton")
+	return f.pushErr
+}
+
+func (f *fakeWSC) GeneratePin(ctx context.Context) (string, error) {
+	f.calls = append(f.calls, "GeneratePin")
+	return f.genPin, f.genErr
+}
+
+func (f *fakeWSC) StartPin(ctx context.Context, pin string) error {
+	f.calls = append(f.calls, "StartPin")
+	f.startedPin = pin
+	return f.startErr
+}
+
+func (f *fakeWSC) Cancel(ctx context.Context) error {
+	f.calls = append(f.calls, "Cancel")
+	return f.cancelErr
+}
+
+func TestRunWSCOp(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("PushButtonSuccess", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		f := &fakeWSC{}
+		require.NoError(t, runWSCOp(app, ctx, "wlan0", f, "push-button", nil))
+		require.Equal(t, []string{"PushButton"}, f.calls)
+		out := buf.String()
+		// The start prompt precedes enrollment, then the connected result.
+		require.Contains(t, out, "press the WPS button")
+		require.Contains(t, out, "connected via WSC")
+	})
+
+	t.Run("PushButtonError", func(t *testing.T) {
+		t.Parallel()
+		app, _ := appWithBuffer(false)
+		f := &fakeWSC{pushErr: errors.New("overlap")}
+		err := runWSCOp(app, ctx, "wlan0", f, "push-button", nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "overlap")
+	})
+
+	t.Run("PushButtonRejectsArgs", func(t *testing.T) {
+		t.Parallel()
+		app, _ := appWithBuffer(false)
+		f := &fakeWSC{}
+		err := runWSCOp(app, ctx, "wlan0", f, "push-button", []string{"extra"})
+		require.Error(t, err)
+		require.Empty(t, f.calls)
+	})
+
+	t.Run("PinWithArg", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		f := &fakeWSC{}
+		require.NoError(t, runWSCOp(app, ctx, "wlan0", f, "pin", []string{"1234-5670"}))
+		// A supplied PIN skips generation.
+		require.Equal(t, []string{"StartPin"}, f.calls)
+		require.Equal(t, "1234-5670", f.startedPin)
+		out := buf.String()
+		// The supplied PIN is echoed before enrollment, mirroring the
+		// generated-PIN case.
+		require.Contains(t, out, "1234-5670")
+		require.Contains(t, out, "connected via WSC")
+	})
+
+	t.Run("PinGenerated", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		f := &fakeWSC{genPin: "12345670"}
+		require.NoError(t, runWSCOp(app, ctx, "wlan0", f, "pin", nil))
+		require.Equal(t, []string{"GeneratePin", "StartPin"}, f.calls)
+		require.Equal(t, "12345670", f.startedPin, "the generated PIN is the one started")
+		out := buf.String()
+		require.Contains(t, out, "12345670", "the generated PIN must be printed for the user")
+		require.Contains(t, out, "connected via WSC")
+	})
+
+	t.Run("PinGenerateError", func(t *testing.T) {
+		t.Parallel()
+		app, _ := appWithBuffer(false)
+		f := &fakeWSC{genErr: errors.New("no pin")}
+		err := runWSCOp(app, ctx, "wlan0", f, "pin", nil)
+		require.Error(t, err)
+		require.Equal(t, []string{"GeneratePin"}, f.calls, "StartPin must not run when generation fails")
+	})
+
+	t.Run("PinRejectsExtraArgs", func(t *testing.T) {
+		t.Parallel()
+		app, _ := appWithBuffer(false)
+		f := &fakeWSC{}
+		err := runWSCOp(app, ctx, "wlan0", f, "pin", []string{"12345670", "extra"})
+		require.Error(t, err)
+		require.Empty(t, f.calls)
+	})
+
+	t.Run("Cancel", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		f := &fakeWSC{}
+		require.NoError(t, runWSCOp(app, ctx, "wlan0", f, "cancel", nil))
+		require.Equal(t, []string{"Cancel"}, f.calls)
+		require.Contains(t, buf.String(), "canceled")
+	})
+
+	t.Run("UnknownSubcommand", func(t *testing.T) {
+		t.Parallel()
+		app, _ := appWithBuffer(false)
+		f := &fakeWSC{}
+		err := runWSCOp(app, ctx, "wlan0", f, "bogus", nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unknown wsc subcommand")
+		require.Empty(t, f.calls)
+	})
+
+	t.Run("JSONOutput", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(true)
+		f := &fakeWSC{}
+		require.NoError(t, runWSCOp(app, ctx, "wlan0", f, "push-button", nil))
+		require.Contains(t, buf.String(), `"Station": "wlan0"`)
+		require.Contains(t, buf.String(), `"Action": "push-button"`)
+	})
+
+	t.Run("PinJSONHasStationAndPin", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(true)
+		f := &fakeWSC{}
+		require.NoError(t, runWSCOp(app, ctx, "wlan0", f, "pin", []string{"12345678"}))
+		out := buf.String()
+		// The pre-enrollment JSON object carries the station and PIN.
+		require.Contains(t, out, `"Station": "wlan0"`)
+		require.Contains(t, out, `"Pin": "12345678"`)
+	})
+}
+
+func TestStationCmd_WSC_UnknownSubcommand(t *testing.T) {
+	t.Parallel()
+	out, code := driveCLI(fakeWithStation(), nil, false, "station", testStationPath, "wsc", "bogus")
+	require.NotEqual(t, 0, code)
+	require.Contains(t, out, "unknown wsc subcommand")
+}
+
+func TestStationCmd_WSC_MissingSubcommand(t *testing.T) {
+	t.Parallel()
+	out, code := driveCLI(fakeWithStation(), nil, false, "station", testStationPath, "wsc")
+	require.NotEqual(t, 0, code)
+	require.Contains(t, out, "usage")
+}
+
+func TestStationCmd_WSC_HandleUnavailable(t *testing.T) {
+	t.Parallel()
+	st := &fakeStation{path: testStationPath, name: testStationName, wscErr: errors.New("wsc not available")}
+	out, code := driveCLI(stationClient(st), nil, false, "station", testStationPath, "wsc", "push-button")
+	require.NotEqual(t, 0, code)
+	require.Contains(t, out, "wsc not available")
 }

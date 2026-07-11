@@ -55,6 +55,13 @@ The following areas are currently implemented and tested end to end:
   `SignalLevelAgent` (`RegisterSignalLevelAgent` / `UnregisterSignalLevelAgent`):
   a second exported agent that reports RSSI threshold crossings, with a
   `station <name> monitor-signal` CLI command and end-to-end mock coverage.
+- WSC / Wi-Fi Simple Configuration (`net.connman.iwd.SimpleConfiguration`) via
+  `Station.SimpleConfiguration`: passphrase-free enrollment to an access point in
+  PushButton (PBC) or PIN mode (`PushButton`, `GeneratePin`, `StartPin`,
+  `Cancel`), with local PIN normalization/validation, a `station <name> wsc` CLI
+  command, and end-to-end mock coverage. The binding is object-path-agnostic (its
+  own `simple configuration` error resource), so it will back P2P-peer connection
+  when P2P lands.
 - Friendly-identifier resolution: `Properties` snapshots and `OrderedNetworks`
   resolve object paths to their human identifiers (network SSID, BSS address,
   device/adapter name) in one batched `GetManagedObjects`, while scalar accessors
@@ -91,9 +98,10 @@ The following areas are currently implemented and tested end to end:
 
 The slices below map the remaining iwd D-Bus surface. spiderw currently
 implements the Daemon, Adapter, Device, Station, Network, KnownNetwork,
-BasicServiceSet, and credentials `Agent` / `AgentManager` interfaces; the intent
-is to eventually cover the rest of iwd. The areas are grouped by theme, not
-strictly ordered — priority is decided slice by slice.
+BasicServiceSet, SimpleConfiguration (WSC), the SignalLevelAgent, and credentials
+`Agent` / `AgentManager` interfaces; the intent is to eventually cover the rest
+of iwd. The areas are grouped by theme, not strictly ordered — priority is
+decided slice by slice.
 
 ### Device operating modes
 
@@ -113,10 +121,6 @@ these modes, but the mode-specific interfaces are unimplemented:
 - **Connection diagnostics** (`net.connman.iwd.StationDiagnostic`,
   `GetDiagnostics`) — read live link statistics (RSSI, TX/RX bitrate, frequency,
   security) for the connected station.
-- **WSC / Wi-Fi Simple Configuration** (`net.connman.iwd.SimpleConfiguration`,
-  a.k.a. WPS) — push-button and PIN enrollment (`PushButton`, `GeneratePin`,
-  `StartPin`, `Cancel`) to join a WSC-capable network without entering its
-  passphrase.
 
 ### Provisioning and enterprise
 
@@ -192,9 +196,9 @@ Each new slice should follow the established pattern:
 - Maintain benchmark coverage for important hot paths without optimizing before
   correctness is clear.
 - Maintain the runnable programs under `examples/` (status, bring-up,
-  scan-and-connect, connect-hidden, monitor, signal-monitor, known-networks)
-  alongside the per-method `Example*` functions in `example_test.go`, extending
-  both as new slices land.
+  scan-and-connect, connect-hidden, monitor, signal-monitor, wsc-push-button,
+  wsc-pin, known-networks) alongside the per-method `Example*` functions in
+  `example_test.go`, extending both as new slices land.
 
 ## Out of Scope for Now
 

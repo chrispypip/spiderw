@@ -76,6 +76,11 @@ const (
 	// ResourceAgent identifies failures involving the iwd credentials agent or
 	// agent manager.
 	ResourceAgent Resource = "agent"
+
+	// ResourceSimpleConfiguration identifies failures involving iwd's WSC
+	// (SimpleConfiguration) interface, used for both infrastructure and P2P-peer
+	// enrollment, so it is not tied to the station or device object.
+	ResourceSimpleConfiguration Resource = "simple configuration"
 )
 
 // String returns the stable resource label.

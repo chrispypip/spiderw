@@ -93,6 +93,11 @@ type Station struct {
 	// Client injects it (bound to the wiring); a station without it cannot
 	// monitor signal level. See MonitorSignalLevel.
 	registerSignalAgent func(ctx context.Context, stationPath string, cfg core.SignalLevelConfig) (core.SignalLevelAgentIface, error)
+
+	// newSimpleConfig constructs the WSC (SimpleConfiguration) handle for this
+	// station. The Client injects it (bound to the wiring); a station without it
+	// cannot use WSC. See SimpleConfiguration.
+	newSimpleConfig func(ctx context.Context, path string) (core.SimpleConfigurationIface, error)
 }
 
 func newStation(c core.StationIface, path, name string) *Station {
