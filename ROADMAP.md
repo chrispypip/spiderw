@@ -50,8 +50,11 @@ The following areas are currently implemented and tested end to end:
   state/scanning change subscriptions; scanning (`Scan`, `OrderedNetworks`);
   writing `Affinities` (`SetAffinities`); `Disconnect`; connecting to a hidden
   network (`ConnectHiddenNetwork`, driving the credentials agent for secured
-  hidden networks); and listing hidden APs (`GetHiddenAccessPoints`). Only the
-  `SignalLevelAgent` remains as a planned follow-up.
+  hidden networks); and listing hidden APs (`GetHiddenAccessPoints`).
+- Signal-strength monitoring (`Station.MonitorSignalLevel`) via the
+  `SignalLevelAgent` (`RegisterSignalLevelAgent` / `UnregisterSignalLevelAgent`):
+  a second exported agent that reports RSSI threshold crossings, with a
+  `station <name> monitor-signal` CLI command and end-to-end mock coverage.
 - Friendly-identifier resolution: `Properties` snapshots and `OrderedNetworks`
   resolve object paths to their human identifiers (network SSID, BSS address,
   device/adapter name) in one batched `GetManagedObjects`, while scalar accessors
@@ -75,8 +78,7 @@ The following areas are currently implemented and tested end to end:
 
 - Continue the vertical-slice cadence through the remaining iwd interfaces (see
   Future iwd Coverage), starting with the smaller station-adjacent slices
-  (`SignalLevelAgent`, `StationDiagnostic`) before the larger operating-mode and
-  P2P areas.
+  (`StationDiagnostic`) before the larger operating-mode and P2P areas.
 - Promote the 802.1x credential-agent callbacks from experimental to tested with
   a mock fixture that drives the username/password and private-key paths.
 - Formalize real-hardware validation (Raspberry Pi against real iwd) as a release
@@ -102,21 +104,19 @@ these modes, but the mode-specific interfaces are unimplemented:
 - **Access Point** (`net.connman.iwd.AccessPoint`) — run an adapter as an AP:
   start/stop a hosted network (open or PSK), scan, and list connected clients,
   plus the companion `AccessPointDiagnostic` interface.
-- **Ad-Hoc / IBSS** (`net.connman.iwd.AdHoc`) — start/stop an ad-hoc network and
-  track connected peers.
+- **Ad-Hoc / IBSS** (`net.connman.iwd.AdHoc`) — start or join an open
+  (`StartOpen`) or PSK-secured (`Start`) ad-hoc (IBSS) network and leave it
+  (`Stop`), reading the `Started` state and the `ConnectedPeers` MAC list.
 
 ### Station-mode features not yet covered
 
-- **Signal-level monitoring** (`SignalLevelAgent`, via
-  `RegisterSignalLevelAgent` / `UnregisterSignalLevelAgent`) — a second exported
-  agent that reports RSSI threshold crossings, building on the existing
-  credentials-agent machinery.
 - **Connection diagnostics** (`net.connman.iwd.StationDiagnostic`,
   `GetDiagnostics`) — read live link statistics (RSSI, TX/RX bitrate, frequency,
   security) for the connected station.
-- **WPS / WiFi Simple Configuration** (`net.connman.iwd.SimpleConfiguration`) —
-  push-button and PIN enrollment (`PushButton`, `GeneratePin`, `StartPin`,
-  `Cancel`).
+- **WSC / Wi-Fi Simple Configuration** (`net.connman.iwd.SimpleConfiguration`,
+  a.k.a. WPS) — push-button and PIN enrollment (`PushButton`, `GeneratePin`,
+  `StartPin`, `Cancel`) to join a WSC-capable network without entering its
+  passphrase.
 
 ### Provisioning and enterprise
 
@@ -134,9 +134,13 @@ these modes, but the mode-specific interfaces are unimplemented:
 
 ### Wi-Fi Direct (P2P)
 
-- **P2P** (`net.connman.iwd.p2p.Device`, `p2p.Peer`, `p2p.ServiceManager`, and
-  `WiFiDisplay` / Miracast) — peer discovery and direct device-to-device
-  connections. A large, largely self-contained area; likely one of the last.
+- **P2P** (`net.connman.iwd.p2p.Device`, `p2p.Peer`, `p2p.ServiceManager`) —
+  enable a device for peer-to-peer use and discover peers (`p2p.Device`:
+  `Enabled` / `Name`, `RequestDiscovery` / `ReleaseDiscovery`, `GetPeers`, plus
+  its own `RegisterSignalLevelAgent`), connect to and disconnect from a discovered
+  `p2p.Peer` (with its connected interface / IP), and advertise Wi-Fi Display
+  (Miracast) services through `p2p.ServiceManager`. A large, largely
+  self-contained area; likely one of the last.
 
 ### Cross-cutting
 
@@ -146,6 +150,19 @@ these modes, but the mode-specific interfaces are unimplemented:
   point-in-time enumeration.
 - **Broader property subscriptions** — property-change subscriptions for object
   types that do not yet expose them.
+
+### Testing and simulation
+
+- **hwsim** (`net.connman.hwsim` — a sibling service to `net.connman.iwd`, backed
+  by the `mac80211_hwsim` kernel module) — manage virtual radios
+  (`net.connman.hwsim.Radio`: enumerate / `Destroy`) and traffic rules between
+  them (`net.connman.hwsim.Rule`: `SignalStrength`, `Drop`, `Source` /
+  `Destination`, `Priority`, ...). This serves a dual purpose: a client binding in
+  its own right, and the foundation for a deterministic RF test tier — driving
+  `Rule.SignalStrength` lets tests set exact per-frame RSSI and step it over time
+  to exercise RSSI-dependent behavior (`SignalLevelAgent` band transitions,
+  roaming) against real iwd without physical radios. Requires a privileged
+  (kernel-module) test environment; see Testing and Tooling Goals.
 
 Each new slice should follow the established pattern:
 
@@ -166,14 +183,18 @@ Each new slice should follow the established pattern:
 - Keep tests deterministic and isolated from host iwd state.
 - Continue using the Go mock for integration coverage that does not require root
   access or system iwd.
+- Add a privileged, opt-in `mac80211_hwsim`-based integration tier (see the hwsim
+  slice) for deterministically exercising RSSI- and radio-dependent behavior
+  (signal-level bands, roaming) against real iwd, kept separate from the
+  root-free Go-mock tier above.
 - Keep race and stress tests focused on unique concurrency risks rather than
   duplicating ordinary unit coverage.
 - Maintain benchmark coverage for important hot paths without optimizing before
   correctness is clear.
 - Maintain the runnable programs under `examples/` (status, bring-up,
-  scan-and-connect, connect-hidden, monitor, known-networks) alongside the
-  per-method `Example*` functions in `example_test.go`, extending both as new
-  slices land.
+  scan-and-connect, connect-hidden, monitor, signal-monitor, known-networks)
+  alongside the per-method `Example*` functions in `example_test.go`, extending
+  both as new slices land.
 
 ## Out of Scope for Now
 
