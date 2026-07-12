@@ -257,6 +257,32 @@ func Benchmark_Iwdbus_ParseStationAffinities(b *testing.B) {
 	}
 }
 
+func Benchmark_Iwdbus_AccessPoint_GetOrderedNetworks(b *testing.B) {
+	// A busy AP scan result: many neighbor dicts (aa{sv}) to parse per call.
+	entries := make([]map[string]dbus.Variant, 64)
+	for i := range entries {
+		entries[i] = map[string]dbus.Variant{
+			"Name":           dbus.MakeVariant(fmt.Sprintf("Neighbor-%d", i)),
+			"SignalStrength": dbus.MakeVariant(int16(-4000 - i*50)),
+			"Type":           dbus.MakeVariant("psk"),
+		}
+	}
+	a := &AccessPoint{call: &fakeCaller{
+		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+			return []interface{}{entries}, nil
+		},
+	}}
+	ctx := context.Background()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := a.GetOrderedNetworks(ctx); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func Benchmark_Iwdbus_ObjectTree_Lookups(b *testing.B) {
 	// A tree the size of a busy multi-radio host after a scan: many network and
 	// BSS objects, resolved per-ref during Properties() bundle enrichment.

@@ -340,6 +340,37 @@ func (c *Client) Station(ctx context.Context, path string) (*Station, error) {
 	return st, nil
 }
 
+// AccessPoint resolves the access point (a device in AP mode) at the given iwd
+// object path (a device path).
+func (c *Client) AccessPoint(ctx context.Context, path string) (*AccessPoint, error) {
+	ap, err := clientObject(c, ctx, "Client.AccessPoint", path, (*connect.Wiring).NewAccessPoint, wrapAccessPoint)
+	if err != nil {
+		return nil, err
+	}
+	// An access point's name is its device's Name, resolved best-effort so a
+	// single lookup is named like an enumerated one. Failure leaves Name() == "".
+	ap.name = c.resolveAccessPointName(ctx, path)
+	return ap, nil
+}
+
+// resolveAccessPointName best-effort resolves an access point's name (the
+// co-located device's Name), returning "" on any failure.
+func (c *Client) resolveAccessPointName(ctx context.Context, path string) string {
+	if c == nil || c.daemon == nil {
+		return ""
+	}
+	refs, err := c.daemon.AccessPoints(ctx)
+	if err != nil {
+		return ""
+	}
+	for _, r := range refs {
+		if r.Path == path {
+			return r.Name
+		}
+	}
+	return ""
+}
+
 // resolveStationName best-effort resolves a station's name (the co-located
 // device's Name) via one ObjectManager enumeration, returning "" on any failure.
 func (c *Client) resolveStationName(ctx context.Context, path string) string {
@@ -459,6 +490,52 @@ func (c *Client) AllStations(ctx context.Context) ([]*Station, error) {
 	}
 
 	return stations, nil
+}
+
+// AllAccessPoints returns every access point (device currently in AP mode)
+// exposed by iwd.
+func (c *Client) AllAccessPoints(ctx context.Context) ([]*AccessPoint, error) {
+	const op = "Client.AllAccessPoints"
+	log := logging.FromContext(ctx)
+
+	if c == nil {
+		log.Error(ctx, "client uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+	if c.closed {
+		log.Error(ctx, "client already closed", "op", op)
+		return nil, &Error{Kind: KindInvalidState, Resource: ResourceClient, Op: op, Err: ErrInvalidState}
+	}
+	if c.wire == nil || c.daemon == nil {
+		log.Error(ctx, "client wiring uninitialized", "op", op)
+		return nil, wrapPublicError(op, ErrInternal)
+	}
+
+	refs, err := c.daemon.AccessPoints(ctx)
+	if err != nil {
+		log.Error(ctx, "access point enumeration failed", "op", op, "err", err)
+		return nil, wrapPublicError(op, err)
+	}
+
+	accessPoints := make([]*AccessPoint, 0, len(refs))
+	for _, ref := range refs {
+		coreAP, err := c.wire.NewAccessPoint(ctx, ref.Path)
+		if err != nil {
+			log.Error(ctx, "access point wiring failed", "op", op, "path", ref.Path, "err", err)
+			return nil, wrapPublicError(op, err)
+		}
+		pub := newAccessPoint(coreAP, ref.Path, ref.Name)
+		if pub == nil {
+			log.Error(ctx, "access point wrapper unexpectedly nil", "op", op, "path", ref.Path)
+			return nil, wrapPublicError(op, ErrInternal)
+		}
+		accessPoints = append(accessPoints, pub)
+	}
+
+	return accessPoints, nil
 }
 
 // BasicServiceSet creates a BasicServiceSet wrapper for a specific iwd BSS

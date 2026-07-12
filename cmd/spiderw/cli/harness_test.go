@@ -16,35 +16,39 @@ import (
 // a D-Bus connection or the iwd mock.
 
 type fakeClient struct {
-	daemon        daemonAPI
-	adapters      map[string]adapterAPI      // keyed by Path
-	devices       map[string]deviceAPI       // keyed by Path
-	stations      map[string]stationAPI      // keyed by Path
-	bsses         map[string]bssAPI          // keyed by Path
-	networks      map[string]networkAPI      // keyed by Path
-	knownNetworks map[string]knownNetworkAPI // keyed by Path
-	adapterErr    error                      // returned by Adapter(...)
-	deviceErr     error                      // returned by Device(...)
-	stationErr    error                      // returned by Station(...)
-	bssErr        error                      // returned by BasicServiceSet(...)
-	networkErr    error                      // returned by Network(...)
-	knownNetErr   error                      // returned by KnownNetwork(...)
-	allAdapters   []adapterAPI
-	allDevices    []deviceAPI
-	allStations   []stationAPI
-	allBSSes      []bssAPI
-	allNetworks   []networkAPI
-	allKnownNets  []knownNetworkAPI
-	allAdaptErr   error
-	allDeviceErr  error
-	allStationErr error
-	allBSSErr     error
-	allNetErr     error
-	allKnownErr   error
-	registerErr   error                // returned by RegisterAgent(...)
-	registeredCfg *spiderw.AgentConfig // last config passed to RegisterAgent
-	agent         *fakeAgent
-	closed        bool
+	daemon            daemonAPI
+	adapters          map[string]adapterAPI      // keyed by Path
+	devices           map[string]deviceAPI       // keyed by Path
+	stations          map[string]stationAPI      // keyed by Path
+	accessPoints      map[string]accessPointAPI  // keyed by Path
+	bsses             map[string]bssAPI          // keyed by Path
+	networks          map[string]networkAPI      // keyed by Path
+	knownNetworks     map[string]knownNetworkAPI // keyed by Path
+	adapterErr        error                      // returned by Adapter(...)
+	deviceErr         error                      // returned by Device(...)
+	stationErr        error                      // returned by Station(...)
+	accessPointErr    error                      // returned by AccessPoint(...)
+	bssErr            error                      // returned by BasicServiceSet(...)
+	networkErr        error                      // returned by Network(...)
+	knownNetErr       error                      // returned by KnownNetwork(...)
+	allAdapters       []adapterAPI
+	allDevices        []deviceAPI
+	allStations       []stationAPI
+	allAccessPoints   []accessPointAPI
+	allBSSes          []bssAPI
+	allNetworks       []networkAPI
+	allKnownNets      []knownNetworkAPI
+	allAdaptErr       error
+	allDeviceErr      error
+	allStationErr     error
+	allAccessPointErr error
+	allBSSErr         error
+	allNetErr         error
+	allKnownErr       error
+	registerErr       error                // returned by RegisterAgent(...)
+	registeredCfg     *spiderw.AgentConfig // last config passed to RegisterAgent
+	agent             *fakeAgent
+	closed            bool
 }
 
 func (f *fakeClient) Daemon() daemonAPI { return f.daemon }
@@ -68,6 +72,13 @@ func (f *fakeClient) Station(ctx context.Context, path string) (stationAPI, erro
 		return nil, f.stationErr
 	}
 	return f.stations[path], nil
+}
+
+func (f *fakeClient) AccessPoint(ctx context.Context, path string) (accessPointAPI, error) {
+	if f.accessPointErr != nil {
+		return nil, f.accessPointErr
+	}
+	return f.accessPoints[path], nil
 }
 
 func (f *fakeClient) BasicServiceSet(ctx context.Context, path string) (bssAPI, error) {
@@ -101,6 +112,10 @@ func (f *fakeClient) AllDevices(ctx context.Context) ([]deviceAPI, error) {
 
 func (f *fakeClient) AllStations(ctx context.Context) ([]stationAPI, error) {
 	return f.allStations, f.allStationErr
+}
+
+func (f *fakeClient) AllAccessPoints(ctx context.Context) ([]accessPointAPI, error) {
+	return f.allAccessPoints, f.allAccessPointErr
 }
 
 func (f *fakeClient) AllBasicServiceSets(ctx context.Context) ([]bssAPI, error) {
@@ -147,6 +162,7 @@ type fakeDaemon struct {
 	adapters      []spiderw.AdapterRef
 	devices       []spiderw.DeviceRef
 	stations      []spiderw.StationRef
+	accessPoints  []spiderw.AccessPointRef
 	bsses         []spiderw.BasicServiceSetRef
 	networks      []spiderw.NetworkRef
 	knownNetworks []spiderw.KnownNetworkRef
@@ -188,6 +204,10 @@ func (f *fakeDaemon) Devices(ctx context.Context) ([]spiderw.DeviceRef, error) {
 
 func (f *fakeDaemon) Stations(ctx context.Context) ([]spiderw.StationRef, error) {
 	return f.stations, f.err
+}
+
+func (f *fakeDaemon) AccessPoints(ctx context.Context) ([]spiderw.AccessPointRef, error) {
+	return f.accessPoints, f.err
 }
 
 func (f *fakeDaemon) BasicServiceSets(ctx context.Context) ([]spiderw.BasicServiceSetRef, error) {
@@ -458,6 +478,84 @@ func (f *fakeStation) MonitorSignalLevel(ctx context.Context, cfg spiderw.Signal
 // covered directly against a fake wscAPI in station_test.go.
 func (f *fakeStation) SimpleConfiguration(ctx context.Context) (*spiderw.SimpleConfiguration, error) {
 	return nil, f.wscErr
+}
+
+type fakeAccessPoint struct {
+	path        string
+	name        string
+	props       *spiderw.AccessPointProperties
+	ordered     []spiderw.AccessPointOrderedNetwork
+	startErr    error
+	stopErr     error
+	scanErr     error
+	startedSSID string
+	startedPSK  string
+	profileSSID string
+	stopCalled  bool
+	scanCalled  bool
+	// scanNeverCompletes makes SubscribeScanningChanged emit only the true edge, so
+	// `access-point scan` (wait mode) blocks until --timeout in tests.
+	scanNeverCompletes bool
+	err                error
+}
+
+func (f *fakeAccessPoint) Path() string { return f.path }
+func (f *fakeAccessPoint) Name() string { return f.name }
+
+func (f *fakeAccessPoint) Properties(ctx context.Context) (*spiderw.AccessPointProperties, error) {
+	return f.props, f.err
+}
+
+func (f *fakeAccessPoint) Start(ctx context.Context, ssid, psk string) error {
+	if f.startErr != nil {
+		return f.startErr
+	}
+	f.startedSSID = ssid
+	f.startedPSK = psk
+	return nil
+}
+
+func (f *fakeAccessPoint) StartProfile(ctx context.Context, ssid string) error {
+	if f.startErr != nil {
+		return f.startErr
+	}
+	f.profileSSID = ssid
+	return nil
+}
+
+func (f *fakeAccessPoint) Stop(ctx context.Context) error {
+	if f.stopErr != nil {
+		return f.stopErr
+	}
+	f.stopCalled = true
+	return nil
+}
+
+func (f *fakeAccessPoint) Scan(ctx context.Context) error {
+	if f.scanErr != nil {
+		return f.scanErr
+	}
+	f.scanCalled = true
+	return nil
+}
+
+func (f *fakeAccessPoint) OrderedNetworks(ctx context.Context) ([]spiderw.AccessPointOrderedNetwork, error) {
+	return f.ordered, f.err
+}
+
+func (f *fakeAccessPoint) SubscribeScanningChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	// Simulate a completed scan (true then false) so `access-point scan` (wait
+	// mode) returns promptly in unit tests.
+	if fn != nil {
+		fn(true)
+		if !f.scanNeverCompletes {
+			fn(false)
+		}
+	}
+	return func() error { return nil }, nil
 }
 
 type fakeBSS struct {

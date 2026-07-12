@@ -18,12 +18,14 @@ type clientAPI interface {
 	Adapter(ctx context.Context, path string) (adapterAPI, error)
 	Device(ctx context.Context, path string) (deviceAPI, error)
 	Station(ctx context.Context, path string) (stationAPI, error)
+	AccessPoint(ctx context.Context, path string) (accessPointAPI, error)
 	BasicServiceSet(ctx context.Context, path string) (bssAPI, error)
 	Network(ctx context.Context, path string) (networkAPI, error)
 	KnownNetwork(ctx context.Context, path string) (knownNetworkAPI, error)
 	AllAdapters(ctx context.Context) ([]adapterAPI, error)
 	AllDevices(ctx context.Context) ([]deviceAPI, error)
 	AllStations(ctx context.Context) ([]stationAPI, error)
+	AllAccessPoints(ctx context.Context) ([]accessPointAPI, error)
 	AllBasicServiceSets(ctx context.Context) ([]bssAPI, error)
 	AllNetworks(ctx context.Context) ([]networkAPI, error)
 	AllKnownNetworks(ctx context.Context) ([]knownNetworkAPI, error)
@@ -43,6 +45,7 @@ type daemonAPI interface {
 	Adapters(ctx context.Context) ([]spiderw.AdapterRef, error)
 	Devices(ctx context.Context) ([]spiderw.DeviceRef, error)
 	Stations(ctx context.Context) ([]spiderw.StationRef, error)
+	AccessPoints(ctx context.Context) ([]spiderw.AccessPointRef, error)
 	BasicServiceSets(ctx context.Context) ([]spiderw.BasicServiceSetRef, error)
 	Networks(ctx context.Context) ([]spiderw.NetworkRef, error)
 	KnownNetworks(ctx context.Context) ([]spiderw.KnownNetworkRef, error)
@@ -92,6 +95,18 @@ type stationAPI interface {
 	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
 	MonitorSignalLevel(ctx context.Context, cfg spiderw.SignalLevelConfig) (*spiderw.SignalLevelAgent, error)
 	SimpleConfiguration(ctx context.Context) (*spiderw.SimpleConfiguration, error)
+}
+
+type accessPointAPI interface {
+	Path() string
+	Name() string
+	Properties(ctx context.Context) (*spiderw.AccessPointProperties, error)
+	Start(ctx context.Context, ssid, psk string) error
+	StartProfile(ctx context.Context, ssid string) error
+	Stop(ctx context.Context) error
+	Scan(ctx context.Context) error
+	OrderedNetworks(ctx context.Context) ([]spiderw.AccessPointOrderedNetwork, error)
+	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
 }
 
 type bssAPI interface {
@@ -164,6 +179,14 @@ func (r realClient) Station(ctx context.Context, path string) (stationAPI, error
 	return s, err
 }
 
+func (r realClient) AccessPoint(ctx context.Context, path string) (accessPointAPI, error) {
+	a, err := r.c.AccessPoint(ctx, path)
+	if a == nil {
+		return nil, err
+	}
+	return a, err
+}
+
 func (r realClient) BasicServiceSet(ctx context.Context, path string) (bssAPI, error) {
 	b, err := r.c.BasicServiceSet(ctx, path)
 	if b == nil {
@@ -220,6 +243,18 @@ func (r realClient) AllStations(ctx context.Context) ([]stationAPI, error) {
 	out := make([]stationAPI, 0, len(ss))
 	for _, s := range ss {
 		out = append(out, s)
+	}
+	return out, nil
+}
+
+func (r realClient) AllAccessPoints(ctx context.Context) ([]accessPointAPI, error) {
+	as, err := r.c.AllAccessPoints(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]accessPointAPI, 0, len(as))
+	for _, a := range as {
+		out = append(out, a)
 	}
 	return out, nil
 }

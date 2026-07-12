@@ -97,21 +97,21 @@ The following areas are currently implemented and tested end to end:
 ## Future iwd Coverage
 
 The slices below map the remaining iwd D-Bus surface. spiderw currently
-implements the Daemon, Adapter, Device, Station, Network, KnownNetwork,
-BasicServiceSet, SimpleConfiguration (WSC), the SignalLevelAgent, and credentials
-`Agent` / `AgentManager` interfaces; the intent is to eventually cover the rest
-of iwd. The areas are grouped by theme, not strictly ordered — priority is
-decided slice by slice.
+implements the Daemon, Adapter, Device, Station, AccessPoint, Network,
+KnownNetwork, BasicServiceSet, SimpleConfiguration (WSC), the SignalLevelAgent,
+and credentials `Agent` / `AgentManager` interfaces; the intent is to eventually
+cover the rest of iwd. The areas are grouped by theme, not strictly ordered —
+priority is decided slice by slice.
 
 ### Device operating modes
 
-iwd exposes a different interface depending on a device's mode, and spiderw only
-covers station mode today. `Device.SetMode` can already switch a device into
-these modes, but the mode-specific interfaces are unimplemented:
+iwd exposes a different interface depending on a device's mode. `Device.SetMode`
+switches a device between modes; station and AP modes are covered, while the
+remaining mode-specific interfaces are unimplemented:
 
-- **Access Point** (`net.connman.iwd.AccessPoint`) — run an adapter as an AP:
-  start/stop a hosted network (open or PSK), scan, and list connected clients,
-  plus the companion `AccessPointDiagnostic` interface.
+- **Access Point diagnostics** (`net.connman.iwd.AccessPointDiagnostic`) — the
+  companion to the now-implemented `AccessPoint` interface, reading per-client
+  link statistics for a hosted network.
 - **Ad-Hoc / IBSS** (`net.connman.iwd.AdHoc`) — start or join an open
   (`StartOpen`) or PSK-secured (`Start`) ad-hoc (IBSS) network and leave it
   (`Stop`), reading the `Started` state and the `ConnectedPeers` MAC list.

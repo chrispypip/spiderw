@@ -156,6 +156,13 @@ func startMock(args []string) (*runningMock, error) {
 				signalReady()
 			}
 		}
+		// This is a best-effort readiness watcher; readiness and early exit are
+		// otherwise driven by the ready/done/timeout branches of the select below.
+		// A read error (typically the pipe closing as the mock exits) just ends
+		// the watch, but surface it so a genuinely broken pipe is not silent.
+		if err := sc.Err(); err != nil {
+			fmt.Fprintf(os.Stderr, "iwdmock: reading mock output: %v\n", err)
+		}
 	}
 
 	go scan(stdout)
@@ -358,4 +365,12 @@ func StartMockWithoutStation(t *testing.T) {
 func StartMockWithoutWSC(t *testing.T) {
 	t.Helper()
 	startMockWithT(t, []string{"--omit-wsc"})
+}
+
+// StartMockWithoutAccessPoint starts the mock with the AccessPoint interface
+// omitted from the AP-mode device, which exercises the client's "access point
+// unavailable" and empty access-point-enumeration paths.
+func StartMockWithoutAccessPoint(t *testing.T) {
+	t.Helper()
+	startMockWithT(t, []string{"--omit-access-point"})
 }

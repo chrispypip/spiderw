@@ -402,6 +402,34 @@ func (d *Daemon) GetStations(ctx context.Context) ([]StationRef, error) {
 		})
 }
 
+// AccessPointRef is a lightweight reference to an access point discovered by
+// ObjectManager. Like a station it shares its object with a device, so Name is
+// the co-located Device Name (e.g. "wlan1"), not the hosted network's SSID.
+type AccessPointRef struct {
+	// Path is the canonical D-Bus object path for the access point (a device
+	// path).
+	Path dbus.ObjectPath
+
+	// Name is the co-located device's Name (best-effort; empty if unavailable).
+	Name string
+}
+
+// GetAccessPoints enumerates devices currently in AP mode via ObjectManager (the
+// objects exposing the AccessPoint interface). Like GetStations, each ref carries
+// the co-located Device Name.
+func (d *Daemon) GetAccessPoints(ctx context.Context) ([]AccessPointRef, error) {
+	if d == nil {
+		return nil, WrapConnection("Daemon.GetAccessPoints", ErrDaemonUninitialized)
+	}
+	return getRefs(ctx, d.conn, "Daemon.GetAccessPoints", IwdAccessPointIface,
+		func(path dbus.ObjectPath, ifaces map[string]map[string]dbus.Variant) (AccessPointRef, error) {
+			if !path.IsValid() || !strings.HasPrefix(string(path), "/") {
+				return AccessPointRef{}, WrapVariant("Path", fmt.Errorf("invalid access point path %q", path))
+			}
+			return AccessPointRef{Path: path, Name: stationNameFromDevice(ifaces)}, nil
+		})
+}
+
 // stationNameFromDevice extracts the Device Name co-located on a station's
 // object, returning "" when absent or not a non-empty string.
 func stationNameFromDevice(ifaces map[string]map[string]dbus.Variant) string {

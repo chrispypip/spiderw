@@ -57,7 +57,8 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
   project targets and validates against; the bundled mock's introspection XML is
   modeled on it.
 - **Supported iwd interfaces:** `Daemon`, `Adapter`, `Device`, `Station`,
-  `BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
+  `AccessPoint`, `BasicServiceSet`, `Network`, `KnownNetwork`, `SimpleConfiguration`
+  (WSC/WPS), `SignalLevelAgent`, and the credentials `Agent`
   (`net.connman.iwd.Agent` / `AgentManager`). `Station` exposes connection state
   (`State`, `Scanning`, `ConnectedNetwork`, and the experimental
   `ConnectedAccessPoint` / `Affinities`) with change subscriptions, scanning
@@ -74,8 +75,12 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
   against the mock or validated on hardware** — treat them as experimental.
   *Provisioning* a brand-new 802.1x network (`NetworkConfigurationAgent`) is not
   implemented. `KnownNetwork` supports inspecting saved networks, toggling
-  auto-connect, and forgetting them. More of the iwd API is planned — see the
-  [Roadmap](ROADMAP.md).
+  auto-connect, and forgetting them. `AccessPoint` runs a device in AP mode:
+  starting a PSK network (`Start`) or one from a stored profile (`StartProfile`),
+  stopping it (`Stop`), scanning (`Scan`, `OrderedNetworks`), and reading the
+  hosted-network properties (`Started`, `SSID`, `Frequency`, ciphers) with change
+  subscriptions; the companion `AccessPointDiagnostic` interface is not yet
+  covered. More of the iwd API is planned — see the [Roadmap](ROADMAP.md).
 - **Operating system:** **Linux only.** iwd is a Linux wireless daemon; spiderw
   has no support for other platforms.
 - **D-Bus:** Requires access to a D-Bus bus. Real iwd runs on the **system bus**
@@ -439,6 +444,25 @@ spiderw station wlan0 affinities set de:ad:be:ef:ca:fe   # a BSS MAC or object p
 spiderw station wlan0 affinities clear
 spiderw station wlan0 wsc push-button                    # press the AP's WPS button first
 spiderw station wlan0 wsc pin                            # generates and prints a PIN to enter at the AP
+```
+
+Inspect and control access points (devices in AP mode). `status` shows `Started`,
+`Scanning`, and — while running — the hosted `SSID`, `Frequency`, and ciphers;
+`start` brings up a PSK network, `start-profile` one from a stored profile, `stop`
+tears it down. `scan` triggers a scan (waiting for it to finish, then listing
+results, unless `--no-wait`; `--timeout` bounds the wait), and `networks` lists
+the last scan's results by signal. An access point is referenced by its device
+name (e.g. `wlan1`) or object path:
+
+```bash
+spiderw access-point list
+spiderw access-point status
+spiderw access-point wlan1 status
+spiderw access-point wlan1 start MyAP s3cretpass
+spiderw access-point wlan1 start-profile MyProfile
+spiderw access-point wlan1 scan --timeout=30s
+spiderw access-point wlan1 networks
+spiderw access-point wlan1 stop
 ```
 
 List basic service sets (BSSes), or print a full snapshot for every BSS. A

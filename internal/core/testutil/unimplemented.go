@@ -31,6 +31,10 @@ func (UnimplementedCoreDaemon) Stations(ctx context.Context) ([]core.StationRef,
 	panic("fakeCoreDaemon.Stations not implemented")
 }
 
+func (UnimplementedCoreDaemon) AccessPoints(ctx context.Context) ([]core.AccessPointRef, error) {
+	panic("fakeCoreDaemon.AccessPoints not implemented")
+}
+
 // BasicServiceSets panics when a test fake does not implement BSS enumeration.
 func (UnimplementedCoreDaemon) BasicServiceSets(ctx context.Context) ([]core.BasicServiceSetRef, error) {
 	panic("fakeCoreDaemon.BasicServiceSets not implemented")

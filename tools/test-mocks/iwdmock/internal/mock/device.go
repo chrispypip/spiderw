@@ -64,6 +64,25 @@ type Device struct {
 	// stationMu guards the mutable Station state (Scanning, Affinities), which
 	// Scan and Set mutate from goroutines godbus dispatches concurrently.
 	stationMu sync.Mutex
+
+	// HasAccessPoint reports whether this device also exports the AccessPoint
+	// interface (true for an AP-mode device unless --omit-access-point is set).
+	// The AP property fields below are only meaningful when HasAccessPoint is true.
+	HasAccessPoint bool
+
+	// APStarted / APScanning are the mock AccessPoint.Started / .Scanning
+	// properties. The remaining AP fields are the optional properties, only
+	// populated (and reported) while the AP is running.
+	APStarted         bool
+	APScanning        bool
+	APName            string
+	APFrequency       uint32
+	APPairwiseCiphers []string
+	APGroupCipher     string
+
+	// apMu guards the mutable AP state, which Start/Stop/Scan mutate from
+	// goroutines godbus dispatches concurrently.
+	apMu sync.Mutex
 }
 
 // ExportDevice exports the mock device objects on the D-Bus connection. A single
@@ -93,12 +112,18 @@ func ExportDevice(conn *dbus.Conn) error {
 			StationAffinities:           []dbus.ObjectPath{stationConnectedAccessPointPath},
 		},
 		{
-			Path:    device1Path,
-			Name:    "wlan1",
-			Address: "11:22:33:44:55:66",
-			Powered: true,
-			Mode:    "ap",
-			Adapter: adapter1Path,
+			Path:              device1Path,
+			Name:              "wlan1",
+			Address:           "11:22:33:44:55:66",
+			Powered:           true,
+			Mode:              "ap",
+			Adapter:           adapter1Path,
+			HasAccessPoint:    accessPointExported(),
+			APStarted:         true,
+			APName:            accessPointHostedSSID,
+			APFrequency:       accessPointFrequency,
+			APPairwiseCiphers: accessPointPairwiseCiphers,
+			APGroupCipher:     accessPointGroupCipher,
 		},
 	}
 
@@ -126,7 +151,17 @@ func ExportDevice(conn *dbus.Conn) error {
 				}
 			}
 		}
-		if err := exportDeviceIntrospection(conn, d.Path, d.HasStation, withWSC); err != nil {
+		// An AP-mode device carries the AccessPoint interface (gated by
+		// --omit-access-point). Its methods are dispatched to a distinct object
+		// (whose method set avoids colliding with the Station-mode Device's Scan /
+		// GetOrderedNetworks); the Device's Properties handler serves its
+		// properties, so property reads and method calls share the same AP state.
+		if d.HasAccessPoint {
+			if err := conn.Export(&AccessPoint{device: d}, d.Path, iwdbus.IwdAccessPointIface); err != nil {
+				return err
+			}
+		}
+		if err := exportDeviceIntrospection(conn, d.Path, d.HasStation, withWSC, d.HasAccessPoint); err != nil {
 			return err
 		}
 		exportedDevices = append(exportedDevices, d)
@@ -157,6 +192,11 @@ func (d *Device) GetAll(iface string) (map[string]dbus.Variant, *dbus.Error) {
 			return nil, dbus.MakeFailedError(fmt.Errorf("unknown property %q", iface))
 		}
 		return d.buildStationPropertyMap(), nil
+	case iwdbus.IwdAccessPointIface:
+		if !d.HasAccessPoint {
+			return nil, dbus.MakeFailedError(fmt.Errorf("unknown property %q", iface))
+		}
+		return d.buildAccessPointPropertyMap(), nil
 	default:
 		return nil, dbus.MakeFailedError(fmt.Errorf("unknown property %q", iface))
 	}
@@ -174,12 +214,25 @@ func (d *Device) Get(iface, p string) (dbus.Variant, *dbus.Error) {
 			return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("unknown property %q", iface))
 		}
 		props = d.buildStationPropertyMap()
+	case iwdbus.IwdAccessPointIface:
+		if !d.HasAccessPoint {
+			return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("unknown property %q", iface))
+		}
+		props = d.buildAccessPointPropertyMap()
 	default:
 		return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("unknown property %q", iface))
 	}
 
 	v, ok := props[p]
 	if !ok {
+		if iface == iwdbus.IwdAccessPointIface {
+			// iwd exposes the optional AccessPoint properties (Scanning, Name,
+			// Frequency, ciphers) only while the AP is started; reading an absent
+			// one yields this getter-declined error, matching real hardware rather
+			// than the "unknown property" reply used for genuinely-undeclared ones.
+			// Lowercased to satisfy ST1005; the client matcher is case-insensitive.
+			return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("getting property value failed"))
+		}
 		return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("unknown property %q", p))
 	}
 	return v, nil

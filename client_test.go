@@ -237,6 +237,47 @@ func TestClient_ResolveStationName(t *testing.T) {
 	})
 }
 
+func TestClient_AccessPoint(t *testing.T) {
+	ctx := context.Background()
+
+	newAPClient := func(refs []core.AccessPointRef) *Client {
+		fd := &fakeCoreDaemon{}
+		fd.setAccessPoints(refs)
+		wire := &connect.Wiring{Conn: &dbus.Conn{}, Daemon: fd, Cleanup: func() error { return nil },
+			AccessPointFactory: func(ctx context.Context, path string) (core.AccessPointIface, error) {
+				return &fakeCoreAccessPoint{}, nil
+			}}
+		return &Client{daemon: newDaemon(fd), wire: wire, cleanup: wire.Cleanup}
+	}
+
+	t.Run("SingleResolvesDeviceName", func(t *testing.T) {
+		c := newAPClient([]core.AccessPointRef{{Path: "/net/connman/iwd/0/4", Name: "wlan1"}})
+		ap, err := c.AccessPoint(ctx, "/net/connman/iwd/0/4")
+		require.NoError(t, err)
+		require.Equal(t, "/net/connman/iwd/0/4", ap.Path())
+		require.Equal(t, "wlan1", ap.Name())
+	})
+
+	t.Run("AllEnumerates", func(t *testing.T) {
+		c := newAPClient([]core.AccessPointRef{
+			{Path: "/net/connman/iwd/0/4", Name: "wlan1"},
+			{Path: "/net/connman/iwd/0/5", Name: "wlan2"},
+		})
+		aps, err := c.AllAccessPoints(ctx)
+		require.NoError(t, err)
+		require.Len(t, aps, 2)
+		require.Equal(t, "wlan1", aps[0].Name())
+		require.Equal(t, "/net/connman/iwd/0/5", aps[1].Path())
+	})
+
+	t.Run("ResolveNameNilOrError", func(t *testing.T) {
+		require.Empty(t, (*Client)(nil).resolveAccessPointName(ctx, "/p"))
+		fd := &fakeCoreDaemon{}
+		fd.setErr(errors.New("boom"))
+		require.Empty(t, (&Client{daemon: newDaemon(fd)}).resolveAccessPointName(ctx, "/p"))
+	})
+}
+
 // TestClient_EnumeratorErrorPaths drives the error branches shared by every
 // Client.AllX enumerator: a nil wiring, a daemon enumeration failure, a
 // per-object wiring failure, and a nil constructed wrapper.
@@ -314,6 +355,28 @@ func TestClient_EnumeratorErrorPaths(t *testing.T) {
 				return &Client{daemon: newDaemon(fd), wire: wire, cleanup: wire.Cleanup}
 			},
 			call: func(c *Client) error { _, err := c.AllStations(ctx); return err },
+		},
+		{
+			name: "AllAccessPoints",
+			makeClient: func(daemonErr, factoryErr error, nilCore bool) *Client {
+				fd := &fakeCoreDaemon{}
+				fd.setAccessPoints([]core.AccessPointRef{{Path: "/ap"}})
+				if daemonErr != nil {
+					fd.setErr(daemonErr)
+				}
+				wire := &connect.Wiring{Conn: &dbus.Conn{}, Daemon: fd, Cleanup: func() error { return nil },
+					AccessPointFactory: func(ctx context.Context, path string) (core.AccessPointIface, error) {
+						if factoryErr != nil {
+							return nil, factoryErr
+						}
+						if nilCore {
+							return nil, nil
+						}
+						return &fakeCoreAccessPoint{}, nil
+					}}
+				return &Client{daemon: newDaemon(fd), wire: wire, cleanup: wire.Cleanup}
+			},
+			call: func(c *Client) error { _, err := c.AllAccessPoints(ctx); return err },
 		},
 		{
 			name: "AllBasicServiceSets",

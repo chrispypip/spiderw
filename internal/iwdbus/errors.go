@@ -55,6 +55,10 @@ var (
 	// (WSC) was used before initialization.
 	ErrSimpleConfigurationUninitialized = errors.New("simple configuration is not initialized")
 
+	// ErrAccessPointUninitialized indicates that an AccessPoint was used before
+	// initialization.
+	ErrAccessPointUninitialized = errors.New("access point is not initialized")
+
 	// ErrAgentCanceled is the value an AgentHandler callback returns to decline a
 	// credentials request. The exported agent maps it (and, defensively, any
 	// non-nil error) to the IwdAgentErrorCanceled D-Bus error returned to iwd.

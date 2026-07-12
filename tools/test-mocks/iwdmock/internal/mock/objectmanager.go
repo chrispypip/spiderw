@@ -68,6 +68,11 @@ func (o *ObjectManager) GetManagedObjects() (map[dbus.ObjectPath]map[string]map[
 		if device.HasStation {
 			ifaces[iwdbus.IwdStationIface] = device.buildStationPropertyMap()
 		}
+		// An AP-mode device advertises the AccessPoint interface, so access-point
+		// enumeration (Daemon.GetAccessPoints) finds it.
+		if device.HasAccessPoint {
+			ifaces[iwdbus.IwdAccessPointIface] = device.buildAccessPointPropertyMap()
+		}
 		objects[device.Path] = ifaces
 	}
 

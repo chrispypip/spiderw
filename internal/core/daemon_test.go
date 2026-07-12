@@ -411,6 +411,40 @@ func TestDaemon_Core(t *testing.T) {
 		})
 	})
 
+	t.Run("AccessPoints", func(t *testing.T) {
+		t.Run("Success", func(t *testing.T) {
+			f := &fakeIwdbusDaemon{}
+			f.setAccessPoints([]iwdbus.AccessPointRef{
+				{Path: "/net/connman/iwd/0/4", Name: "wlan1"},
+				{Path: "  /net/connman/iwd/0/5  ", Name: "wlan2"},
+			})
+			out, err := NewDaemon(f).AccessPoints(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, []AccessPointRef{
+				{Path: "/net/connman/iwd/0/4", Name: "wlan1"},
+				{Path: "/net/connman/iwd/0/5", Name: "wlan2"},
+			}, out)
+		})
+
+		t.Run("InvalidPath", func(t *testing.T) {
+			f := &fakeIwdbusDaemon{}
+			f.setAccessPoints([]iwdbus.AccessPointRef{{Path: "not/abs"}})
+			_, err := NewDaemon(f).AccessPoints(context.Background())
+			require.Error(t, err)
+			var ce *Error
+			require.ErrorAs(t, err, &ce)
+			require.Equal(t, ResourceAccessPoint, ce.Resource)
+			require.Contains(t, err.Error(), "invalid path")
+		})
+
+		t.Run("Error", func(t *testing.T) {
+			f := &fakeIwdbusDaemon{}
+			f.setErr(iwdbus.ErrDBusMethod)
+			_, err := NewDaemon(f).AccessPoints(context.Background())
+			require.Error(t, err)
+		})
+	})
+
 	t.Run("BasicServiceSets", func(t *testing.T) {
 		t.Run("Uninitialized", func(t *testing.T) {
 			tests := []struct {

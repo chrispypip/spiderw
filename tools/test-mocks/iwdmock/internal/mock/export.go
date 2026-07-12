@@ -45,6 +45,9 @@ var (
 
 	//go:embed xml/wsc.xml
 	wscIntrospectionXML []byte
+
+	//go:embed xml/accesspoint.xml
+	accessPointIntrospectionXML []byte
 )
 
 func exportDaemonIntrospection(conn *dbus.Conn) error {
@@ -61,17 +64,22 @@ func exportAdapterIntrospection(conn *dbus.Conn, path dbus.ObjectPath) error {
 	return conn.Export(introspectStub(adapterIntrospectionXML), path, iwdbus.DBusIntrospectableIface)
 }
 
-func exportDeviceIntrospection(conn *dbus.Conn, path dbus.ObjectPath, withStation, withWSC bool) error {
-	xml := deviceIntrospectionXML
+func exportDeviceIntrospection(conn *dbus.Conn, path dbus.ObjectPath, withStation, withWSC, withAccessPoint bool) error {
+	// Splice any extra interface blocks in before the closing </node> so client
+	// introspection sees them alongside the Device interface on the same object
+	// (mirroring iwd, where a device's mode interfaces live on the device object).
+	var extra string
 	if withStation {
-		// Splice the Station (and, unless omitted, SimpleConfiguration/WSC)
-		// interface blocks in before the closing </node> so client introspection
-		// sees them alongside the Device interface on the same object (mirroring
-		// iwd, where both live on the station-mode device object).
-		extra := string(stationIntrospectionXML)
+		extra += string(stationIntrospectionXML)
 		if withWSC {
 			extra += string(wscIntrospectionXML)
 		}
+	}
+	if withAccessPoint {
+		extra += string(accessPointIntrospectionXML)
+	}
+	xml := deviceIntrospectionXML
+	if extra != "" {
 		xml = []byte(strings.Replace(string(deviceIntrospectionXML), "</node>", extra+"</node>", 1))
 	}
 	return conn.Export(introspectStub(xml), path, iwdbus.DBusIntrospectableIface)

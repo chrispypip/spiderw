@@ -74,6 +74,10 @@ const (
 	// ResourceAgent identifies failures involving the iwd credentials agent or
 	// agent manager.
 	ResourceAgent Resource = Resource(failure.ResourceAgent)
+
+	// ResourceAccessPoint identifies failures involving an iwd access point (a
+	// device running in AP mode).
+	ResourceAccessPoint Resource = Resource(failure.ResourceAccessPoint)
 )
 
 // -----------------------------------------------------------------------------

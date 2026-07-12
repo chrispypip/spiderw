@@ -69,6 +69,18 @@ type StationRef struct {
 	Name string
 }
 
+// AccessPointRef is a lightweight reference to an access point (a device in AP
+// mode). Name is the co-located device's Name (e.g. "wlan1"), not the hosted
+// network's SSID.
+type AccessPointRef struct {
+	// Path is the canonical D-Bus object path for the access point (a device
+	// path).
+	Path string
+
+	// Name is the co-located device's Name (best-effort; empty if unavailable).
+	Name string
+}
+
 // DaemonInfo is the public API view of the iwd daemon metadata.
 //
 // This intentionally mirrors core.DaemonInfo but is separate to avoid leaking
@@ -196,6 +208,22 @@ func (d *Daemon) Stations(ctx context.Context) ([]StationRef, error) {
 		out := make([]StationRef, 0, len(refs))
 		for _, r := range refs {
 			out = append(out, StationRef{Path: r.Path, Name: r.Name})
+		}
+		return out, nil
+	})
+}
+
+// AccessPoints returns lightweight references to the access points (devices in AP
+// mode) currently exposed by iwd. Resolve one with Client.AccessPoint.
+func (d *Daemon) AccessPoints(ctx context.Context) ([]AccessPointRef, error) {
+	return delegate(ctx, "Daemon.AccessPoints", d.coreDaemon, func(ctx context.Context, c core.DaemonIface) ([]AccessPointRef, error) {
+		refs, err := c.AccessPoints(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]AccessPointRef, 0, len(refs))
+		for _, r := range refs {
+			out = append(out, AccessPointRef{Path: r.Path, Name: r.Name})
 		}
 		return out, nil
 	})

@@ -269,3 +269,15 @@ func TestDaemon_StationsMapsName(t *testing.T) {
 	require.Equal(t, "/net/connman/iwd/0/3", refs[0].Path)
 	require.Equal(t, "wlan0", refs[0].Name)
 }
+
+func TestDaemon_AccessPointsMapsName(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeCoreDaemon{}
+	f.setAccessPoints([]core.AccessPointRef{{Path: "/net/connman/iwd/0/4", Name: "wlan1"}})
+
+	refs, err := (&Daemon{core: f}).AccessPoints(ctx)
+	require.NoError(t, err)
+	require.Len(t, refs, 1)
+	require.Equal(t, "/net/connman/iwd/0/4", refs[0].Path)
+	require.Equal(t, "wlan1", refs[0].Name)
+}

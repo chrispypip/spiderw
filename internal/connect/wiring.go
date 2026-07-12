@@ -24,6 +24,7 @@ var (
 	newIwdKnownNetworkFn        = iwdbus.NewKnownNetwork
 	newIwdAgentManagerFn        = iwdbus.NewAgentManager
 	newIwdSimpleConfigurationFn = iwdbus.NewSimpleConfiguration
+	newIwdAccessPointFn         = iwdbus.NewAccessPoint
 	exportAgentFn               = iwdbus.ExportAgent
 	exportSignalLevelAgentFn    = iwdbus.ExportSignalLevelAgent
 	newCoreDaemonFn             = func(raw *iwdbus.Daemon) *core.Daemon { return core.NewDaemon(raw) }
@@ -37,6 +38,9 @@ var (
 	}
 	newCoreSimpleConfigurationFn = func(raw *iwdbus.SimpleConfiguration) *core.SimpleConfiguration {
 		return core.NewSimpleConfiguration(raw)
+	}
+	newCoreAccessPointFn = func(raw *iwdbus.AccessPoint) *core.AccessPoint {
+		return core.NewAccessPoint(raw)
 	}
 	closeConnFn = func(c *dbus.Conn) error { return c.Close() }
 )
@@ -132,6 +136,9 @@ type Wiring struct {
 
 	// SimpleConfigurationFactory optionally overrides WSC construction for tests.
 	SimpleConfigurationFactory func(ctx context.Context, path string) (core.SimpleConfigurationIface, error)
+
+	// AccessPointFactory optionally overrides access-point construction for tests.
+	AccessPointFactory func(ctx context.Context, path string) (core.AccessPointIface, error)
 
 	// ResolverOverride optionally supplies the friendly-reference resolver,
 	// bypassing the Conn-backed one. Fake-backed tests set it (typically to
@@ -248,6 +255,43 @@ func (w *Wiring) NewStation(ctx context.Context, path string) (core.StationIface
 		return nil, core.WrapStationUnavailable(op, "station unavailable", fmt.Errorf("core station interface not available"))
 	}
 	return coreStation, nil
+}
+
+// NewAccessPoint constructs a core access-point wrapper for the given iwd object
+// path (a device path, since the AccessPoint interface is exported on the device
+// object when the device is in AP mode).
+func (w *Wiring) NewAccessPoint(ctx context.Context, path string) (core.AccessPointIface, error) {
+	const op = "NewAccessPoint"
+
+	if w == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "wiring cannot be nil", core.ErrCore)
+	}
+	if path == "" {
+		return nil, core.WrapInvalidArgument(core.ResourceAccessPoint, op, "access point path cannot be empty", core.ErrCore)
+	}
+	if path[0] != '/' {
+		return nil, core.WrapInvalidArgument(core.ResourceAccessPoint, op, "access point path must be absolute", core.ErrCore)
+	}
+	if w.AccessPointFactory != nil {
+		return w.AccessPointFactory(ctx, path)
+	}
+	if w.Conn == nil {
+		return nil, core.WrapInvalidState(core.ResourceClient, op, "D-Bus conn cannot be nil", core.ErrCore)
+	}
+
+	iwdAccessPoint, err := newIwdAccessPointFn(ctx, w.Conn, dbus.ObjectPath(path))
+	if err != nil {
+		return nil, core.WrapAccessPointUnavailable(op, "access point unavailable", err)
+	}
+	if iwdAccessPoint == nil {
+		return nil, core.WrapAccessPointUnavailable(op, "access point unavailable", iwdbus.WrapIntrospection(path, fmt.Errorf("iwd access point interface not available")))
+	}
+
+	coreAccessPoint := newCoreAccessPointFn(iwdAccessPoint)
+	if coreAccessPoint == nil {
+		return nil, core.WrapAccessPointUnavailable(op, "access point unavailable", fmt.Errorf("core access point interface not available"))
+	}
+	return coreAccessPoint, nil
 }
 
 // NewBasicServiceSet constructs a core BSS wrapper for the given iwd object path.

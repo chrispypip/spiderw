@@ -220,6 +220,10 @@ defined across:
   Don't export the `net.connman.iwd.Station` interface on the station-mode
   device, so the device still exists but has no Station. Exercises the client's
   "station unavailable" path and empty station enumeration.
+* `--omit-access-point`
+  Don't export the `net.connman.iwd.AccessPoint` interface on the AP-mode
+  device, so the device still exists but has no AccessPoint. Exercises the
+  client's "access point unavailable" path and empty access-point enumeration.
 
 The mock exports multiple basic service sets by default, mirroring iwd reporting
 one BSS per access point/radio a device can hear during a scan. It also exports
@@ -262,6 +266,26 @@ for a normal PIN but returns the WSC `NoCredentials` error for the sentinel PIN
 `00000000`, so integration tests can assert that matchable sentinel end to end.
 `--omit-wsc` drops just this interface while keeping the station (as with a driver
 that does not support WSC); `--omit-station` drops the station and WSC together.
+
+### Access Point
+
+The AP-mode device (`wlan1`) exports the `net.connman.iwd.AccessPoint` interface
+on its object, mirroring iwd (where AccessPoint lives on the device object in AP
+mode). The station-mode device (`wlan0`) does not, so access-point enumeration
+returns exactly one access point. The mock seeds a *running* AP: `Started` is
+true, hosting SSID `MockAP` on `Frequency` 5180 MHz with `PairwiseCiphers`
+`["CCMP"]` and `GroupCipher` `CCMP` (the optional properties are present only
+while running, as in iwd).
+
+`Start` brings up a PSK AP with the given SSID (rejected `AlreadyExists` if one is
+already running, `InvalidArguments` for an empty SSID or a passphrase under 8
+characters); `StartProfile` accepts the one seeded profile name `MockProfile` and
+rejects any other `NotFound`. `Stop` tears the AP down, clearing the optional
+properties. `Scan` models the asynchronous scan just like Station (true→false
+`Scanning` transition, `InProgress` if already scanning), and `GetOrderedNetworks`
+returns two seeded neighbor networks (`OpenNet`, `SecuredNet`) with signal
+strengths in 100 × dBm, strongest first. Use `--omit-access-point` to drop the
+interface while keeping the device.
 
 ### Credentials agent (AgentManager)
 

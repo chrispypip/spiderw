@@ -86,6 +86,10 @@ const (
 	// (SimpleConfiguration) interface, used for both infrastructure and P2P-peer
 	// enrollment.
 	ResourceSimpleConfiguration = failure.ResourceSimpleConfiguration
+
+	// ResourceAccessPoint identifies failures involving an iwd AccessPoint object
+	// (a device running in AP mode).
+	ResourceAccessPoint = failure.ResourceAccessPoint
 )
 
 // Error sentinels support errors.Is checks in core-layer errors.
@@ -131,6 +135,10 @@ var (
 	// ErrSimpleConfigurationNotInitialized indicates that a SimpleConfiguration
 	// (WSC) wrapper has no backend.
 	ErrSimpleConfigurationNotInitialized = errors.New("simple configuration not initialized")
+
+	// ErrAccessPointNotInitialized indicates that an AccessPoint wrapper has no
+	// backend.
+	ErrAccessPointNotInitialized = errors.New("access point not initialized")
 
 	// ErrNoAgent indicates that iwd rejected an operation because no credentials
 	// agent is registered. It is re-exported from the iwdbus layer so callers can
@@ -240,6 +248,7 @@ var (
 	// WSC (SimpleConfiguration) operations are method calls only (no properties),
 	// so includeDBusProperty stays false.
 	simpleConfigurationUnavailablePolicy = unavailablePolicy{resource: ResourceSimpleConfiguration}
+	accessPointUnavailablePolicy         = unavailablePolicy{resource: ResourceAccessPoint, includeDBusProperty: true}
 )
 
 func wrapUnavailable(op, details string, err error, policy unavailablePolicy) error {
@@ -309,6 +318,12 @@ func WrapAgentUnavailable(op, details string, err error) error {
 // failures by kind and resource.
 func WrapSimpleConfigurationUnavailable(op, details string, err error) error {
 	return wrapUnavailable(op, details, err, simpleConfigurationUnavailablePolicy)
+}
+
+// WrapAccessPointUnavailable classifies D-Bus AccessPoint failures by kind and
+// resource.
+func WrapAccessPointUnavailable(op, details string, err error) error {
+	return wrapUnavailable(op, details, err, accessPointUnavailablePolicy)
 }
 
 // WrapInvalidState wraps invalid state issues for resource.

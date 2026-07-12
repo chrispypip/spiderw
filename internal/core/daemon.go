@@ -68,6 +68,17 @@ type StationRef struct {
 	Name string
 }
 
+// AccessPointRef is a lightweight reference to an access point (a device in AP
+// mode) discovered by the iwd daemon. Name is the co-located device's Name (e.g.
+// "wlan1"), not the hosted network's SSID.
+type AccessPointRef struct {
+	// Path is the canonical D-Bus object path for the access point.
+	Path string
+
+	// Name is the co-located device's Name (best-effort, may be empty).
+	Name string
+}
+
 // DaemonIface defines the core daemon operations used by the public layer.
 type DaemonIface interface {
 	Info(ctx context.Context) (*DaemonInfo, error)
@@ -77,6 +88,7 @@ type DaemonIface interface {
 	Adapters(ctx context.Context) ([]AdapterRef, error)
 	Devices(ctx context.Context) ([]DeviceRef, error)
 	Stations(ctx context.Context) ([]StationRef, error)
+	AccessPoints(ctx context.Context) ([]AccessPointRef, error)
 	BasicServiceSets(ctx context.Context) ([]BasicServiceSetRef, error)
 	Networks(ctx context.Context) ([]NetworkRef, error)
 	KnownNetworks(ctx context.Context) ([]KnownNetworkRef, error)
@@ -99,6 +111,7 @@ type daemonRaw interface {
 	GetAdapters(ctx context.Context) ([]iwdbus.AdapterRef, error)
 	GetDevices(ctx context.Context) ([]iwdbus.DeviceRef, error)
 	GetStations(ctx context.Context) ([]iwdbus.StationRef, error)
+	GetAccessPoints(ctx context.Context) ([]iwdbus.AccessPointRef, error)
 	GetBasicServiceSets(ctx context.Context) ([]iwdbus.BasicServiceSetRef, error)
 	GetNetworks(ctx context.Context) ([]iwdbus.NetworkRef, error)
 	GetKnownNetworks(ctx context.Context) ([]iwdbus.KnownNetworkRef, error)
@@ -270,6 +283,31 @@ func (d *Daemon) Stations(ctx context.Context) ([]StationRef, error) {
 			return nil, WrapInvalidState(ResourceStation, op, "station returned invalid path", fmt.Errorf("invalid station path %q", p))
 		}
 		refs = append(refs, StationRef{Path: p, Name: strings.TrimSpace(r.Name)})
+	}
+	return refs, nil
+}
+
+// AccessPoints returns the access points (devices in AP mode) currently exposed
+// by the iwd daemon. Each ref carries the co-located device Name.
+func (d *Daemon) AccessPoints(ctx context.Context) ([]AccessPointRef, error) {
+	const op = "Daemon.AccessPoints"
+
+	rawDaemon, err := d.rawDaemon(op)
+	if err != nil {
+		return nil, err
+	}
+
+	rawRefs, err := rawDaemon.GetAccessPoints(ctx)
+	if err != nil {
+		return nil, WrapDaemonUnavailable(op, "failed getting access points", err)
+	}
+	refs := make([]AccessPointRef, 0, len(rawRefs))
+	for _, r := range rawRefs {
+		p := strings.TrimSpace(string(r.Path))
+		if p == "" || !strings.HasPrefix(p, "/") {
+			return nil, WrapInvalidState(ResourceAccessPoint, op, "access point returned invalid path", fmt.Errorf("invalid access point path %q", p))
+		}
+		refs = append(refs, AccessPointRef{Path: p, Name: strings.TrimSpace(r.Name)})
 	}
 	return refs, nil
 }

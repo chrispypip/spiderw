@@ -33,6 +33,8 @@ var (
 	omitStationFlag = flag.Bool("omit-station", false, "Don't export the Station interface on the station-mode device (so station operations are unavailable)")
 
 	omitWSCFlag = flag.Bool("omit-wsc", false, "Don't export the SimpleConfiguration (WSC) interface on the station-mode device (so WSC is unavailable while the station remains)")
+
+	omitAccessPointFlag = flag.Bool("omit-access-point", false, "Don't export the AccessPoint interface on the AP-mode device (so access-point operations are unavailable)")
 )
 
 func emitPropertiesChanged(path dbus.ObjectPath, iface string, changed map[string]dbus.Variant, invalid []string) {

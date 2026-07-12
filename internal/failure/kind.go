@@ -81,6 +81,10 @@ const (
 	// (SimpleConfiguration) interface, used for both infrastructure and P2P-peer
 	// enrollment, so it is not tied to the station or device object.
 	ResourceSimpleConfiguration Resource = "simple configuration"
+
+	// ResourceAccessPoint identifies failures involving an iwd AccessPoint object
+	// (a device running in AP mode).
+	ResourceAccessPoint Resource = "access point"
 )
 
 // String returns the stable resource label.

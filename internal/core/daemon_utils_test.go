@@ -27,6 +27,7 @@ type fakeIwdbusDaemon struct {
 	adapters      atomic.Pointer[[]iwdbus.AdapterRef]
 	devices       atomic.Pointer[[]iwdbus.DeviceRef]
 	stations      atomic.Pointer[[]iwdbus.StationRef]
+	accessPoints  atomic.Pointer[[]iwdbus.AccessPointRef]
 	bsses         atomic.Pointer[[]iwdbus.BasicServiceSetRef]
 	networks      atomic.Pointer[[]iwdbus.NetworkRef]
 	knownNetworks atomic.Pointer[[]iwdbus.KnownNetworkRef]
@@ -59,6 +60,12 @@ func (f *fakeIwdbusDaemon) setDevices(devices []iwdbus.DeviceRef) *fakeIwdbusDae
 func (f *fakeIwdbusDaemon) setStations(stations []iwdbus.StationRef) *fakeIwdbusDaemon {
 	cloned := cloneIwdbusStationRefs(stations)
 	f.stations.Store(&cloned)
+	return f
+}
+
+func (f *fakeIwdbusDaemon) setAccessPoints(accessPoints []iwdbus.AccessPointRef) *fakeIwdbusDaemon {
+	cloned := cloneIwdbusAccessPointRefs(accessPoints)
+	f.accessPoints.Store(&cloned)
 	return f
 }
 
@@ -123,6 +130,14 @@ func (f *fakeIwdbusDaemon) GetStations(ctx context.Context) ([]iwdbus.StationRef
 		return nil, f.loadErr()
 	}
 	return cloneIwdbusStationRefs(*ptr), f.loadErr()
+}
+
+func (f *fakeIwdbusDaemon) GetAccessPoints(ctx context.Context) ([]iwdbus.AccessPointRef, error) {
+	ptr := f.accessPoints.Load()
+	if ptr == nil {
+		return nil, f.loadErr()
+	}
+	return cloneIwdbusAccessPointRefs(*ptr), f.loadErr()
 }
 
 func (f *fakeIwdbusDaemon) GetBasicServiceSets(ctx context.Context) ([]iwdbus.BasicServiceSetRef, error) {
@@ -199,6 +214,15 @@ func cloneIwdbusStationRefs(refs []iwdbus.StationRef) []iwdbus.StationRef {
 		return nil
 	}
 	out := make([]iwdbus.StationRef, len(refs))
+	copy(out, refs)
+	return out
+}
+
+func cloneIwdbusAccessPointRefs(refs []iwdbus.AccessPointRef) []iwdbus.AccessPointRef {
+	if refs == nil {
+		return nil
+	}
+	out := make([]iwdbus.AccessPointRef, len(refs))
 	copy(out, refs)
 	return out
 }

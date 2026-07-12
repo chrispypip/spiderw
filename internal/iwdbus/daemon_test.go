@@ -397,6 +397,7 @@ func TestDaemon_GetEnumerators_Guards(t *testing.T) {
 		{"GetNetworks", func(d *Daemon) error { _, err := d.GetNetworks(context.Background()); return err }},
 		{"GetKnownNetworks", func(d *Daemon) error { _, err := d.GetKnownNetworks(context.Background()); return err }},
 		{"GetStations", func(d *Daemon) error { _, err := d.GetStations(context.Background()); return err }},
+		{"GetAccessPoints", func(d *Daemon) error { _, err := d.GetAccessPoints(context.Background()); return err }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
