@@ -264,7 +264,8 @@ func TestStationMock_CLI_Scan(t *testing.T) {
 
 	out, err := runSpider(t, "station", devicePath, "scan")
 	require.NoError(t, err, out)
-	require.Contains(t, out, "KnownNet") // resolved SSID
+	require.Contains(t, out, "scan started") // wait-mode start notice
+	require.Contains(t, out, "KnownNet")     // resolved SSID
 	require.Contains(t, out, "dBm")
 }
 

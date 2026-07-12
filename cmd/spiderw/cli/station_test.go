@@ -216,8 +216,9 @@ func TestStationCmd_Scan_WaitsThenListsNetworks(t *testing.T) {
 	out, code := driveCLI(stationClient(st), nil, false, "station", testStationPath, "scan")
 	require.Equal(t, 0, code, out)
 	require.True(t, st.scanCalled)
-	// The fake's SubscribeScanningChanged fires true then false, so wait mode
-	// completes and prints the ordered networks by resolved SSID.
+	// Wait mode announces that the scan started, then prints the ordered networks
+	// by resolved SSID once the fake's SubscribeScanningChanged fires true→false.
+	require.Contains(t, out, "scan started")
 	require.Contains(t, out, "KnownNet")
 	require.Contains(t, out, "-60 dBm")
 }

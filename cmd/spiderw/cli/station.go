@@ -258,6 +258,17 @@ func (r stationScanResult) String() string {
 	return "scan started"
 }
 
+// stationScanStartedResult is printed in `scan` wait mode once the scan has been
+// triggered, before blocking for it to finish.
+type stationScanStartedResult struct {
+	Station string `json:"Station"`
+}
+
+// String returns the CLI string form of the value.
+func (r stationScanStartedResult) String() string {
+	return fmt.Sprintf("station %q: scan started; waiting for it to finish...", r.Station)
+}
+
 func runStationScan(app *App, ctx context.Context, stationRef string, args []string) error {
 	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
 	fs.SetOutput(app.stderr())
@@ -310,6 +321,12 @@ func runStationScan(app *App, ctx context.Context, stationRef string, args []str
 		}()
 
 		if err := s.Scan(ctx); err != nil {
+			return err
+		}
+
+		// Signal that the scan started before blocking on the result, mirroring the
+		// wsc commands (which print before their blocking enrollment).
+		if err := app.printOutput(stationScanStartedResult{Station: stationRef}); err != nil {
 			return err
 		}
 
