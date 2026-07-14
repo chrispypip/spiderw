@@ -217,7 +217,7 @@ func TestStationCmd_Scan_WaitsThenListsNetworks(t *testing.T) {
 	require.Equal(t, 0, code, out)
 	require.True(t, st.scanCalled)
 	// Wait mode announces that the scan started, then prints the ordered networks
-	// by resolved SSID once the fake's SubscribeScanningChanged fires true→false.
+	// by resolved SSID once the fake's SubscribeScanningChanged fires true->false.
 	require.Contains(t, out, "scan started")
 	require.Contains(t, out, "KnownNet")
 	require.Contains(t, out, "-60 dBm")
@@ -805,7 +805,7 @@ func TestStationCmd_Monitor_BadArgs(t *testing.T) {
 
 // TestStreamStationProperty drives the monitor's non-blocking core directly: it
 // prints the current value and wires the matching subscription. The `subscribed`
-// assertion is the point — it proves each target reaches its own Subscribe method,
+// assertion is the point - it proves each target reaches its own Subscribe method,
 // so swapping two branches of the switch (network <-> access-point, an easy
 // copy-paste slip) fails here instead of shipping.
 func TestStreamStationProperty(t *testing.T) {
@@ -833,7 +833,7 @@ func TestStreamStationProperty(t *testing.T) {
 
 	// The seed line renders the ref Properties() already resolved (SSID / MAC). The
 	// streamed line goes through the resolver, which here has no client, so it falls
-	// back to the raw path — proving the fallback never prints blank.
+	// back to the raw path - proving the fallback never prints blank.
 	for _, tc := range []struct {
 		what        string
 		wantSeed    string
@@ -916,8 +916,8 @@ func TestParseStationMonitorTarget(t *testing.T) {
 	}
 }
 
-// TestStreamStationProperty_ResolvesNames proves the streamed value — which the
-// subscription delivers as a bare object path — is rendered as the SSID (and the
+// TestStreamStationProperty_ResolvesNames proves the streamed value - which the
+// subscription delivers as a bare object path - is rendered as the SSID (and the
 // BSS as a MAC), matching what `station status` shows. Without the resolver the
 // user would see /net/connman/iwd/0/3/<hex-ssid>_psk instead of the SSID.
 func TestStreamStationProperty_ResolvesNames(t *testing.T) {
@@ -969,7 +969,7 @@ func TestStreamStationProperty_DisconnectClearsLine(t *testing.T) {
 
 // TestStationCmd_Affinities_SetError covers the failure path for `affinities set`.
 // iwd rejects SetAffinities on hardware that does not support it (a Raspberry Pi's
-// brcmfmac does), so this is a path users hit routinely — and it had no test.
+// brcmfmac does), so this is a path users hit routinely - and it had no test.
 func TestStationCmd_Affinities_SetError(t *testing.T) {
 	t.Parallel()
 
@@ -1044,4 +1044,43 @@ func TestParseSignalThresholds_RejectsNonDescending(t *testing.T) {
 	require.NoError(t, err)
 	_, err = parseSignalThresholds([]string{"-60", "-70", "-80"})
 	require.NoError(t, err)
+}
+
+// TestSignalBandRange covers the mapping from iwd's band index back to the dBm
+// range it represents. iwd reports a band, not an RSSI, so this is what the user
+// actually reads.
+//
+// With N thresholds there are N+1 bands, indexed 0..N - so `level == len(thresholds)`
+// is a legitimate value (the weakest band), and it is the boundary that matters:
+// the guard there is what stops the default branch from indexing thresholds[N] and
+// panicking. A mutation loosening it to `level > n` survived the whole suite, so
+// nothing exercised it.
+func TestSignalBandRange(t *testing.T) {
+	t.Parallel()
+
+	thresholds := []int{-60, -70, -80} // 3 thresholds => 4 bands, levels 0..3
+
+	for _, tc := range []struct {
+		name  string
+		level int
+		want  string
+	}{
+		{"strongest band", 0, ">= -60 dBm"},
+		{"middle band", 1, "-70 to -60 dBm"},
+		{"lower middle band", 2, "-80 to -70 dBm"},
+		{"weakest band (level == len(thresholds))", 3, "< -80 dBm"},
+
+		// iwd should not report these, but the renderer must not panic if it does.
+		{"below range", -1, ">= -60 dBm"},
+		{"above range", 99, "< -80 dBm"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.want, signalBandRange(tc.level, thresholds))
+		})
+	}
+
+	// A single threshold yields two bands and must not index out of range.
+	require.Equal(t, ">= -70 dBm", signalBandRange(0, []int{-70}))
+	require.Equal(t, "< -70 dBm", signalBandRange(1, []int{-70}))
 }
