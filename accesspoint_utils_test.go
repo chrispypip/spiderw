@@ -96,6 +96,9 @@ func (f *fakeCoreAccessPoint) SubscribePropertiesChanged(ctx context.Context, fn
 		return nil, f.err
 	}
 	if fn != nil && f.subEvent != nil {
+		// Deliberately hands every subscriber the *same* map, so a concurrent race
+		// test proves the public wrapper makes its own defensive copy rather than
+		// proving the fake does. Do not "fix" this by copying here.
 		fn(*f.subEvent)
 	}
 	return func() error { return nil }, nil

@@ -2,6 +2,8 @@ package spiderw
 
 import (
 	"context"
+	"maps"
+	"slices"
 
 	"github.com/chrispypip/spiderw/internal/core"
 	"github.com/chrispypip/spiderw/internal/logging"
@@ -206,9 +208,10 @@ func (a *AccessPoint) OrderedNetworks(ctx context.Context) ([]AccessPointOrdered
 		out := make([]AccessPointOrderedNetwork, 0, len(raw))
 		for _, n := range raw {
 			// Scan results routinely include neighbor networks whose security iwd
-			// does not classify (an empty or unrecognized Security field), so an
-			// unknown type collapses to NetworkTypeUnknown rather than failing the
-			// whole list. This differs from a specific Network, whose Type is strict.
+			// does not classify (an empty or unrecognized value in the wire's "Type"
+			// key, which carries the security), so an unknown type collapses to
+			// NetworkTypeUnknown rather than failing the whole list. This differs
+			// from a specific Network, whose Type is strict.
 			netType, err := convertNetworkType(n.Type)
 			if err != nil {
 				netType = NetworkTypeUnknown
@@ -236,7 +239,19 @@ func (a *AccessPoint) SubscribePropertiesChanged(ctx context.Context, fn func(Ac
 	}
 
 	unsubscribe, err := coreAP.SubscribePropertiesChanged(ctx, func(ev core.AccessPointPropertiesChanged) {
-		fn(AccessPointPropertiesChanged{Changed: ev.Changed, Invalidated: ev.Invalidated})
+		changed := make(map[string]any, len(ev.Changed))
+		maps.Copy(changed, ev.Changed)
+
+		// Copy invalidated to avoid aliasing/mutation across layers.
+		var invalidated []string
+		if ev.Invalidated != nil {
+			invalidated = slices.Clone(ev.Invalidated)
+		}
+
+		fn(AccessPointPropertiesChanged{
+			Changed:     changed,
+			Invalidated: invalidated,
+		})
 	})
 	if err != nil {
 		return nil, wrapPublicError(op, err)
