@@ -1,4 +1,4 @@
-//go:build unit || bench
+//go:build unit || bench || regression
 
 package iwdbus
 

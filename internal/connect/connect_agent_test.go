@@ -96,4 +96,26 @@ func TestWiring_NewAgent_FailurePaths(t *testing.T) {
 		require.Contains(t, err.Error(), "agent manager unavailable")
 		require.True(t, unexported, "export must be undone when registration fails")
 	})
+
+	t.Run("register_error_unexports", func(t *testing.T) {
+		// The third failure branch: the manager resolves, but iwd rejects the
+		// registration (another agent already owns the slot). The exported object
+		// must still be torn down, or the process leaks a D-Bus export that shadows
+		// any later agent.
+		var unexported bool
+		exportAgentFn = func(*dbus.Conn, dbus.ObjectPath, iwdbus.AgentHandler) (func() error, error) {
+			return func() error { unexported = true; return nil }, nil
+		}
+		// An uninitialized AgentManager fails RegisterAgent without touching a bus.
+		newIwdAgentManagerFn = func(ctx context.Context, conn *dbus.Conn) (*iwdbus.AgentManager, error) {
+			return &iwdbus.AgentManager{}, nil
+		}
+
+		w := &Wiring{Conn: &dbus.Conn{}}
+		a, err := w.NewAgent(context.Background(), validConnectCallbacks())
+		require.Nil(t, a)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed registering agent")
+		require.True(t, unexported, "export must be undone when registration fails")
+	})
 }

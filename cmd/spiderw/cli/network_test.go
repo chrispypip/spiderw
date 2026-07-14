@@ -421,3 +421,34 @@ func TestParseNetworkMonitorTarget(t *testing.T) {
 		require.Error(t, err)
 	}
 }
+
+// TestNetworkCmd_Connect_ConnectFails covers iwd rejecting the connection itself —
+// a wrong passphrase, a timeout, an AP that refuses. The existing tests only cover
+// the agent *registration* failing, which is a different branch: there, Connect is
+// never reached.
+func TestNetworkCmd_Connect_ConnectFails(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithNetwork()
+	open := fc.networks["/net/connman/iwd/phy0/wlan0/open"].(*fakeNetwork)
+	open.connectErr = errors.New("invalid passphrase")
+
+	out, code := driveCLI(fc, nil, false, "network", "OpenNet", "connect")
+	require.Equal(t, 1, code, out)
+	require.Contains(t, out, "invalid passphrase")
+	require.NotContains(t, out, "connected", "a failed connect must not report success")
+}
+
+// TestNetworkCmd_Connect_AgentUnregisterFails covers the teardown failing after a
+// successful connect. The connect still succeeded, so the command must not report
+// failure — but the unregister error must not be silently swallowed either.
+func TestNetworkCmd_Connect_AgentUnregisterFails(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithNetwork()
+	fc.agent = &fakeAgent{unregisterErr: errors.New("unregister failed")}
+
+	out, code := driveConnect(fc, "", nil, "network", "SecuredNet", "connect", "--passphrase=s3cretpass")
+	require.Equal(t, 0, code, out, "a teardown failure must not mask a successful connect")
+	require.True(t, fc.agent.unregistered, "the agent must still be unregistered")
+}

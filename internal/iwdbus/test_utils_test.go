@@ -1,4 +1,4 @@
-//go:build unit || stress || race
+//go:build unit || stress || race || regression
 
 package iwdbus
 

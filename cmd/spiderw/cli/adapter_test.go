@@ -355,3 +355,25 @@ func TestPrintAdapterPoweredLine(t *testing.T) {
 	require.Contains(t, bufJSON.String(), `"Powered":false`)
 	require.Contains(t, bufJSON.String(), `"phy0"`)
 }
+
+// TestAdapterCmd_SupportsAPAndAdHoc covers the two capability subcommands that had
+// no test; supports-station and supports-mode were covered, these were not.
+func TestAdapterCmd_SupportsAPAndAdHoc(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		sub  string
+		want string
+	}{
+		{"supports-ap", "true"},
+		{"supports-adhoc", "false"},
+		{"supports-ad-hoc", "false"},
+	} {
+		t.Run(tc.sub, func(t *testing.T) {
+			t.Parallel()
+			out, code := driveCLI(fakeWithAdapter(), nil, false, "adapter", "phy0", tc.sub)
+			require.Equal(t, 0, code, out)
+			require.Contains(t, out, tc.want)
+		})
+	}
+}

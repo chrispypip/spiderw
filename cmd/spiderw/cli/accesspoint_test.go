@@ -583,3 +583,15 @@ func TestParseAccessPointMonitorTarget(t *testing.T) {
 		require.Error(t, err)
 	}
 }
+
+// TestAccessPointCmd_Status_EnumerationError covers the enumeration itself failing,
+// as the sibling resources already do. This is distinct from a per-AP Properties()
+// error: here the daemon never hands back a list at all.
+func TestAccessPointCmd_Status_EnumerationError(t *testing.T) {
+	t.Parallel()
+
+	fc := &fakeClient{allAccessPointErr: errors.New("enumeration boom")}
+	out, code := driveCLI(fc, nil, false, "access-point", "status")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "enumeration boom")
+}

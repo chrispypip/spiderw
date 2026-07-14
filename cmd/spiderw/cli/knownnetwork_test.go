@@ -352,3 +352,12 @@ func TestParseKnownNetworkMonitorTarget(t *testing.T) {
 		require.Error(t, err)
 	}
 }
+
+// TestKnownNetworkCmd_Name covers the `name` subcommand, which had no test.
+func TestKnownNetworkCmd_Name(t *testing.T) {
+	t.Parallel()
+
+	out, code := driveCLI(fakeWithKnownNetwork(), nil, false, "known-network", "KnownNet", "name")
+	require.Equal(t, 0, code, out)
+	require.Contains(t, out, "KnownNet")
+}

@@ -318,3 +318,20 @@ func TestPrintDeviceLines(t *testing.T) {
 		require.Contains(t, buf.String(), `"Mode":"station"`)
 	})
 }
+
+// TestDeviceCmd_Monitor_BadArgs covers `device <ref> monitor`'s argument guard. The
+// monitor command itself blocks on an OS signal, but validation runs first — the
+// station/access-point/network monitors have this test and device did not.
+func TestDeviceCmd_Monitor_BadArgs(t *testing.T) {
+	t.Parallel()
+
+	for _, args := range [][]string{
+		{"device", "wlan0", "monitor"},
+		{"device", "wlan0", "monitor", "bogus"},
+		{"device", "wlan0", "monitor", "powered", "extra"},
+	} {
+		out, code := driveCLI(fakeWithDevice(), nil, false, args...)
+		require.Equal(t, 1, code, out)
+		require.Contains(t, out, "usage:")
+	}
+}

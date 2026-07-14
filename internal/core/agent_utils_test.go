@@ -16,7 +16,6 @@ type fakeAgentManager struct {
 	mu              sync.Mutex
 	registerCalls   []dbus.ObjectPath
 	unregisterCalls []dbus.ObjectPath
-	registerErr     error
 	unregisterErr   error
 }
 
@@ -24,7 +23,7 @@ func (f *fakeAgentManager) RegisterAgent(ctx context.Context, path dbus.ObjectPa
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.registerCalls = append(f.registerCalls, path)
-	return f.registerErr
+	return nil
 }
 
 func (f *fakeAgentManager) UnregisterAgent(ctx context.Context, path dbus.ObjectPath) error {

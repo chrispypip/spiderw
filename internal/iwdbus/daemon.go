@@ -234,6 +234,11 @@ func parseDaemonMap(get func(k string) (interface{}, bool)) (*DaemonInfo, error)
 // for every object that implements iface, built by makeRef and sorted by object
 // path. It is the shared enumeration skeleton behind GetAdapters, GetDevices,
 // and the other Get* methods.
+// getManagedObjectsFn is a seam: getRefs needs a live *dbus.Conn, so stubbing the
+// ObjectManager call is the only way to unit-test the filtering, the makeRef error
+// path, and the sort that gives `list` its deterministic order.
+var getManagedObjectsFn = getManagedObjects
+
 func getRefs[T any](
 	ctx context.Context,
 	conn *dbus.Conn,
@@ -244,7 +249,7 @@ func getRefs[T any](
 		return nil, WrapConnection(op, ErrDaemonUninitialized)
 	}
 
-	objects, err := getManagedObjects(ctx, conn, IwdService)
+	objects, err := getManagedObjectsFn(ctx, conn, IwdService)
 	if err != nil {
 		return nil, WrapIntrospection(DBusObjectManagerGetManagedObjects, err)
 	}

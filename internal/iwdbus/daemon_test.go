@@ -4,6 +4,7 @@ package iwdbus
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -617,4 +618,85 @@ func TestObjectNameFromManagedObject(t *testing.T) {
 			require.Equal(t, tc.want, got)
 		})
 	}
+}
+
+// TestDaemon_GetRefs covers the enumeration primitive shared by all seven Get*
+// enumerators. It needs a live *dbus.Conn, so the ObjectManager call is stubbed —
+// otherwise only the nil-conn guard is reachable and the parts that decide what
+// `list` actually prints go untested.
+func TestDaemon_GetRefs(t *testing.T) {
+	orig := getManagedObjectsFn
+	t.Cleanup(func() { getManagedObjectsFn = orig })
+
+	const iface = IwdAdapterIface
+	makeRef := func(path dbus.ObjectPath, ifaces map[string]map[string]dbus.Variant) (string, error) {
+		return string(path), nil
+	}
+
+	t.Run("filters to the requested interface", func(t *testing.T) {
+		getManagedObjectsFn = func(ctx context.Context, conn *dbus.Conn, service string) (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, error) {
+			return map[dbus.ObjectPath]map[string]map[string]dbus.Variant{
+				"/phy0":       {iface: {}},
+				"/phy0/wlan0": {IwdDeviceIface: {}}, // a different interface
+			}, nil
+		}
+
+		refs, err := getRefs(context.Background(), &dbus.Conn{}, "op", iface, makeRef)
+		require.NoError(t, err)
+		require.Equal(t, []string{"/phy0"}, refs, "objects without the interface must be skipped")
+	})
+
+	t.Run("orders refs by path", func(t *testing.T) {
+		// Map iteration is random, so without the sort `adapter list` would print a
+		// different order on every run. Seed enough objects that an unsorted result
+		// is overwhelmingly unlikely to come out ordered by chance.
+		getManagedObjectsFn = func(ctx context.Context, conn *dbus.Conn, service string) (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, error) {
+			objects := map[dbus.ObjectPath]map[string]map[string]dbus.Variant{}
+			for _, p := range []dbus.ObjectPath{"/phy9", "/phy3", "/phy7", "/phy1", "/phy5", "/phy0", "/phy8", "/phy2"} {
+				objects[p] = map[string]map[string]dbus.Variant{iface: {}}
+			}
+			return objects, nil
+		}
+
+		refs, err := getRefs(context.Background(), &dbus.Conn{}, "op", iface, makeRef)
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			"/phy0", "/phy1", "/phy2", "/phy3", "/phy5", "/phy7", "/phy8", "/phy9",
+		}, refs)
+	})
+
+	t.Run("propagates a makeRef error", func(t *testing.T) {
+		getManagedObjectsFn = func(ctx context.Context, conn *dbus.Conn, service string) (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, error) {
+			return map[dbus.ObjectPath]map[string]map[string]dbus.Variant{
+				"/phy0": {iface: {}},
+			}, nil
+		}
+
+		wantErr := errors.New("bad ref")
+		_, err := getRefs(context.Background(), &dbus.Conn{}, "op", iface,
+			func(dbus.ObjectPath, map[string]map[string]dbus.Variant) (string, error) {
+				return "", wantErr
+			})
+		require.ErrorIs(t, err, wantErr, "a malformed object must fail the enumeration, not be dropped")
+	})
+
+	t.Run("propagates an ObjectManager error", func(t *testing.T) {
+		getManagedObjectsFn = func(ctx context.Context, conn *dbus.Conn, service string) (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, error) {
+			return nil, errors.New("bus failure")
+		}
+
+		_, err := getRefs(context.Background(), &dbus.Conn{}, "op", iface, makeRef)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "bus failure")
+	})
+
+	t.Run("empty when nothing implements the interface", func(t *testing.T) {
+		getManagedObjectsFn = func(ctx context.Context, conn *dbus.Conn, service string) (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, error) {
+			return map[dbus.ObjectPath]map[string]map[string]dbus.Variant{}, nil
+		}
+
+		refs, err := getRefs(context.Background(), &dbus.Conn{}, "op", iface, makeRef)
+		require.NoError(t, err)
+		require.Empty(t, refs)
+	})
 }

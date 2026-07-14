@@ -5,8 +5,12 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"slices"
 	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/chrispypip/spiderw"
 )
@@ -936,4 +940,71 @@ func (f *fakeKnownNetwork) SubscribeLastConnectedTimeChanged(ctx context.Context
 		fn(f.lastConnEvent.v)
 	}
 	return func() error { return nil }, nil
+}
+
+// TestClientLookupFailure covers the path every `<resource> <ref> <cmd>` takes: the
+// ref resolves against the daemon's enumeration, and then the client is asked for a
+// live handle. That second call can fail on a real daemon — the object may be gone
+// between the enumeration and the lookup, which happens routinely right after a
+// scan — and every resource had the branch untested.
+func TestClientLookupFailure(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name   string
+		client func(error) *fakeClient
+		args   []string
+	}{
+		{"station", func(err error) *fakeClient {
+			fc := fakeWithStation()
+			fc.stationErr = err
+			return fc
+		}, []string{"station", testStationName, "status"}},
+
+		{"access-point", func(err error) *fakeClient {
+			fc, _ := fakeWithAccessPoint()
+			fc.accessPointErr = err
+			return fc
+		}, []string{"access-point", testAPName, "status"}},
+
+		{"device", func(err error) *fakeClient {
+			fc := fakeWithDevice()
+			fc.deviceErr = err
+			return fc
+		}, []string{"device", "/net/connman/iwd/phy0/wlan0", "status"}},
+
+		{"adapter", func(err error) *fakeClient {
+			fc := fakeWithAdapter()
+			fc.adapterErr = err
+			return fc
+		}, []string{"adapter", "/net/connman/iwd/phy0", "status"}},
+
+		{"network", func(err error) *fakeClient {
+			fc := fakeWithNetwork()
+			fc.networkErr = err
+			return fc
+		}, []string{"network", "OpenNet", "status"}},
+
+		{"known-network", func(err error) *fakeClient {
+			fc := fakeWithKnownNetwork()
+			fc.knownNetErr = err
+			return fc
+		}, []string{"known-network", "KnownNet", "status"}},
+
+		{"bss", func(err error) *fakeClient {
+			fc := fakeWithBSS()
+			fc.bssErr = err
+			return fc
+		}, []string{"bss", "/net/connman/iwd/phy0/wlan0/aabbccddeeff", "status"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fc := tc.client(errors.New("object vanished"))
+			out, code := driveCLI(fc, nil, false, tc.args...)
+			require.Equal(t, 1, code, out)
+			require.Contains(t, out, "object vanished",
+				"a failed client lookup must surface, not be swallowed")
+		})
+	}
 }
