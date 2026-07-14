@@ -966,3 +966,82 @@ func TestStreamStationProperty_DisconnectClearsLine(t *testing.T) {
 
 	require.Contains(t, buf.String(), "network=none (disconnected)")
 }
+
+// TestStationCmd_Affinities_SetError covers the failure path for `affinities set`.
+// iwd rejects SetAffinities on hardware that does not support it (a Raspberry Pi's
+// brcmfmac does), so this is a path users hit routinely — and it had no test.
+func TestStationCmd_Affinities_SetError(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{
+		path:      testStationPath,
+		name:      testStationName,
+		props:     &spiderw.StationProperties{State: spiderw.StationStateConnected},
+		setAffErr: errors.New("not supported"),
+	}
+	// Pass the BSS object path, so the command reaches SetAffinities without
+	// needing a MAC-to-path resolution first.
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationName, "affinities", "set", testStationAP)
+	require.Equal(t, 1, code, out)
+	require.Contains(t, out, "not supported")
+}
+
+// TestStationCmd_Affinities_ClearError covers the same failure on `affinities clear`,
+// which is a separate SetAffinities call.
+func TestStationCmd_Affinities_ClearError(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStation{
+		path:      testStationPath,
+		name:      testStationName,
+		props:     &spiderw.StationProperties{State: spiderw.StationStateConnected},
+		setAffErr: errors.New("not supported"),
+	}
+	out, code := driveCLI(stationClient(st), nil, false,
+		"station", testStationName, "affinities", "clear")
+	require.Equal(t, 1, code, out)
+	require.Contains(t, out, "not supported")
+}
+
+// TestStationCmd_MonitorSignal_BadArgs covers `monitor-signal`'s argument guard,
+// which runs before the command blocks on an OS signal. The command had no test
+// invocation at all.
+func TestStationCmd_MonitorSignal_BadArgs(t *testing.T) {
+	t.Parallel()
+
+	for _, args := range [][]string{
+		{"station", testStationName, "monitor-signal"},               // no thresholds
+		{"station", testStationName, "monitor-signal", "abc"},        // not a number
+		{"station", testStationName, "monitor-signal", "-70", "-60"}, // not descending
+	} {
+		out, code := driveCLI(fakeWithStation(), nil, false, args...)
+		require.Equal(t, 1, code, out)
+		require.NotEmpty(t, out)
+	}
+}
+
+// TestParseSignalThresholds_RejectsNonDescending pins the ordering contract.
+// signalBandRange maps a band index back to the dBm range it covers, which is only
+// meaningful when the thresholds descend. The help documented "highest first" but
+// nothing enforced it, so an ascending list was accepted and then rendered as
+// nonsense ranges.
+func TestParseSignalThresholds_RejectsNonDescending(t *testing.T) {
+	t.Parallel()
+
+	for _, args := range [][]string{
+		{"-70", "-60"},        // ascending
+		{"-60", "-60"},        // equal is not strictly descending
+		{"-60", "-80", "-70"}, // out of order in the middle
+	} {
+		_, err := parseSignalThresholds(args)
+		require.Error(t, err, args)
+		require.Contains(t, err.Error(), "descending")
+	}
+
+	// A single threshold, and a properly descending list, remain valid.
+	_, err := parseSignalThresholds([]string{"-60"})
+	require.NoError(t, err)
+	_, err = parseSignalThresholds([]string{"-60", "-70", "-80"})
+	require.NoError(t, err)
+}

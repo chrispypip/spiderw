@@ -709,6 +709,18 @@ func parseSignalThresholds(args []string) ([]int, error) {
 		}
 		thresholds = append(thresholds, v)
 	}
+
+	// signalBandRange maps a band index back to the dBm range it covers, which only
+	// holds if the thresholds descend. The help said "highest first" but nothing
+	// enforced it, so `monitor-signal -70 -60` was accepted and then printed
+	// nonsense ranges.
+	for i := 1; i < len(thresholds); i++ {
+		if thresholds[i] >= thresholds[i-1] {
+			return nil, fmt.Errorf(
+				"signal thresholds must be strictly descending (highest dBm first), got %d after %d",
+				thresholds[i], thresholds[i-1])
+		}
+	}
 	return thresholds, nil
 }
 
