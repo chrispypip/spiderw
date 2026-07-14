@@ -64,6 +64,10 @@ const (
 	// ResourceStation identifies failures involving an iwd station object.
 	ResourceStation Resource = Resource(failure.ResourceStation)
 
+	// ResourceSimpleConfiguration identifies failures involving iwd's WSC (Wi-Fi
+	// Simple Configuration / WPS) interface, reached via Station.SimpleConfiguration.
+	ResourceSimpleConfiguration Resource = Resource(failure.ResourceSimpleConfiguration)
+
 	// ResourceNetwork identifies failures involving an iwd network object.
 	ResourceNetwork Resource = Resource(failure.ResourceNetwork)
 

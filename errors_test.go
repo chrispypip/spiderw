@@ -148,3 +148,37 @@ func TestErrors_Public(t *testing.T) {
 		})
 	})
 }
+
+// TestResource_AllFailureResourcesAreExported guards a hole a docs audit found:
+// ResourceSimpleConfiguration existed in the failure taxonomy and was carried on
+// real WSC errors, but was never re-exported here - so a caller inspecting
+// swerr.Resource on a WSC failure had no constant to compare against and would
+// have had to string-match.
+//
+// Every resource the layers can attach to an error must be nameable by a caller.
+func TestResource_AllFailureResourcesAreExported(t *testing.T) {
+	t.Parallel()
+
+	// ResourceUnknown is deliberately the zero value ("no specific resource").
+	require.Empty(t, string(ResourceUnknown))
+
+	for _, want := range []Resource{
+		ResourceClient,
+		ResourceDaemon,
+		ResourceAdapter,
+		ResourceDevice,
+		ResourceBasicServiceSet,
+		ResourceStation,
+		ResourceSimpleConfiguration,
+		ResourceAccessPoint,
+		ResourceNetwork,
+		ResourceKnownNetwork,
+		ResourceAgent,
+	} {
+		require.NotEmpty(t, string(want), "every exported resource must have a value")
+	}
+
+	// A WSC failure carries a resource the caller can name.
+	err := &Error{Kind: KindUnavailable, Resource: ResourceSimpleConfiguration, Op: "SimpleConfiguration.PushButton"}
+	require.Equal(t, ResourceSimpleConfiguration, err.Resource)
+}
