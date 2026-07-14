@@ -613,6 +613,21 @@ func TestRunWSCOp(t *testing.T) {
 		require.Empty(t, f.calls)
 	})
 
+	t.Run("PinStartError", func(t *testing.T) {
+		t.Parallel()
+		// The likeliest real WSC failure: enrollment itself fails (wrong PIN, walk
+		// time expired, no AP responding). The PIN is still printed first, so the
+		// user can see which one was tried.
+		app, buf := appWithBuffer(false)
+		f := &fakeWSC{startErr: errors.New("walk time expired")}
+		err := runWSCOp(app, ctx, "wlan0", f, "pin", []string{"12345670"})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "walk time expired")
+		require.Equal(t, []string{"StartPin"}, f.calls)
+		require.Contains(t, buf.String(), "12345670")
+		require.NotContains(t, buf.String(), "connected via WSC", "a failed enrollment must not report success")
+	})
+
 	t.Run("Cancel", func(t *testing.T) {
 		t.Parallel()
 		app, buf := appWithBuffer(false)
@@ -620,6 +635,25 @@ func TestRunWSCOp(t *testing.T) {
 		require.NoError(t, runWSCOp(app, ctx, "wlan0", f, "cancel", nil))
 		require.Equal(t, []string{"Cancel"}, f.calls)
 		require.Contains(t, buf.String(), "canceled")
+	})
+
+	t.Run("CancelError", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		f := &fakeWSC{cancelErr: errors.New("nothing to cancel")}
+		err := runWSCOp(app, ctx, "wlan0", f, "cancel", nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "nothing to cancel")
+		require.NotContains(t, buf.String(), "canceled", "a failed cancel must not report success")
+	})
+
+	t.Run("CancelRejectsArgs", func(t *testing.T) {
+		t.Parallel()
+		app, _ := appWithBuffer(false)
+		f := &fakeWSC{}
+		err := runWSCOp(app, ctx, "wlan0", f, "cancel", []string{"extra"})
+		require.Error(t, err)
+		require.Empty(t, f.calls)
 	})
 
 	t.Run("UnknownSubcommand", func(t *testing.T) {
