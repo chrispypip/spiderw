@@ -24,9 +24,12 @@ type AccessPointPropertiesChanged struct {
 }
 
 // AccessPointProperties holds every access-point property read in a single
-// Properties.GetAll call. Started and Scanning are always reported; the remaining
-// fields are optional (iwd omits them when the AP is not running) and are left
-// nil when absent.
+// Properties.GetAll call.
+//
+// Started is the only always-reported property. Everything else - including
+// Scanning, which iwd's documentation calls mandatory - is optional: iwd omits it
+// while the access point is not running, so a stopped AP reports Started and
+// nothing else. Absent fields are left nil, or false for Scanning.
 type AccessPointProperties struct {
 	Started         bool
 	Scanning        bool
@@ -182,8 +185,8 @@ func (a *AccessPoint) GetGroupCipher(ctx context.Context) (*string, error) {
 }
 
 // GetProperties reads every access-point property in a single Properties.GetAll
-// call. Only Started is always present; the remaining fields — including Scanning
-// — are optional and left at their zero value (nil, or false for Scanning) when
+// call. Only Started is always present. The remaining fields (including Scanning)
+// are optional and left at their zero value (nil, or false for Scanning) when
 // absent, which iwd does while the AP is not started.
 //
 // iwd's docs describe Scanning as always-present, but in practice it, like
@@ -319,7 +322,7 @@ func (a *AccessPoint) GetOrderedNetworks(ctx context.Context) ([]AccessPointOrde
 	}
 
 	// The reply is aa{sv}: an array of dicts, each with Name (s), SignalStrength
-	// (n), and Type (s) — the security, e.g. "open"/"psk"/"8021x". (iwd's own docs
+	// (n), and Type (s) - the security, e.g. "open"/"psk"/"8021x". (iwd's own docs
 	// mislabel this key "Security"; the wire key is "Type", confirmed on hardware.)
 	var entries []map[string]dbus.Variant
 	if err := dbus.Store(body, &entries); err != nil {

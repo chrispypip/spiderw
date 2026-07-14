@@ -37,12 +37,23 @@ Most tests in spiderw are behind explicit build tags.
 | `unit` | Fast, deterministic unit tests | Default inner-loop suite |
 | `regression` | Deterministic tests added after a bug is found | Prevent reintroducing known bugs |
 | `race` | Scenario-style concurrency tests | Run with `-race` for maximum signal |
-| `stress` | Higher-load deterministic tests | Longer-running, opt-in |
-| `fuzz` | Fuzz tests | Developer-invoked, time-bounded |
+| `stress` | Higher-load deterministic tests | Run under `-race` in CI (on a D-Bus session bus, since `-race` also enables the `race` build tag); they carry no assertions, so the detector is the assertion |
+| `fuzz` | Fuzz tests | Runs in CI (seed corpus + a short bounded fuzz per target). **Not a gate** - advisory only |
 | `bench` | Benchmarks | Performance exploration/regression detection |
 | `integration` | D-Bus + iwd mock integration tests | End-to-end confidence |
 
-> NOTE: `go test ./...` (with no tags) may run few or no tests, depending on what is currently tagged.
+> NOTE: `go test ./...` with no tags runs **nothing** - every test file here is
+> build-tagged. Use `make test` (which runs the tiers explicitly) or pass a tag.
+
+> NOTE: `-race` does more than turn on the race detector - it also enables the
+> `race` **build tag**. So `go test -tags=stress -race` compiles the race-tagged
+> files too, and those drive the iwd mock over a session bus. Any `-race` run needs
+> `dbus-run-session`, whatever tag you passed.
+
+> NOTE: the fuzz tier is build-tagged, so `go build`, `go vet`, and the other
+> suites never compile it. It is run in CI for exactly that reason: a fuzz target
+> that stops compiling would otherwise rot unnoticed. Fuzzing is bounded and
+> advisory, and does not gate a release.
 
 ### Quick Start Commands
 
@@ -66,9 +77,23 @@ go test ./... -race -tags=race
 make test-stress
 go test ./... -tags=stress
 
-# Stress scenarios under the Go race detector
+# Stress scenarios under the Go race detector (what CI runs)
+# Needs a session bus: -race also enables the `race` build tag, which pulls in the
+# race-tagged tests, and internal/connect's drive the iwd mock over D-Bus.
 make test-stress-race
-go test ./... -race -tags=stress
+dbus-run-session -- go test ./... -race -tags=stress
+
+# Fuzz seed corpus: compiles and executes every fuzz target once
+make test-fuzz-seed
+go test ./... -tags=fuzz
+
+# Fuzz every target for a bounded time (advisory, not a gate)
+make test-fuzz
+FUZZTIME=30s make test-fuzz
+./scripts/fuzz.sh 30s
+
+# Every tier at once
+make test
 ```
 
 Tags can be combined (comma-separated), e.g. `-tags=unit,regression`.
@@ -334,6 +359,41 @@ Fuzzing would attempt to construct states that the API does not admit.
 
 ---
 
+## cmd/spiderw/cli
+
+### Role
+
+Argument parsing, command dispatch, rendering (human and `--json`), and mapping a
+failure to an exit code. The CLI holds no iwd logic of its own - it drives the
+public API - so its failure modes are about *routing and presentation*.
+
+### Test Types
+
+* **Unit**, via an in-process harness: `driveCLI` runs a command against fake
+  resource handles and returns the captured output plus the exit code, so routing,
+  rendering, and error mapping are testable without D-Bus.
+* **Integration**, via `runSpider`, which drives the real command path against the
+  iwd mock over a session bus. This is the only place the wiring from a typed
+  command line down to an iwd call is exercised end to end.
+
+### The monitor commands
+
+A `monitor` subcommand blocks on an OS signal, so it cannot be driven to
+completion in-process. Each is therefore split in two: a **non-blocking core**
+(read the current value, print it, subscribe) which is unit-tested directly, and a
+thin shell that waits for Ctrl-C. The shell is left untested; the core is not.
+
+Test the subscription *wiring*, not just the output: a fake that records which
+`Subscribe` method a target called is what stops `monitor network` from being
+quietly wired to the access-point subscription.
+
+### A note on fakes
+
+A fake field that no test ever sets is a failure mode no test covers. Auditing for
+them has repeatedly found real gaps - a client lookup that could fail, an agent
+that could fail to unregister, a scan that could be rejected. If you add a field to
+a fake, add the test that uses it.
+
 ## Integration Tests (Deterministic, Environment-Dependent)
 
 Integration tests validate the CLI and public API against the project's iwd mock
@@ -352,23 +412,35 @@ targets or are not running in the dev container, see `make test-mock`.
 
 ## Promotion Model and Test Gating
 
-spiderw follows a **promotion-based release model** locally today. GitHub
-Actions CI is planned, but the dev-container Makefile workflow is currently the
-source of truth for release-readiness checks.
+spiderw follows a **promotion-based release model**. GitHub Actions CI runs the
+suites on every push and pull request; the dev-container Makefile workflow runs
+the same checks locally and remains the source of truth for release-readiness.
 
 ### Promotion Gates (Deterministic)
 
 The following must pass before a version is promoted:
 
 ```bash
-go test ./...
+# Test suites
 go test ./... -tags=unit
 go test ./... -tags=regression
-go test ./... -tags=stress
-go test ./... -race -tags=race
-go test ./... -race -tags=stress
-go test ./... -tags=integration
+dbus-run-session -- go test ./... -race -tags=race
+dbus-run-session -- go test ./... -race -tags=stress
+dbus-run-session -- go test ./... -tags=integration
+
+# Static gates (also run in CI)
+make fmt-check      # gofmt
+make lint-check     # golangci-lint
+make codespell      # spelling, in code and docs
+make ascii-check    # no non-ASCII characters anywhere
 ```
+
+Note there is no bare `go test ./...` gate: every test file here is build-tagged,
+so it would run nothing and pass.
+
+Fuzzing is **not** a gate. It runs in CI (seed corpus, then a short bounded fuzz
+per target) so a fuzz target cannot silently stop compiling behind its build tag,
+but a fuzz finding is advisory and does not block a release.
 
 The Makefile exposes these through focused targets such as `make test-unit`,
 `make test-race`, `make test-stress`, `make test-stress-race`, and

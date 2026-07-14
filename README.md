@@ -20,7 +20,7 @@ surface today covers `Client`, `Daemon`, `Adapter`, `Device`, `Station`,
 `BasicServiceSet`, `Network`, `KnownNetwork`, and the credentials `Agent`
 (identity, powered/mode state, supported modes, property subscriptions,
 station connection state and scanning, connecting to open, already-known, **and
-secured (PSK)** networks via a registered agent, and managing saved networks) —
+secured (PSK)** networks via a registered agent, and managing saved networks) -
 with much more of the iwd API planned.
 It is developed and tested
 against **iwd 3.12** (see [Compatibility & Requirements](#compatibility--requirements)).
@@ -68,11 +68,11 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
   access points (`HiddenAccessPoints`). Network `Connect()` works for open
   and already-known networks with no agent; connecting to a not-yet-known secured
   network requires a registered agent (`Client.RegisterAgent`) to supply
-  credentials — without one, `Connect()` surfaces an error matching
+  credentials - without one, `Connect()` surfaces an error matching
   `spiderw.ErrNoAgent`. The agent's **PSK passphrase** path is implemented and
   tested end to end. The 802.1x credential callbacks (username/password and
   private-key passphrase) are wired through every layer but are **not yet tested
-  against the mock or validated on hardware** — treat them as experimental.
+  against the mock or validated on hardware** - treat them as experimental.
   *Provisioning* a brand-new 802.1x network (`NetworkConfigurationAgent`) is not
   implemented. `KnownNetwork` supports inspecting saved networks, toggling
   auto-connect, and forgetting them. `AccessPoint` runs a device in AP mode:
@@ -80,7 +80,7 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
   stopping it (`Stop`), scanning (`Scan`, `OrderedNetworks`), and reading the
   hosted-network properties (`Started`, `SSID`, `Frequency`, ciphers) with change
   subscriptions; the companion `AccessPointDiagnostic` interface is not yet
-  covered. More of the iwd API is planned — see the [Roadmap](ROADMAP.md).
+  covered. More of the iwd API is planned - see the [Roadmap](ROADMAP.md).
 - **Operating system:** **Linux only.** iwd is a Linux wireless daemon; spiderw
   has no support for other platforms.
 - **D-Bus:** Requires access to a D-Bus bus. Real iwd runs on the **system bus**
@@ -96,6 +96,12 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
 - **Strongly typed Go API**
   D-Bus values are validated and converted into concrete Go types.
   Callers never handle `dbus.Variant` or weakly typed maps.
+
+- **Property-change subscriptions**
+  Every iwd object with properties exposes a generic `SubscribePropertiesChanged`
+  plus typed convenience subscriptions, so state is observed as events rather than
+  polled - including roaming, which is only visible as a change of the station's
+  associated access point while its state stays `connected`.
 
 - **Structured errors**
   Public errors expose a stable category, resource, operation, and wrapped
@@ -136,9 +142,20 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
 ## Current Automation Status
 
 GitHub Actions CI runs on every push to `main` and every pull request targeting
-it. The pipeline builds and vets the module, runs `golangci-lint`, executes the
-unit, stress, regression, and benchmark suites natively, and runs the race and
-mock integration suites under a D-Bus session bus.
+it. The pipeline:
+
+- builds and vets the module, and cross-compiles the CLI for each supported
+  architecture;
+- runs `golangci-lint`, `codespell`, and an ASCII check (this project writes plain
+  ASCII - no em dashes, ellipses, or arrows, anywhere);
+- executes the unit, stress, regression, benchmark, and fuzz suites natively;
+- runs the race and mock integration suites, and the stress suite under the race
+  detector, on a D-Bus session bus;
+- and gates the whole thing behind a final job that fails unless every suite above
+  passed.
+
+Fuzzing is bounded and advisory - it does not gate a release, but it runs so that
+a fuzz target which stops compiling cannot rot unnoticed behind its build tag.
 
 The same checks are available locally through the dev-container Makefile
 workflow (formatting, linting, and the full test matrix). Before publishing a
@@ -211,10 +228,11 @@ if err != nil {
 ```
 
 The public error categories are `KindUnavailable`, `KindInvalidState`,
-`KindInvalidArgument`, and `KindInternal`. Resource values include
-`ResourceClient`, `ResourceDaemon`, `ResourceAdapter`, `ResourceDevice`,
-`ResourceBasicServiceSet`, `ResourceNetwork`, `ResourceKnownNetwork`,
-`ResourceStation`, and `ResourceAgent`.
+`KindInvalidArgument`, and `KindInternal`. Resource values are `ResourceClient`,
+`ResourceDaemon`, `ResourceAdapter`, `ResourceDevice`, `ResourceBasicServiceSet`,
+`ResourceStation`, `ResourceAccessPoint`, `ResourceSimpleConfiguration` (WSC),
+`ResourceNetwork`, `ResourceKnownNetwork`, and `ResourceAgent`; `ResourceUnknown`
+is the zero value, meaning no specific resource.
 
 Some operations also map specific iwd D-Bus errors to matchable sentinels, so you
 can react to a precise outcome without parsing text. For example,
@@ -224,7 +242,13 @@ registered), `spiderw.ErrBusy`, `spiderw.ErrInProgress`, `spiderw.ErrFailed`,
 `spiderw.ErrNotConfigured`; registering an agent can surface
 `spiderw.ErrAlreadyExists` (another agent already owns the connection). These
 join the rest of iwd's named errors (`spiderw.ErrNotFound`,
-`spiderw.ErrInvalidArguments`, …) — all usable with `errors.Is`.
+`spiderw.ErrInvalidArguments`, ...) - all usable with `errors.Is`.
+
+A few interfaces add their own scoped sentinels. WSC enrollment surfaces
+`spiderw.ErrWSCWalkTimeExpired` (nobody pressed the button in time),
+`spiderw.ErrWSCNoCredentials`, `spiderw.ErrWSCSessionOverlap` (two enrollments
+racing), `spiderw.ErrWSCNotReachable`, and `spiderw.ErrWSCTimeExpired`. See the
+[godoc](https://pkg.go.dev/github.com/chrispypip/spiderw) for the full set.
 
 ---
 
@@ -314,17 +338,20 @@ More testing and benchmarking commands are in [TESTING.md](TESTING.md) and
 ## Repository Structure
 
 ```text
+*.go                     -> The public spiderw library (package spiderw)
 dev/                     -> Development files
     Dockerfile.dev       -> Dev container runtime definition
     docker-compose.yml   -> Orchestration for development environment
     dev.sh               -> Entry point for dev shell
 cmd/                     -> Tooling and CLI utilities
+examples/                -> Runnable example programs (see examples/README.md)
 internal/connect         -> D-Bus connection and typed object wiring
 internal/core            -> Validation, normalization, and core error wrapping
 internal/failure         -> Shared error kind/resource taxonomy
 internal/iwdbus          -> Strongly typed D-Bus/iwd bindings
 internal/iwdvalue        -> Shared canonical iwd value parsing and formatting
 internal/logging         -> Lightweight structured logging helpers
+scripts/                 -> Developer/CI scripts (bounded fuzzing, ASCII check)
 tools/test-mocks/        -> Go-based iwd mock and introspection XML fixtures
 tests/                   -> Integration tests and test utilities
 ```
@@ -351,9 +378,9 @@ D-Bus decoding is handled internally; public methods return standard Go types
 
 ## CLI Quick Start
 
-The `spiderw` command can query the daemon, adapters, devices, basic service
-sets, networks, and known networks through the same public API used by library
-callers. It uses the system bus
+The `spiderw` command can query the daemon, adapters, devices, stations, access
+points, basic service sets, networks, and known networks through the same public
+API used by library callers. It uses the system bus
 by default, which is where real iwd runs, so the examples below need no bus flag.
 The Go mock registers on the session bus, so pass `--session` when testing
 against `iwdmock`.
@@ -444,10 +471,20 @@ spiderw station wlan0 affinities set de:ad:be:ef:ca:fe   # a BSS MAC or object p
 spiderw station wlan0 affinities clear
 spiderw station wlan0 wsc push-button                    # press the AP's WPS button first
 spiderw station wlan0 wsc pin                            # generates and prints a PIN to enter at the AP
+spiderw station wlan0 monitor state                      # stream a property until Ctrl-C
+spiderw station wlan0 monitor network                    # the connected network's SSID
+spiderw station wlan0 monitor access-point               # the associated BSS - this is how a roam is watched
+spiderw station wlan0 monitor affinities
+spiderw station wlan0 monitor-signal -60 -70 -80         # RSSI thresholds, highest first
 ```
 
+`monitor access-point` is the only way to observe a **roam**: the station moves
+between access points of the same network, so the BSS changes while the state
+stays `connected` and the network does not change at all. A reconnect looks
+different - the BSS drops to `none` in between.
+
 Inspect and control access points (devices in AP mode). `status` shows `Started`,
-`Scanning`, and — while running — the hosted `SSID`, `Frequency`, and ciphers;
+`Scanning`, and - while running - the hosted `SSID`, `Frequency`, and ciphers;
 `start` brings up a PSK network, `start-profile` one from a stored profile, `stop`
 tears it down. `scan` triggers a scan (waiting for it to finish, then listing
 results, unless `--no-wait`; `--timeout` bounds the wait), and `networks` lists
@@ -463,10 +500,12 @@ spiderw access-point wlan1 start-profile MyProfile
 spiderw access-point wlan1 scan --timeout=30s
 spiderw access-point wlan1 networks
 spiderw access-point wlan1 stop
+spiderw access-point wlan1 monitor started               # stream a property until Ctrl-C
+spiderw access-point wlan1 monitor scanning
 ```
 
 List basic service sets (BSSes), or print a full snapshot for every BSS. A
-device usually sees many BSSes — one per access point/radio heard during a scan:
+device usually sees many BSSes - one per access point/radio heard during a scan:
 
 ```bash
 spiderw bss list
@@ -498,6 +537,8 @@ spiderw network OpenNet device
 spiderw network OpenNet known-network
 spiderw network OpenNet bsses
 spiderw network OpenNet monitor connected
+spiderw network OpenNet monitor known-network            # fires when the network is saved or forgotten
+spiderw network OpenNet monitor bsses
 ```
 
 `connect` joins open and already-known networks directly. For a not-yet-known
@@ -529,6 +570,8 @@ spiderw known-network KnownNet autoconnect
 spiderw known-network KnownNet autoconnect false
 spiderw known-network KnownNet forget
 spiderw known-network KnownNet monitor autoconnect
+spiderw known-network KnownNet monitor hidden
+spiderw known-network KnownNet monitor last-connected    # fires on each successful connect
 ```
 
 To target the Go mock instead of a real daemon, add `--session`:
@@ -537,8 +580,10 @@ To target the Go mock instead of a real daemon, add `--session`:
 spiderw --session daemon info
 ```
 
-Monitor commands print the current value and then stream future changes until
-interrupted.
+Monitor commands print the property's current value, then stream each change until
+interrupted (Ctrl-C). `<resource> <ref> monitor --help` lists what that resource
+can monitor. With `--json`, each change is emitted as its own object, one per line,
+so the stream can be piped into a consumer.
 
 ---
 

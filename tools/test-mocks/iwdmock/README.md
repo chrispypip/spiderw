@@ -58,23 +58,33 @@ tools/test-mocks/iwdmock/
 |-- main.go          # iwdmock binary entrypoint
 |-- doc.go           # package docs
 |-- internal/mock    # Mock implementations of the iwd API
+|   |-- accesspoint.go
 |   |-- adapter.go
+|   |-- agent.go
 |   |-- bss.go
 |   |-- daemon.go
 |   |-- device.go
 |   |-- export.go
 |   |-- firehose.go
 |   |-- knownnetwork.go
+|   |-- lifecycle.go   # object creation/destruction + InterfacesAdded/Removed
 |   |-- network.go
 |   |-- objectmanager.go
+|   |-- signalagent.go
+|   |-- station.go
 |   |-- utils.go
+|   |-- wsc.go
 |   `-- xml          # introspection XML served by Introspectable (go:embed)
+|       |-- accesspoint.xml
 |       |-- adapter.xml
+|       |-- agentmanager.xml
 |       |-- bss.xml
 |       |-- daemon.xml
 |       |-- device.xml
 |       |-- knownnetwork.xml
-|       `-- network.xml
+|       |-- network.xml
+|       |-- station.xml
+|       `-- wsc.xml
 `-- README.md        # This file
 ```
 
@@ -201,6 +211,12 @@ defined across:
 * `--daemon-fail-calls`
   Make daemon calls return a D-Bus error
 
+### Adapter scenario flags
+
+* `--adapter-bad-modes`
+  Make `Adapter.GetSupportedModes` return the wrong D-Bus type, so the client's
+  mode parsing has a malformed reply to reject.
+
 ### Device, basic service set, network, and known-network scenario flags
 
 * `--omit-device`
@@ -227,8 +243,8 @@ defined across:
 
 The mock exports multiple basic service sets by default, mirroring iwd reporting
 one BSS per access point/radio a device can hear during a scan. It also exports
-three networks — an open network, a known (provisioned) secured network, and an
-unknown secured network — so `Network.Connect` exercises both the no-agent
+three networks - an open network, a known (provisioned) secured network, and an
+unknown secured network - so `Network.Connect` exercises both the no-agent
 success paths and the `net.connman.iwd.NoAgent` rejection. The open network's
 `ExtendedServiceSet` lists both mock BSSes, demonstrating multi-BSS membership.
 
@@ -237,15 +253,17 @@ success paths and the `net.connman.iwd.NoAgent` rejection. The open network's
 The station-mode device (`wlan0`) also exports the `net.connman.iwd.Station`
 interface on the same object, mirroring iwd (where Station lives on the device
 object in station mode). The AP-mode device (`wlan1`) does not, so station
-enumeration returns exactly one station. The mock seeds a "connected" station
+enumeration returns exactly one station - *at startup*. These are starting
+positions, not fixed roles: setting a device's `Mode` swaps the interface it
+carries (see *Object lifecycle*). The mock seeds a "connected" station
 wired to real mock objects: `ConnectedNetwork` points at the known network,
 `ConnectedAccessPoint` and the single `Affinities` entry point at a mock BSS, and
 `Scanning` is `false`.
 
 `Scan` models the asynchronous scan: it sets `Scanning` to true and emits a
 `PropertiesChanged`, then flips it back to false and emits again a short moment
-later — so subscribers observe the true→false transition. `GetOrderedNetworks`
-returns the three mock networks with seeded signal strengths (in 100 × dBm),
+later - so subscribers observe the true->false transition. `GetOrderedNetworks`
+returns the three mock networks with seeded signal strengths (in 100 x dBm),
 strongest first. `Affinities` is writable: setting it stores the BSS paths and
 emits a change.
 
@@ -281,17 +299,17 @@ while running, as in iwd).
 already running, `InvalidArguments` for an empty SSID or a passphrase under 8
 characters); `StartProfile` accepts the one seeded profile name `MockProfile` and
 rejects any other `NotFound`. `Stop` tears the AP down, clearing the optional
-properties. `Scan` models the asynchronous scan just like Station (true→false
+properties. `Scan` models the asynchronous scan just like Station (true->false
 `Scanning` transition, `InProgress` if already scanning), and `GetOrderedNetworks`
 returns two seeded neighbor networks (`OpenNet`, `SecuredNet`) with signal
-strengths in 100 × dBm, strongest first. Use `--omit-access-point` to drop the
+strengths in 100 x dBm, strongest first. Use `--omit-access-point` to drop the
 interface while keeping the device.
 
 ### Credentials agent (AgentManager)
 
 The mock daemon also hosts the `net.connman.iwd.AgentManager` interface
 (`RegisterAgent`/`UnregisterAgent`) on the daemon object, recording the single
-registered agent the way iwd does — a second `RegisterAgent` is rejected with
+registered agent the way iwd does - a second `RegisterAgent` is rejected with
 `net.connman.iwd.AlreadyExists`, and unregistering an unknown path with
 `net.connman.iwd.NotFound`. Connecting the unknown secured network drives the
 full callback loop: the mock calls the registered agent's `RequestPassphrase`
@@ -302,7 +320,7 @@ back over D-Bus and connects only when it returns the expected passphrase
 
 Two known networks are exported: one (`psk`, with a last-connected time and
 auto-connect on) at the path the mock network references via its `KnownNetwork`
-property — so that linkage resolves end to end — and one `hotspot` that has never
+property - so that linkage resolves end to end - and one `hotspot` that has never
 been connected to (no `LastConnectedTime`) with auto-connect off.
 
 Two adapters (named `phy0`, `phy1`) and two devices (named `wlan0`, `wlan1`) are
@@ -315,11 +333,49 @@ Object paths mirror real iwd rather than using the friendly names: the adapter
 is `/net/connman/iwd/0`, the device `/net/connman/iwd/0/3`, a network
 `/net/connman/iwd/0/3/<hex-SSID>_<security>` (e.g. `4b6e6f776e4e6574_psk` is
 "KnownNet"), and a BSS is nested under its network with the MAC (colons stripped)
-as the path tail — e.g. `…/4b6e6f776e4e6574_psk/deadbeefcafe` for
+as the path tail - e.g. `.../4b6e6f776e4e6574_psk/deadbeefcafe` for
 `de:ad:be:ef:ca:fe`. So a Name/Address never matches its path tail by accident,
 exercising the public API's path-to-identifier resolution against realistic data.
 
 ---
+
+## Object lifecycle
+
+iwd's object tree is not static, and neither is the mock's. The ObjectManager reads
+the object registries live on every call, so objects appearing and disappearing are
+visible to enumeration, and `InterfacesAdded` / `InterfacesRemoved` are emitted for
+each transition.
+
+Nothing in spiderw consumes those two signals yet - they exist so the live-object-
+events work has a mock to be written against. That makes them easy to get wrong
+without noticing, so the integration suite subscribes to the raw ObjectManager
+interface and asserts both fire with the right object path and argument shape. If
+you change how they are emitted, those tests are what will tell you.
+
+* **Setting a device's `Mode` swaps its interface.** Moving a device to `ap`
+  removes `net.connman.iwd.Station` (and the `SimpleConfiguration` interface that
+  lives on it) and adds `net.connman.iwd.AccessPoint`; moving back reverses it. A
+  `Station` handle to a device that has become an access point stops resolving,
+  exactly as against iwd. This is the transition a user actually performs to bring
+  up an AP. Any other mode (`ad-hoc`) carries neither interface, so the device
+  drops out of both enumerations while the device object itself survives.
+* **`KnownNetwork.Forget` destroys the object.** It leaves enumeration, its exports
+  are torn down so further calls to it fail, and every `Network` that referenced it
+  loses the link - reported by *invalidating* the `KnownNetwork` property, which is
+  how iwd signals it.
+* **`Network.Connect` on a secured network provisions.** A `KnownNetwork` object is
+  created and the `Network` gains a link to it, as iwd does when it writes a profile
+  on first connect.
+
+Two wire details the mock is careful about, because the client depends on both and
+neither is what iwd's documentation implies:
+
+* An object that is **gone** is signalled by *invalidating* the property, not by
+  sending the null object path `"/"`. A disconnect invalidates `ConnectedNetwork`
+  and `ConnectedAccessPoint`; a forget invalidates `KnownNetwork`.
+* An **absent optional property** is reported with iwd's own wording (`getting
+  property value failed`). The client keys off that text to tell "absent" from
+  "broken", so a different wording turns a tolerated absence into a hard error.
 
 ## Extending the Mock
 
@@ -340,22 +396,36 @@ Be faithful to what spiderw *observes at the boundary*; do not reimplement iwd's
 
 Model with high fidelity:
 
-* Property **shape** — types, and especially presence/absence (e.g. omit
+* Property **shape**--types, and especially presence/absence (e.g. omit
   `KnownNetwork` when a network is not known; omit `LastConnectedTime` when a
   known network has never connected).
 * Realistic **fixture values** so normalization and both branches get exercised
   (e.g. one known network with `AutoConnect` true and one false).
-* **Method contracts and error names** for a given input (`Connect` →
-  `NoAgent`/`Failed`, `RegisterAgent` → `AlreadyExists`, etc.).
-
-Do **not** simulate iwd's stateful side effects — provisioning a `KnownNetwork`
-on first connect, computing the `AutoConnect` default, object
-creation/destruction, calling `Agent.Release` on a client-initiated
-`UnregisterAgent` — unless a specific spiderw code path observes that transition
-in the same flow.
+* **Method contracts and error names** for a given input (`Connect` ->
+  `NoAgent`/`Failed`, `RegisterAgent` -> `AlreadyExists`, etc.).
 
 Litmus test: *does spiderw read back the result of the side effect in the same
 flow?* If yes, simulate it minimally (this is why the mock validates the secured
-passphrase against a constant — spiderw's agent + `Connect` flow has both success
+passphrase against a constant - spiderw's agent + `Connect` flow has both success
 and failure branches to exercise). If no, simulating it tests a reimplementation
 of iwd rather than spiderw, so leave it to real-hardware testing.
+
+So do **not** simulate side effects spiderw never observes - computing the
+`AutoConnect` default, calling `Agent.Release` on a client-initiated
+`UnregisterAgent`.
+
+But do simulate the **object lifecycle**, because spiderw reads all of it back
+(see *Object lifecycle* below). This section once said the opposite - that object
+creation/destruction and provisioning-on-connect should be left alone - and that
+advice was wrong by this section's own litmus test. It is why `Forget` was a
+no-op stub for the life of the project, with a green integration test calling it
+every CI run.
+
+A closing warning, learned the hard way. Every bug this project has shipped to
+hardware came from the mock being **more forgiving than iwd**--optional
+properties present on a stopped access point (they are not), the ordered-networks
+security key being `Type` and not `Security`, `Scan` succeeding on a stopped
+access point (it does not), a disconnect sending a null path (it invalidates
+instead), and an absent property worded so the client could not recognize it as
+absent. When adding a behavior, the question is never "is this good enough to
+pass?" - it is **"would real iwd reject or omit this?"**

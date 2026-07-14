@@ -71,10 +71,19 @@ The following areas are currently implemented and tested end to end:
 - Known-network discovery, construction, and properties (name, type, hidden,
   last-connected time, auto-connect), plus toggling auto-connect, forgetting, and
   auto-connect subscriptions.
+- Property-change subscriptions across every iwd object that has properties: a
+  generic `SubscribePropertiesChanged` plus typed convenience subscriptions,
+  including the station's connected network, its associated access point (the only
+  way to observe a **roam** - the BSS changes while the state stays `connected`),
+  and its affinities; a network's known-network link (saved or forgotten) and BSS
+  list; and a known network's hidden flag and last-connected time. An absent value
+  is delivered as nil: iwd signals "gone" by invalidating the property rather than
+  sending a null path.
 - CLI coverage for daemon, adapter, device, station (`list` / `status` / `scan` /
   `networks` / `disconnect` / `connect-hidden` / `hidden-aps` / `affinities`),
-  basic service set, network (including interactive secured connect with
-  `--passphrase` / `--passphrase-stdin`), and known-network operations.
+  access point, basic service set, network (including interactive secured connect
+  with `--passphrase` / `--passphrase-stdin`), and known-network operations, plus a
+  `monitor` subcommand on every resource that streams a property until interrupted.
 - Mock iwd integration tests, including signal firehose coverage.
 - Shared adapter mode and network type parsing and formatting across layers.
 - Structured error handling using generic error kinds plus resource metadata,
@@ -100,7 +109,7 @@ The slices below map the remaining iwd D-Bus surface. spiderw currently
 implements the Daemon, Adapter, Device, Station, AccessPoint, Network,
 KnownNetwork, BasicServiceSet, SimpleConfiguration (WSC), the SignalLevelAgent,
 and credentials `Agent` / `AgentManager` interfaces; the intent is to eventually
-cover the rest of iwd. The areas are grouped by theme, not strictly ordered —
+cover the rest of iwd. The areas are grouped by theme, not strictly ordered -
 priority is decided slice by slice.
 
 ### Device operating modes
@@ -109,36 +118,36 @@ iwd exposes a different interface depending on a device's mode. `Device.SetMode`
 switches a device between modes; station and AP modes are covered, while the
 remaining mode-specific interfaces are unimplemented:
 
-- **Access Point diagnostics** (`net.connman.iwd.AccessPointDiagnostic`) — the
+- **Access Point diagnostics** (`net.connman.iwd.AccessPointDiagnostic`) - the
   companion to the now-implemented `AccessPoint` interface, reading per-client
   link statistics for a hosted network.
-- **Ad-Hoc / IBSS** (`net.connman.iwd.AdHoc`) — start or join an open
+- **Ad-Hoc / IBSS** (`net.connman.iwd.AdHoc`) - start or join an open
   (`StartOpen`) or PSK-secured (`Start`) ad-hoc (IBSS) network and leave it
   (`Stop`), reading the `Started` state and the `ConnectedPeers` MAC list.
 
 ### Station-mode features not yet covered
 
 - **Connection diagnostics** (`net.connman.iwd.StationDiagnostic`,
-  `GetDiagnostics`) — read live link statistics (RSSI, TX/RX bitrate, frequency,
+  `GetDiagnostics`) - read live link statistics (RSSI, TX/RX bitrate, frequency,
   security) for the connected station.
 
 ### Provisioning and enterprise
 
-- **802.1x / enterprise** — end-to-end coverage for the enterprise credential
+- **802.1x / enterprise** - end-to-end coverage for the enterprise credential
   callbacks (`RequestUserNameAndPassword` / `RequestUserPassword` /
   `RequestPrivateKeyPassphrase`) via a mock fixture that promotes them from
   experimental to tested, plus *configuring* a brand-new enterprise network
   (distinct from the already-implemented credentials `Agent`, which only supplies
   secrets for connecting).
-- **Network configuration** (`net.connman.iwd.NetworkConfigurationAgent`) —
+- **Network configuration** (`net.connman.iwd.NetworkConfigurationAgent`) -
   provisioning new network profiles and IP/DHCP configuration.
 - **DPP / Wi-Fi Easy Connect** (`net.connman.iwd.DeviceProvisioning` plus a
-  `SharedCodeAgent`) — QR-code / shared-code provisioning, acting as either
+  `SharedCodeAgent`) - QR-code / shared-code provisioning, acting as either
   enrollee or configurator.
 
 ### Wi-Fi Direct (P2P)
 
-- **P2P** (`net.connman.iwd.p2p.Device`, `p2p.Peer`, `p2p.ServiceManager`) —
+- **P2P** (`net.connman.iwd.p2p.Device`, `p2p.Peer`, `p2p.ServiceManager`) -
   enable a device for peer-to-peer use and discover peers (`p2p.Device`:
   `Enabled` / `Name`, `RequestDiscovery` / `ReleaseDiscovery`, `GetPeers`, plus
   its own `RegisterSignalLevelAgent`), connect to and disconnect from a discovered
@@ -148,21 +157,23 @@ remaining mode-specific interfaces are unimplemented:
 
 ### Cross-cutting
 
-- **Live object events** — react to `org.freedesktop.DBus.ObjectManager`
+- **Live object events** - react to `org.freedesktop.DBus.ObjectManager`
   `InterfacesAdded` / `InterfacesRemoved` so adapters, devices, networks, and
   BSSes appearing or disappearing surface as spiderw events, rather than only
-  point-in-time enumeration.
-- **Broader property subscriptions** — property-change subscriptions for object
-  types that do not yet expose them.
+  point-in-time enumeration. The mock already models the object lifecycle and
+  emits both signals (forgetting a known network destroys its object, connecting
+  to a secured network provisions one, and switching a device between station and
+  AP mode swaps the interface it carries), so this has something to be tested
+  against.
 
 ### Testing and simulation
 
-- **hwsim** (`net.connman.hwsim` — a sibling service to `net.connman.iwd`, backed
-  by the `mac80211_hwsim` kernel module) — manage virtual radios
+- **hwsim** (`net.connman.hwsim` - a sibling service to `net.connman.iwd`, backed
+  by the `mac80211_hwsim` kernel module) - manage virtual radios
   (`net.connman.hwsim.Radio`: enumerate / `Destroy`) and traffic rules between
   them (`net.connman.hwsim.Rule`: `SignalStrength`, `Drop`, `Source` /
   `Destination`, `Priority`, ...). This serves a dual purpose: a client binding in
-  its own right, and the foundation for a deterministic RF test tier — driving
+  its own right, and the foundation for a deterministic RF test tier - driving
   `Rule.SignalStrength` lets tests set exact per-frame RSSI and step it over time
   to exercise RSSI-dependent behavior (`SignalLevelAgent` band transitions,
   roaming) against real iwd without physical radios. Requires a privileged

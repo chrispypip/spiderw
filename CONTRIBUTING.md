@@ -151,7 +151,15 @@ verifies the D-Bus session environment and iwd mock tooling.
 
 - Use `go fmt`, `gofumpt`, or editor-integrated formatting
 - Write idiomatic, readable Go
-- Name **every** parameter, even when unused — never use a blank identifier
+- **ASCII only.** No em dashes, ellipses, arrows, or other typographic
+  punctuation, anywhere - code, comments, docs, or printed strings. Use the ASCII
+  equivalent: `-` for an em dash, `...` for an ellipsis, `->` for an arrow, `x`
+  for a multiplication sign. They are easy to introduce by copy-paste and awkward
+  to grep for. `make ascii-check` (and the `ascii` CI job) enforces this
+  - Write an em dash as a single spaced hyphen (`like - this`), not `--`. A double
+    hyphen is already ASCII, so the check cannot catch it, but it reads as a flag
+    and the codebase uses one hyphen throughout
+- Name **every** parameter, even when unused - never use a blank identifier
   (`_`) for a parameter
   - A named parameter documents intent and appears in godoc and editor
     signatures; leaving it unused is fine (Go does not require parameters to be
@@ -219,6 +227,15 @@ type.
 ## Directory Layout
 
 ```text
+/ (root)
+    The public spiderw library (package spiderw) - the only package callers import
+
+/cmd/spiderw
+    The spiderw CLI, a thin wrapper over the public library
+
+/examples
+    Runnable example programs, each a small main package
+
 /internal/iwdbus
     Low-level D-Bus binding, signal dispatch, and iwd object wrappers
 
@@ -236,6 +253,9 @@ type.
 
 /internal/logging
     Lightweight structured logging helpers
+
+/scripts
+    Developer/CI scripts: bounded fuzzing across every target, and the ASCII check
 
 /tools/test-mocks/iwdmock
     Go-based iwd mock and D-Bus introspection XML fixtures
@@ -258,7 +278,9 @@ Depending on the change, this may include:
 * Unit tests
 * Race and/or stress tests for concurrency changes
 * Integration tests
-* Regression tests for fixed bugs
+* Regression tests for fixed bugs - especially for anything a real daemon
+  disagreed with, since the mock cannot catch what it does not model
+* Fuzz targets for parsers that decode daemon-supplied data
 
 Use the dev container for integration tests.
 

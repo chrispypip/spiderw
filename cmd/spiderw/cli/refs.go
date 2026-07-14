@@ -60,9 +60,10 @@ func readableAddrRefs(rs []addrRef) string {
 	return strings.Join(parts, ", ")
 }
 
-// optionalPathText renders an optional object path for the human-readable
-// monitor output. iwd reports "no such object" as a null path, which the library
-// surfaces as nil, so the absent case gets a word rather than an empty string.
+// optionalPathText renders an optional object path for the human-readable monitor
+// output. The library surfaces an absent object as nil (iwd signals it by
+// invalidating the property), so the absent case gets a word rather than an empty
+// string.
 func optionalPathText(path *string, absent string) string {
 	if path == nil || *path == "" {
 		return absent
@@ -110,7 +111,7 @@ func bssRefPaths(refs []spiderw.BasicServiceSetRef) []string {
 }
 
 // monitorResolver turns the raw object paths a subscription delivers into the
-// friendly identifiers the monitor prints — an SSID for a network, a MAC for a
+// friendly identifiers the monitor prints - an SSID for a network, a MAC for a
 // BSS. `status` already renders resolved refs, so `monitor` matches it rather than
 // printing bare paths.
 //

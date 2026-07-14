@@ -1,6 +1,12 @@
-// Command monitor watches the first station and prints its connection-state and
-// scanning changes live, until interrupted with Ctrl-C. It demonstrates the
-// subscription API and how signals flow through spiderw. It changes nothing.
+// Command monitor watches the first station and prints its state, scanning,
+// connected-network, and associated-access-point changes live, until interrupted
+// with Ctrl-C. It demonstrates the subscription API and how signals flow through
+// spiderw. It changes nothing.
+//
+// The access-point subscription is how a roam is observed: the station moves
+// between access points of the same network, so the BSS changes while the state
+// stays connected and the network does not change at all. A nil value means the
+// object is gone - iwd signals that by invalidating the property.
 //
 // It targets the system bus (real iwd) by default; pass -session for the mock.
 //
@@ -74,6 +80,35 @@ func main() {
 		log.Fatalf("subscribe scanning: %v", err)
 	}
 	defer func() { _ = unsubScan.Unsubscribe() }()
+
+	// Which network we are on. A nil path means disconnected: iwd signals "gone"
+	// by invalidating the property, and spiderw delivers that as nil.
+	unsubNet, err := station.SubscribeConnectedNetworkChanged(ctx, func(path *string) {
+		if path == nil {
+			fmt.Println("network -> none (disconnected)")
+			return
+		}
+		fmt.Printf("network -> %s\n", *path)
+	})
+	if err != nil {
+		log.Fatalf("subscribe connected network: %v", err)
+	}
+	defer func() { _ = unsubNet.Unsubscribe() }()
+
+	// The access point we are associated with. This is the only way to observe a
+	// roam: the station moves between APs of the same network, so the BSS changes
+	// while the state stays connected and the network does not change at all.
+	unsubAP, err := station.SubscribeConnectedAccessPointChanged(ctx, func(path *string) {
+		if path == nil {
+			fmt.Println("access-point -> none (not associated)")
+			return
+		}
+		fmt.Printf("access-point -> %s\n", *path)
+	})
+	if err != nil {
+		log.Fatalf("subscribe connected access point: %v", err)
+	}
+	defer func() { _ = unsubAP.Unsubscribe() }()
 
 	fmt.Println("watching for changes (Ctrl-C to stop)...")
 	<-ctx.Done()

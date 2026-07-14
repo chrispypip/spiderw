@@ -326,7 +326,11 @@ func (n *Network) SubscribeConnectedChanged(ctx context.Context, fn func(bool)) 
 
 // SubscribeKnownNetworkChanged registers fn for raw changes to the network's
 // KnownNetwork association. fn receives the KnownNetwork object path, or nil when
-// the network is not known (iwd reports that as the null path "/").
+// the network is not known.
+//
+// A forget arrives as an *invalidation*: iwd lists the property in Invalidated and
+// sends no value (not the null path "/"). Either way the absent case is delivered
+// as nil.
 //
 // This is how a network being saved or forgotten is observed: provisioning a
 // network gives it a KnownNetwork, and forgetting it takes it away.

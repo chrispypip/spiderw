@@ -776,6 +776,7 @@ type wscPinResult struct {
 	Pin     string `json:"Pin"`
 }
 
+// String returns the CLI string form of the value.
 func (r wscPinResult) String() string {
 	return fmt.Sprintf("WSC PIN %s (enter this at the access point within the WSC walk time)", r.Pin)
 }
@@ -784,6 +785,7 @@ type wscPushButtonResult struct {
 	Station string `json:"Station"`
 }
 
+// String returns the CLI string form of the value.
 func (r wscPushButtonResult) String() string {
 	return fmt.Sprintf("station %q: press the WPS button on your access point now", r.Station)
 }
@@ -793,6 +795,7 @@ type wscResult struct {
 	Action  string `json:"Action"`
 }
 
+// String returns the CLI string form of the value.
 func (r wscResult) String() string {
 	if r.Action == "cancel" {
 		return "WSC operation canceled"
@@ -1111,7 +1114,7 @@ func parseStationMonitorTarget(args []string) (string, error) {
 
 // streamStationProperty prints the property's current value, then subscribes so
 // subsequent changes print too. It returns the subscription so the caller can
-// unsubscribe; it does not block, which is what makes it testable — the blocking
+// unsubscribe; it does not block, which is what makes it testable - the blocking
 // wait for Ctrl-C lives in monitorStation.
 func streamStationProperty(ctx context.Context, app *App, ref, what string, s stationAPI, res monitorResolver, mu *sync.Mutex) (spiderw.UnsubscribeFunc, error) {
 	// One Properties read seeds every branch's current value, so the stream opens

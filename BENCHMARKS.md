@@ -39,16 +39,29 @@ Each benchmark exists to protect a specific invariant, such as:
 
 ### internal/iwdbus
 
-Benchmarks cover:
+Benchmarks cover two areas.
+
+**Dispatcher mechanics** - that concurrency safety and isolation do not introduce
+excessive overhead:
 
 * Signal dispatch fast paths (single handler)
 * Fan-out behavior with multiple handlers
 * Wildcard vs exact handler resolution
 * Dispatcher startup and shutdown
 * Registration overhead under contention
+* A slow handler not blocking the others
 
-These benchmarks ensure that concurrency safety and isolation do not introduce
-excessive overhead.
+**Data paths** - the in-process parse and resolution work that runs per read, sized
+to inputs a busy host actually produces:
+
+* `Properties.GetAll` decoding for a status read (the batched read the layers use)
+* Object-path list and affinity decoding
+* `AccessPoint.GetOrderedNetworks` neighbour-dict (`aa{sv}`) parsing across a full
+  scan result
+* `ObjectTree` lookups, which back the resolution of paths to SSIDs and MACs
+
+These avoid a real D-Bus connection and measure only in-process cost, so a
+regression in the parse or lookup logic is visible.
 
 ### internal/logging
 

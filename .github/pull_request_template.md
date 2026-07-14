@@ -16,6 +16,7 @@
 - [ ] `make test-regression`
 - [ ] `make test-race`
 - [ ] `make test-stress`
+- [ ] `make test-fuzz-seed`
 - [ ] `make test-mock`
 
 ## Checklist

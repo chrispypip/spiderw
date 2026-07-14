@@ -490,7 +490,12 @@ func (s *Station) SubscribeScanningChanged(ctx context.Context, fn func(bool)) (
 
 // SubscribeConnectedNetworkChanged registers fn for raw changes to the connected
 // network. fn receives the network's object path, or nil when the station is not
-// connected to one (iwd reports that as the null path "/"). A malformed path is
+// connected to one.
+//
+// A disconnect arrives as an *invalidation*, not as a value: iwd lists the
+// property in Invalidated and sends nothing else. (It does not send the null path
+// "/" - believing otherwise is why this subscription was once silent on every
+// disconnect.) The absent case is delivered as nil either way. A malformed path is
 // skipped rather than surfaced.
 func (s *Station) SubscribeConnectedNetworkChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
 	if fn == nil {
@@ -548,7 +553,7 @@ func (s *Station) SubscribeConnectedAccessPointChanged(ctx context.Context, fn f
 }
 
 // SubscribeAffinitiesChanged registers fn for raw changes to the station's
-// affinities. Affinities are writable, so they can change from under a caller —
+// affinities. Affinities are writable, so they can change from under a caller -
 // another client (iwctl, a second spiderw process) may set them, and iwd itself
 // may clear them. This is the only way to observe that.
 func (s *Station) SubscribeAffinitiesChanged(ctx context.Context, fn func([]string)) (UnsubscribeFunc, error) {
