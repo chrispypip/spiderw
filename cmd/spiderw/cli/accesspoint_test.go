@@ -348,3 +348,127 @@ func TestAccessPointCmd_EmptyRef(t *testing.T) {
 	require.Equal(t, 1, code)
 	require.Contains(t, out, "reference required")
 }
+
+func TestAccessPointCmd_StopError(t *testing.T) {
+	t.Parallel()
+
+	ap := &fakeAccessPoint{path: testAPPath, name: testAPName, stopErr: errors.New("stop failed")}
+	out, code := driveCLI(accessPointClient(ap), nil, false, "access-point", testAPName, "stop")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "stop failed")
+}
+
+func TestAccessPointCmd_StartProfileError(t *testing.T) {
+	t.Parallel()
+
+	// StartProfile shares the fake's startErr; the `start` error path is covered
+	// separately, so this pins the start-profile branch.
+	ap := &fakeAccessPoint{path: testAPPath, name: testAPName, startErr: errors.New("no such profile")}
+	out, code := driveCLI(accessPointClient(ap), nil, false,
+		"access-point", testAPName, "start-profile", "MyProfile")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "no such profile")
+}
+
+func TestAccessPointCmd_ScanError(t *testing.T) {
+	t.Parallel()
+
+	// A scan on a stopped AP is rejected by iwd with NotAvailable, so this is a
+	// path users actually reach. Both wait mode and --no-wait must surface it.
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{"wait mode", []string{"access-point", testAPName, "scan"}},
+		{"no-wait", []string{"access-point", testAPName, "scan", "--no-wait"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ap := &fakeAccessPoint{path: testAPPath, name: testAPName, scanErr: errors.New("operation not available")}
+			out, code := driveCLI(accessPointClient(ap), nil, false, tc.args...)
+			require.Equal(t, 1, code)
+			require.Contains(t, out, "operation not available")
+		})
+	}
+}
+
+func TestAccessPointCmd_Scan_SubscribeError(t *testing.T) {
+	t.Parallel()
+
+	// Wait mode subscribes to Scanning before triggering the scan, so a failing
+	// subscription must surface rather than the scan running unwatched.
+	ap := &fakeAccessPoint{path: testAPPath, name: testAPName, err: errors.New("subscribe failed")}
+	out, code := driveCLI(accessPointClient(ap), nil, false, "access-point", testAPName, "scan")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "subscribe failed")
+	require.False(t, ap.scanCalled, "the scan must not start when the subscription fails")
+}
+
+func TestAccessPointCmd_Scan_BadFlag(t *testing.T) {
+	t.Parallel()
+
+	fc, _ := fakeWithAccessPoint()
+	out, code := driveCLI(fc, nil, false, "access-point", testAPName, "scan", "--bogus")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "bogus")
+}
+
+func TestAccessPointCmd_Scan_RejectsPositionalArg(t *testing.T) {
+	t.Parallel()
+
+	fc, _ := fakeWithAccessPoint()
+	out, code := driveCLI(fc, nil, false, "access-point", testAPName, "scan", "extra")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "usage:")
+}
+
+func TestAccessPointCmd_RejectsUnknownArguments(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{"list", []string{"access-point", "list", "extra"}},
+		{"status", []string{"access-point", "status", "extra"}},
+		{"single status", []string{"access-point", testAPName, "status", "extra"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fc, _ := fakeWithAccessPoint()
+			out, code := driveCLI(fc, nil, false, tc.args...)
+			require.Equal(t, 1, code)
+			require.NotEmpty(t, out)
+		})
+	}
+}
+
+func TestAccessPointCmd_RefWithNoAccessPoints(t *testing.T) {
+	t.Parallel()
+
+	// Referencing an access point when the host has none is distinct from naming
+	// one that does not exist ("not found").
+	fc := &fakeClient{daemon: &fakeDaemon{}}
+	out, code := driveCLI(fc, nil, false, "access-point", testAPName, "status")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "no access points available")
+}
+
+func TestAccessPointCmd_Status_Empty(t *testing.T) {
+	t.Parallel()
+
+	fc := &fakeClient{daemon: &fakeDaemon{}}
+	out, code := driveCLI(fc, nil, false, "access-point", "status")
+	require.Equal(t, 0, code, out)
+	require.Contains(t, out, "no access points")
+}
+
+func TestAccessPointCmd_Networks_Empty(t *testing.T) {
+	t.Parallel()
+
+	// An AP that has not scanned yet reports no results rather than an empty list.
+	ap := &fakeAccessPoint{path: testAPPath, name: testAPName}
+	out, code := driveCLI(accessPointClient(ap), nil, false, "access-point", testAPName, "networks")
+	require.Equal(t, 0, code, out)
+	require.Contains(t, out, "no networks available")
+}
