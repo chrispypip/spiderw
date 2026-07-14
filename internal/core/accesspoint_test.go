@@ -5,6 +5,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
@@ -133,6 +134,33 @@ func TestAccessPoint_Core(t *testing.T) {
 			}
 		})
 
+		t.Run("BoundariesAccepted", func(t *testing.T) {
+			t.Parallel()
+			// The rejecting side is covered above. Pin the accepting side too, or
+			// loosening `l > 32` to `l >= 32` (or `l < 8` to `l <= 8`) would pass the
+			// whole suite: an SSID of 1 and 32 bytes, and a passphrase of 8 and 63
+			// characters, are all valid and must reach iwd.
+			for _, tc := range []struct {
+				name string
+				ssid string
+				psk  string
+			}{
+				{"shortest ssid", "a", "12345678"},
+				{"longest ssid", strings.Repeat("a", 32), "12345678"},
+				{"shortest psk", "MyAP", strings.Repeat("p", 8)},
+				{"longest psk", "MyAP", strings.Repeat("p", 63)},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					t.Parallel()
+					f := &fakeAccessPointRaw{}
+					require.NoError(t, NewAccessPoint(f).Start(ctx, tc.ssid, tc.psk))
+					ssid, psk := f.startArgs()
+					require.Equal(t, tc.ssid, ssid, "a boundary-valid request must reach iwd")
+					require.Equal(t, tc.psk, psk)
+				})
+			}
+		})
+
 		t.Run("AlreadyExistsSentinelPreserved", func(t *testing.T) {
 			t.Parallel()
 			f := &fakeAccessPointRaw{err: fmt.Errorf("%w: %w", iwdbus.ErrDBusMethod, iwdbus.ErrAlreadyExists)}
@@ -152,12 +180,41 @@ func TestAccessPoint_Core(t *testing.T) {
 			require.Equal(t, "HomeAP", f.profileArg())
 		})
 
-		t.Run("EmptySSIDFailsLocally", func(t *testing.T) {
+		t.Run("InvalidSSIDFailsLocally", func(t *testing.T) {
 			t.Parallel()
-			f := &fakeAccessPointRaw{}
-			err := NewAccessPoint(f).StartProfile(ctx, "")
-			require.Error(t, err)
-			require.Empty(t, f.profileArg())
+			// StartProfile validates the SSID with the same 1-32 byte rule as Start,
+			// so both rejecting bounds must fail before any D-Bus round-trip.
+			for _, tc := range []struct {
+				name string
+				ssid string
+			}{
+				{"empty ssid", ""},
+				{"ssid too long", strings.Repeat("a", 33)},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					t.Parallel()
+					f := &fakeAccessPointRaw{}
+					err := NewAccessPoint(f).StartProfile(ctx, tc.ssid)
+					require.Error(t, err)
+					var ce *Error
+					require.ErrorAs(t, err, &ce)
+					require.Equal(t, KindInvalidArgument, ce.Kind)
+					require.Equal(t, ResourceAccessPoint, ce.Resource)
+					require.Empty(t, f.profileArg(), "iwd must not be called for an invalid request")
+				})
+			}
+		})
+
+		t.Run("BoundarySSIDsAccepted", func(t *testing.T) {
+			t.Parallel()
+			for _, ssid := range []string{"a", strings.Repeat("a", 32)} {
+				t.Run(fmt.Sprintf("len%d", len(ssid)), func(t *testing.T) {
+					t.Parallel()
+					f := &fakeAccessPointRaw{}
+					require.NoError(t, NewAccessPoint(f).StartProfile(ctx, ssid))
+					require.Equal(t, ssid, f.profileArg())
+				})
+			}
 		})
 	})
 

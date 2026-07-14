@@ -56,9 +56,9 @@ func TestAccessPoint_Iwdbus(t *testing.T) {
 		t.Run("AccessPoint_Scan", testAccessPoint_Scan)
 		t.Run("AccessPoint_Scan_InProgressMatchable", testAccessPoint_Scan_InProgressMatchable)
 		t.Run("AccessPoint_GetOrderedNetworks", testAccessPoint_GetOrderedNetworks)
-		t.Run("AccessPoint_GetOrderedNetworks_UnknownSecurity", testAccessPoint_GetOrderedNetworks_UnknownSecurity)
+		t.Run("AccessPoint_GetOrderedNetworks_UnclassifiedType", testAccessPoint_GetOrderedNetworks_UnclassifiedType)
 		t.Run("AccessPoint_GetOrderedNetworks_Empty", testAccessPoint_GetOrderedNetworks_Empty)
-		t.Run("AccessPoint_GetOrderedNetworks_BadType", testAccessPoint_GetOrderedNetworks_BadType)
+		t.Run("AccessPoint_GetOrderedNetworks_MalformedEntries", testAccessPoint_GetOrderedNetworks_MalformedEntries)
 		t.Run("AccessPoint_GetOrderedNetworks_Err", testAccessPoint_GetOrderedNetworks_Err)
 	})
 
@@ -452,7 +452,9 @@ func testAccessPoint_GetOrderedNetworks(t *testing.T) {
 	a := &AccessPoint{call: &fakeCaller{
 		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
 			require.Equal(t, "GetOrderedNetworks", method)
-			// aa{sv}: array of {Name, SignalStrength, Security} dicts.
+			// aa{sv}: array of {Name, SignalStrength, Type} dicts, where the "Type"
+			// key carries the security (iwd's docs mislabel this key "Security"; the
+			// wire key is "Type", confirmed on hardware).
 			return []interface{}{
 				[]map[string]dbus.Variant{
 					{
@@ -477,11 +479,14 @@ func testAccessPoint_GetOrderedNetworks(t *testing.T) {
 	}, got)
 }
 
-func testAccessPoint_GetOrderedNetworks_UnknownSecurity(t *testing.T) {
+func testAccessPoint_GetOrderedNetworks_UnclassifiedType(t *testing.T) {
 	t.Parallel()
-	// A neighbor whose Security iwd cannot classify (empty or unrecognized) must
-	// parse to NetworkTypeUnknown, not fail the whole reply — the hardware bug
-	// where one unclassifiable neighbor broke `access-point networks`.
+	// A neighbor whose security iwd cannot classify — an empty or unrecognized
+	// string in the "Type" key — must parse to NetworkTypeUnknown, not fail the
+	// whole reply. This is the hardware bug where one unclassifiable neighbor broke
+	// `access-point networks`. Note the deliberate asymmetry with
+	// MalformedEntries below: an unrecognized Type *string* is tolerated, while a
+	// Type that is not a string at all is an error.
 	a := &AccessPoint{call: &fakeCaller{
 		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
 			return []interface{}{
@@ -526,20 +531,44 @@ func testAccessPoint_GetOrderedNetworks_Empty(t *testing.T) {
 	require.Empty(t, got)
 }
 
-func testAccessPoint_GetOrderedNetworks_BadType(t *testing.T) {
+func testAccessPoint_GetOrderedNetworks_MalformedEntries(t *testing.T) {
 	t.Parallel()
-	a := &AccessPoint{call: &fakeCaller{
-		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
-			return []interface{}{
-				[]map[string]dbus.Variant{
-					{"Name": dbus.MakeVariant("Bad"), "SignalStrength": dbus.MakeVariant("not-int16")},
-				},
-			}, nil
+	// Every field of a neighbor dict is daemon-supplied. A value of the wrong D-Bus
+	// type (as opposed to an unrecognized Type *string*, which is tolerated above)
+	// must be reported rather than silently coerced.
+	for _, tc := range []struct {
+		name     string
+		entry    map[string]dbus.Variant
+		wantHint string
+	}{
+		{
+			"bad Name",
+			map[string]dbus.Variant{"Name": dbus.MakeVariant(int32(7)), "SignalStrength": dbus.MakeVariant(int16(-6000))},
+			"expected string",
 		},
-	}}
-	_, err := a.GetOrderedNetworks(context.Background())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "expected int16")
+		{
+			"bad SignalStrength",
+			map[string]dbus.Variant{"Name": dbus.MakeVariant("Bad"), "SignalStrength": dbus.MakeVariant("not-int16")},
+			"expected int16",
+		},
+		{
+			"bad Type",
+			map[string]dbus.Variant{"Name": dbus.MakeVariant("Bad"), "Type": dbus.MakeVariant(uint32(1))},
+			"expected string",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			a := &AccessPoint{call: &fakeCaller{
+				callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
+					return []interface{}{[]map[string]dbus.Variant{tc.entry}}, nil
+				},
+			}}
+			_, err := a.GetOrderedNetworks(context.Background())
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.wantHint)
+		})
+	}
 }
 
 func testAccessPoint_GetOrderedNetworks_Err(t *testing.T) {

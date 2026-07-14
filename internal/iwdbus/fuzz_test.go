@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"strings"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
@@ -199,15 +200,15 @@ func Fuzz_Iwdbus_ObjectPathParsers(f *testing.F) {
 // Fuzz_Iwdbus_ObjectPathListParsers exercises the array-of-object-path decoders
 // across the []dbus.ObjectPath and []interface{} forms with adversarial paths.
 func Fuzz_Iwdbus_ObjectPathListParsers(f *testing.F) {
-	f.Add([]byte("/a,/b"))
-	f.Add([]byte(""))
-	f.Add([]byte("not-a-path"))
+	f.Add("/a,/b")
+	f.Add("")
+	f.Add("not-a-path")
 
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(t *testing.T, data string) {
 		var typed []dbus.ObjectPath
 		var iface []interface{}
 		if len(data) > 0 {
-			for _, part := range bytes.Split(data, []byte{','}) {
+			for part := range strings.SplitSeq(data, ",") {
 				typed = append(typed, dbus.ObjectPath(part))
 				iface = append(iface, dbus.ObjectPath(part))
 			}
@@ -288,6 +289,83 @@ func Fuzz_Iwdbus_ParseIntrospectionChildNames(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// Must never panic on arbitrary input.
 		_, _ = parseIntrospectionChildNames(string(data))
+	})
+}
+
+// Fuzz_Iwdbus_AccessPointOptionalParsers exercises the decoders for the AccessPoint
+// properties iwd only exposes while the AP is running (Name, Frequency, the
+// ciphers). Each accepts a nil, a concrete value, or a dbus.Variant wrapping
+// either, so all three shapes plus a wrong-typed value must stay panic-free.
+func Fuzz_Iwdbus_AccessPointOptionalParsers(f *testing.F) {
+	f.Add("MyAP")
+	f.Add("")
+	f.Add("CCMP")
+
+	f.Fuzz(func(t *testing.T, s string) {
+		// nil (the absent-property shape)
+		_, _ = parseOptionalAccessPointString("Name", nil)
+		_, _ = parseAccessPointFrequency(nil)
+		_, _ = parseAccessPointCiphers(nil)
+
+		// concrete form
+		_, _ = parseOptionalAccessPointString("Name", s)
+		_, _ = parseAccessPointCiphers([]string{s})
+
+		// variant-wrapped form (recurses through the unwrap branch)
+		_, _ = parseOptionalAccessPointString("GroupCipher", dbus.MakeVariant(s))
+		_, _ = parseAccessPointFrequency(dbus.MakeVariant(uint32(len(s))))
+		_, _ = parseAccessPointCiphers(dbus.MakeVariant([]string{s}))
+
+		// wrong-typed form (exercises the type-assertion failure branch)
+		_, _ = parseOptionalAccessPointString("Name", int64(1))
+		_, _ = parseAccessPointFrequency(s)
+		_, _ = parseAccessPointCiphers(s)
+	})
+}
+
+// Fuzz_Iwdbus_ParseAccessPointOrderedNetwork exercises the neighbor-dict decoder
+// for AccessPoint.GetOrderedNetworks. Every key is daemon-supplied and each may
+// be absent or of any D-Bus type, so the parser must never panic — it may only
+// return an error. The Type key (which carries the security) is the interesting
+// one: an unrecognized string is tolerated as unknown, while a non-string is an
+// error, and neither may crash.
+func Fuzz_Iwdbus_ParseAccessPointOrderedNetwork(f *testing.F) {
+	f.Add("OpenNet", int16(-6000), "open")
+	f.Add("SecuredNet", int16(-7200), "psk")
+	f.Add("", int16(0), "")
+	f.Add("MysteryNet", int16(32767), "wpa9000")
+
+	f.Fuzz(func(t *testing.T, name string, signal int16, netType string) {
+		// Well-typed entry: arbitrary values, correct D-Bus types.
+		_, _ = parseAccessPointOrderedNetwork(map[string]dbus.Variant{
+			"Name":           dbus.MakeVariant(name),
+			"SignalStrength": dbus.MakeVariant(signal),
+			"Type":           dbus.MakeVariant(netType),
+		})
+
+		// Missing keys: iwd may omit any of them.
+		_, _ = parseAccessPointOrderedNetwork(map[string]dbus.Variant{})
+		_, _ = parseAccessPointOrderedNetwork(map[string]dbus.Variant{
+			"Name": dbus.MakeVariant(name),
+		})
+
+		// Wrong-typed keys, one at a time, exercising each failure branch.
+		_, _ = parseAccessPointOrderedNetwork(map[string]dbus.Variant{
+			"Name": dbus.MakeVariant(int64(len(name))),
+		})
+		_, _ = parseAccessPointOrderedNetwork(map[string]dbus.Variant{
+			"SignalStrength": dbus.MakeVariant(netType),
+		})
+		_, _ = parseAccessPointOrderedNetwork(map[string]dbus.Variant{
+			"Type": dbus.MakeVariant(signal),
+		})
+
+		// An unexpected extra key must simply be ignored.
+		_, _ = parseAccessPointOrderedNetwork(map[string]dbus.Variant{
+			"Name":     dbus.MakeVariant(name),
+			"Security": dbus.MakeVariant(netType),
+			netType:    dbus.MakeVariant(name),
+		})
 	})
 }
 
