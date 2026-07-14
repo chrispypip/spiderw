@@ -210,7 +210,7 @@ func TestNetworkMock_AllNetworks_Empty(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// CLI (`spiderw network …`) against the mock
+// CLI (`spiderw network ...`) against the mock
 // -----------------------------------------------------------------------------
 
 // TestNetworkMock_StatusJSON is the representative end-to-end CLI smoke for the
@@ -237,7 +237,7 @@ func TestNetworkMock_StatusJSON(t *testing.T) {
 // TestNetworkMock_ConnectProvisionsKnownNetwork covers iwd writing a profile the
 // first time a secured network is connected to: a KnownNetwork object appears, and
 // the Network gains a link to it. The mock's tree used to be static, so this
-// transition — the one that makes a network "known" — was unmodelled.
+// transition - the one that makes a network "known" - was unmodelled.
 func TestNetworkMock_ConnectProvisionsKnownNetwork(t *testing.T) {
 	iwdmock.StartMockNormal(t)
 
@@ -295,4 +295,62 @@ func TestNetworkMock_AbsentKnownNetworkSingleGetter(t *testing.T) {
 	kn, err := secured.KnownNetwork(ctx)
 	require.NoError(t, err, "an unprovisioned network's KnownNetwork must read as nil, not error")
 	require.Nil(t, kn)
+}
+
+// TestNetworkMock_ProvisioningEmitsInterfacesAdded is the counterpart to the
+// InterfacesRemoved guard: provisioning creates a KnownNetwork object, so the mock
+// must announce it. Nothing consumes the signal yet, which is exactly why it needs
+// observing - a broken emitter would stay hidden until the live-object-events work
+// is written against it.
+func TestNetworkMock_ProvisioningEmitsInterfacesAdded(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	conn, err := dbus.SessionBus()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+
+	require.NoError(t, conn.AddMatchSignal(
+		dbus.WithMatchInterface("org.freedesktop.DBus.ObjectManager"),
+	))
+	signals := make(chan *dbus.Signal, 16)
+	conn.Signal(signals)
+
+	agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) {
+			return "mock-secret-passphrase", nil
+		},
+	})
+	require.NoError(t, err)
+	defer func() { _ = agent.Unregister(context.Background()) }()
+
+	secured := newPublicMockNetwork(t, ctx, client, "SecuredNet")
+	require.NoError(t, secured.Connect(ctx))
+
+	deadline := time.After(signalTimeout)
+	for {
+		select {
+		case sig := <-signals:
+			if sig.Name != "org.freedesktop.DBus.ObjectManager.InterfacesAdded" {
+				continue
+			}
+			require.Len(t, sig.Body, 2, "InterfacesAdded carries (object_path, interfaces+properties)")
+
+			_, ok := sig.Body[0].(dbus.ObjectPath)
+			require.True(t, ok, "first argument is the object path")
+
+			ifaces, ok := sig.Body[1].(map[string]map[string]dbus.Variant)
+			require.True(t, ok, "second argument maps each new interface to its properties")
+			if _, isKnown := ifaces["net.connman.iwd.KnownNetwork"]; !isKnown {
+				continue
+			}
+			// The announcement carries the object's properties, as iwd's does.
+			require.NotEmpty(t, ifaces["net.connman.iwd.KnownNetwork"])
+			return
+
+		case <-deadline:
+			t.Fatal("mock never emitted InterfacesAdded for the provisioned known network")
+		}
+	}
 }

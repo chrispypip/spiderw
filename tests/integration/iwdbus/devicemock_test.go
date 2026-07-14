@@ -319,7 +319,7 @@ func TestDeviceMock_SecondDeviceTopology(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// CLI (`spiderw device …`) against the mock
+// CLI (`spiderw device ...`) against the mock
 // -----------------------------------------------------------------------------
 
 func findDeviceStatusEntry(t *testing.T, list []map[string]any, path string) map[string]any {
@@ -446,4 +446,44 @@ func TestDeviceMock_ModeSwitchSwapsInterfaces(t *testing.T) {
 	require.NoError(t, err, "switching back must restore the Station interface")
 	_, err = client.AccessPoint(ctx, devicePath)
 	require.Error(t, err, "the AccessPoint interface must be gone again")
+}
+
+// TestDeviceMock_ModeSwitchToAdHocDropsBothInterfaces covers switchDeviceMode's
+// remaining branch. A mode that is neither station nor ap (ad-hoc) carries neither
+// the Station nor the AccessPoint interface, so a device moved there must stop
+// resolving as either, and must drop out of both enumerations.
+func TestDeviceMock_ModeSwitchToAdHocDropsBothInterfaces(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	device, err := client.Device(ctx, devicePath)
+	require.NoError(t, err)
+
+	// It starts as a station.
+	_, err = client.Station(ctx, devicePath)
+	require.NoError(t, err)
+
+	require.NoError(t, device.SetMode(ctx, spiderw.ModeAdHoc))
+
+	_, err = client.Station(ctx, devicePath)
+	require.Error(t, err, "an ad-hoc device carries no Station interface")
+	_, err = client.AccessPoint(ctx, devicePath)
+	require.Error(t, err, "an ad-hoc device carries no AccessPoint interface")
+
+	stations, err := client.AllStations(ctx)
+	require.NoError(t, err)
+	for _, s := range stations {
+		require.NotEqual(t, devicePath, s.Path(), "an ad-hoc device must not enumerate as a station")
+	}
+	aps, err := client.AllAccessPoints(ctx)
+	require.NoError(t, err)
+	for _, a := range aps {
+		require.NotEqual(t, devicePath, a.Path(), "an ad-hoc device must not enumerate as an access point")
+	}
+
+	// The device object itself survives; only its mode-specific interface moved.
+	mode, err := device.Mode(ctx)
+	require.NoError(t, err)
+	require.Equal(t, spiderw.ModeAdHoc, mode)
 }

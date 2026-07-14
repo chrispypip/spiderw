@@ -130,7 +130,7 @@ func TestKnownNetworkMock_SetAutoConnect(t *testing.T) {
 
 // TestKnownNetworkMock_Forget verifies a forget actually destroys the profile.
 //
-// This test used to assert only that Forget returned no error — and the mock's
+// This test used to assert only that Forget returned no error - and the mock's
 // Forget was a no-op stub, so it passed for the life of the project while doing
 // nothing at all. Assert the observable consequences instead: the known network
 // disappears from enumeration, and a handle to it stops working.
@@ -202,7 +202,7 @@ func TestKnownNetworkMock_AllKnownNetworks_Empty(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// CLI (`spiderw known-network …`) against the mock
+// CLI (`spiderw known-network ...`) against the mock
 // -----------------------------------------------------------------------------
 
 func runSpiderKnownNetwork(t *testing.T, args ...string) (string, error) {
@@ -234,7 +234,7 @@ func TestKnownNetworkMock_StatusJSON(t *testing.T) {
 
 // TestKnownNetworkMock_ForgetInvalidatesNetworkLink is the regression guard for the
 // hardware bug: forgetting a known network does not send the null path "/" for the
-// Network's KnownNetwork property — iwd invalidates it and sends no value. A
+// Network's KnownNetwork property - iwd invalidates it and sends no value. A
 // subscription that reads only Changed never fires, which is exactly what happened
 // on real hardware (monitoring known-network printed nothing on forget) while the
 // mock's no-op Forget hid it.
@@ -276,7 +276,7 @@ func TestKnownNetworkMock_ForgetInvalidatesNetworkLink(t *testing.T) {
 // These are different code paths: Properties() uses GetAll, which simply omits an
 // absent key, while the single getter issues a Get and must recognize iwd's "no
 // value" error as absence. Only the bundle path was ever exercised, so the getter
-// path stayed broken against the mock — it reported absence with wording the client
+// path stayed broken against the mock - it reported absence with wording the client
 // does not match, turning a tolerated nil into a hard error.
 func TestKnownNetworkMock_AbsentOptionalSingleGetter(t *testing.T) {
 	iwdmock.StartMockNormal(t)
@@ -293,4 +293,59 @@ func TestKnownNetworkMock_AbsentOptionalSingleGetter(t *testing.T) {
 	// The CLI surfaces it as "never" rather than failing.
 	out, err := runSpider(t, "known-network", "GuestHotspot", "last-connected")
 	require.NoError(t, err, out)
+}
+
+// TestKnownNetworkMock_EmitsObjectManagerSignals verifies the mock announces object
+// lifecycle the way iwd does, on org.freedesktop.DBus.ObjectManager.
+//
+// Nothing in spiderw consumes InterfacesAdded/InterfacesRemoved yet - they exist so
+// the live-object-events work has a mock to be written against. That makes them
+// fire-and-forget: a wrong signal name, path, or argument shape would go unnoticed
+// until that slice is written, and then look like a bug in the new code rather than
+// in the mock. Observe them directly instead.
+func TestKnownNetworkMock_EmitsObjectManagerSignals(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	conn, err := dbus.SessionBus()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+
+	require.NoError(t, conn.AddMatchSignal(
+		dbus.WithMatchInterface("org.freedesktop.DBus.ObjectManager"),
+	))
+
+	signals := make(chan *dbus.Signal, 16)
+	conn.Signal(signals)
+
+	// Forgetting a known network destroys its object.
+	known := newPublicMockKnownNetwork(t, ctx, client, "KnownNet")
+	path := known.Path()
+	require.NoError(t, known.Forget(ctx))
+
+	deadline := time.After(signalTimeout)
+	for {
+		select {
+		case sig := <-signals:
+			if sig.Name != "org.freedesktop.DBus.ObjectManager.InterfacesRemoved" {
+				continue
+			}
+			require.Len(t, sig.Body, 2, "InterfacesRemoved carries (object_path, interfaces)")
+
+			removedPath, ok := sig.Body[0].(dbus.ObjectPath)
+			require.True(t, ok, "first argument is the object path")
+			if string(removedPath) != path {
+				continue
+			}
+
+			ifaces, ok := sig.Body[1].([]string)
+			require.True(t, ok, "second argument is the interface list")
+			require.Contains(t, ifaces, "net.connman.iwd.KnownNetwork")
+			return
+
+		case <-deadline:
+			t.Fatal("mock never emitted InterfacesRemoved for the forgotten known network")
+		}
+	}
 }
