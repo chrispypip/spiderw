@@ -147,6 +147,12 @@ func TestNetworkMock_Connect_KnownPSK(t *testing.T) {
 	// A known (provisioned) secured network connects without an agent.
 	known := newPublicMockNetwork(t, ctx, client, "KnownNet")
 	require.NoError(t, known.Connect(ctx))
+
+	// Assert the connection actually happened; asserting only NoError would pass
+	// against a Connect that did nothing.
+	connected, err := known.Connected(ctx)
+	require.NoError(t, err)
+	require.True(t, connected)
 }
 
 func TestNetworkMock_Connect_SecuredNoAgent(t *testing.T) {
@@ -226,4 +232,67 @@ func TestNetworkMock_StatusJSON(t *testing.T) {
 	open := byName["OpenNet"]
 	require.NotNil(t, open, "OpenNet missing:\n%s", out)
 	require.Equal(t, "open", jsonGetString(t, open, "Type"))
+}
+
+// TestNetworkMock_ConnectProvisionsKnownNetwork covers iwd writing a profile the
+// first time a secured network is connected to: a KnownNetwork object appears, and
+// the Network gains a link to it. The mock's tree used to be static, so this
+// transition — the one that makes a network "known" — was unmodelled.
+func TestNetworkMock_ConnectProvisionsKnownNetwork(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	secured := newPublicMockNetwork(t, ctx, client, "SecuredNet")
+
+	// It starts out unknown.
+	kn, err := secured.KnownNetwork(ctx)
+	require.NoError(t, err)
+	require.Nil(t, kn, "SecuredNet is not provisioned yet")
+
+	before, err := client.AllKnownNetworks(ctx)
+	require.NoError(t, err)
+
+	// Connecting a secured network needs an agent to supply the passphrase.
+	agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
+		Passphrase: func(ctx context.Context, networkPath string) (string, error) {
+			return "mock-secret-passphrase", nil
+		},
+	})
+	require.NoError(t, err)
+	defer func() { _ = agent.Unregister(context.Background()) }()
+
+	require.NoError(t, secured.Connect(ctx))
+
+	// The profile now exists and the network points at it.
+	kn, err = secured.KnownNetwork(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, kn, "connecting a secured network must provision a KnownNetwork")
+
+	after, err := client.AllKnownNetworks(ctx)
+	require.NoError(t, err)
+	require.Len(t, after, len(before)+1, "the provisioned network must appear in enumeration")
+
+	provisioned, err := client.KnownNetwork(ctx, *kn)
+	require.NoError(t, err)
+	name, err := provisioned.Name(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "SecuredNet", name)
+}
+
+// TestNetworkMock_AbsentKnownNetworkSingleGetter reads KnownNetwork on an
+// unprovisioned network through the single-property getter. Like the known-network
+// case, this is the Get path (not the GetAll bundle), and it is the path that broke
+// when the mock reported absence with wording the client does not recognize.
+func TestNetworkMock_AbsentKnownNetworkSingleGetter(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	secured := newPublicMockNetwork(t, ctx, client, "SecuredNet")
+
+	kn, err := secured.KnownNetwork(ctx)
+	require.NoError(t, err, "an unprovisioned network's KnownNetwork must read as nil, not error")
+	require.Nil(t, kn)
 }

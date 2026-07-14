@@ -274,6 +274,9 @@ func (d *Device) Set(iface, p string, v dbus.Variant) *dbus.Error {
 		}
 		d.Mode = s
 		emitPropertiesChanged(d.Path, iwdbus.IwdDeviceIface, map[string]dbus.Variant{"Mode": dbus.MakeVariant(s)}, []string{})
+		// iwd swaps the mode-specific interface on the device object, so the
+		// Station interface goes away when the device becomes an AP and vice versa.
+		switchDeviceMode(d, s)
 		return nil
 	default:
 		return dbus.MakeFailedError(fmt.Errorf("cannot set property %q", p))

@@ -391,3 +391,59 @@ func TestDeviceMock_ScopedStatusJSON(t *testing.T) {
 	require.Equal(t, "/net/connman/iwd/0", adapter["Path"])
 	require.Equal(t, "phy0", adapter["Name"])
 }
+
+// TestDeviceMock_ModeSwitchSwapsInterfaces covers what iwd does when a device's
+// Mode changes: the mode-specific interface on the device object is swapped. Moving
+// to "ap" removes Station (and the WSC interface that lives on it) and adds
+// AccessPoint; moving back reverses it.
+//
+// This is the transition a user actually performs (`device wlan0 mode ap`, which is
+// how an AP is brought up at all), and it was previously unmodelled: the mock
+// shipped one station-only device and one AP-only device with fixed interfaces, so
+// nothing ever verified that a Station stops resolving once the device is an AP.
+func TestDeviceMock_ModeSwitchSwapsInterfaces(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	// wlan0 starts in station mode: Station resolves, AccessPoint does not.
+	_, err := client.Station(ctx, devicePath)
+	require.NoError(t, err)
+	_, err = client.AccessPoint(ctx, devicePath)
+	require.Error(t, err, "a station-mode device has no AccessPoint interface")
+
+	device, err := client.Device(ctx, devicePath)
+	require.NoError(t, err)
+	require.NoError(t, device.SetMode(ctx, spiderw.ModeAP))
+
+	// The interfaces have swapped.
+	ap, err := client.AccessPoint(ctx, devicePath)
+	require.NoError(t, err, "an AP-mode device must expose AccessPoint")
+	require.NotNil(t, ap)
+
+	_, err = client.Station(ctx, devicePath)
+	require.Error(t, err, "the Station interface must be gone once the device is an AP")
+
+	// Enumeration agrees with the object tree.
+	stations, err := client.AllStations(ctx)
+	require.NoError(t, err)
+	for _, s := range stations {
+		require.NotEqual(t, devicePath, s.Path(), "an AP-mode device must not enumerate as a station")
+	}
+	aps, err := client.AllAccessPoints(ctx)
+	require.NoError(t, err)
+	var found bool
+	for _, a := range aps {
+		if a.Path() == devicePath {
+			found = true
+		}
+	}
+	require.True(t, found, "an AP-mode device must enumerate as an access point")
+
+	// And back again.
+	require.NoError(t, device.SetMode(ctx, spiderw.ModeStation))
+	_, err = client.Station(ctx, devicePath)
+	require.NoError(t, err, "switching back must restore the Station interface")
+	_, err = client.AccessPoint(ctx, devicePath)
+	require.Error(t, err, "the AccessPoint interface must be gone again")
+}

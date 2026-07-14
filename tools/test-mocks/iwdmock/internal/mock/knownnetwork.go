@@ -113,22 +113,16 @@ func (k *KnownNetwork) buildPropertyMap() map[string]dbus.Variant {
 	return props
 }
 
-// Forget implements the mock KnownNetwork.Forget method: the known-network record
-// goes away, so every Network that referenced it loses its KnownNetwork property.
+// Forget implements the mock KnownNetwork.Forget method: iwd deletes the stored
+// profile, so the KnownNetwork object is destroyed — it stops appearing in
+// enumeration, further calls to it fail, and InterfacesRemoved is emitted. Every
+// Network that referenced it loses the link (by invalidation, as iwd reports it).
 //
-// iwd signals that loss by *invalidating* the property, not by sending the null
-// path "/" (confirmed on hardware: monitoring a network's known-network printed
-// nothing on forget). The mock previously did nothing at all here, which is why a
-// subscription that only read Changed looked correct.
+// This used to be a no-op stub, and the integration test that called it asserted
+// only that it returned no error, so the mock did nothing for the life of the
+// project and nothing noticed.
 func (k *KnownNetwork) Forget() *dbus.Error {
-	for _, n := range exportedNetworks {
-		if n.KnownNetwork != k.Path {
-			continue
-		}
-		n.KnownNetwork = ""
-		emitPropertiesChanged(n.Path, iwdbus.IwdNetworkIface,
-			map[string]dbus.Variant{}, []string{"KnownNetwork"})
-	}
+	removeKnownNetwork(k)
 	return nil
 }
 
@@ -149,7 +143,10 @@ func (k *KnownNetwork) Get(iface, p string) (dbus.Variant, *dbus.Error) {
 	props := k.buildPropertyMap()
 	v, ok := props[p]
 	if !ok {
-		return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("unknown property %q", p))
+		// An absent optional property is reported the way iwd words it — the
+		// client's "is this just absent?" matcher keys off this text, and a
+		// different wording turns a tolerated absence into a hard error.
+		return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("getting property value failed"))
 	}
 	return v, nil
 }

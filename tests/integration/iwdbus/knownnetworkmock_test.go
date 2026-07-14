@@ -128,14 +128,36 @@ func TestKnownNetworkMock_SetAutoConnect(t *testing.T) {
 	require.False(t, auto)
 }
 
+// TestKnownNetworkMock_Forget verifies a forget actually destroys the profile.
+//
+// This test used to assert only that Forget returned no error — and the mock's
+// Forget was a no-op stub, so it passed for the life of the project while doing
+// nothing at all. Assert the observable consequences instead: the known network
+// disappears from enumeration, and a handle to it stops working.
 func TestKnownNetworkMock_Forget(t *testing.T) {
 	iwdmock.StartMockNormal(t)
 
 	ctx := context.Background()
 	client := newMockClient(t, ctx)
 
+	before, err := client.AllKnownNetworks(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, before)
+
 	known := newPublicMockKnownNetwork(t, ctx, client, "KnownNet")
+	path := known.Path()
 	require.NoError(t, known.Forget(ctx))
+
+	after, err := client.AllKnownNetworks(ctx)
+	require.NoError(t, err)
+	require.Len(t, after, len(before)-1, "a forgotten network must leave the enumeration")
+	for _, kn := range after {
+		require.NotEqual(t, path, kn.Path(), "the forgotten network is still listed")
+	}
+
+	// The object is destroyed, so a fresh handle to its path must fail.
+	_, err = client.KnownNetwork(ctx, path)
+	require.Error(t, err, "a destroyed known network must not resolve")
 }
 
 // TestKnownNetworkMock_SubscribeAutoConnectChanged exercises raw-iwdbus signal
@@ -246,4 +268,29 @@ func TestKnownNetworkMock_ForgetInvalidatesNetworkLink(t *testing.T) {
 	require.NoError(t, known.Forget(ctx))
 
 	requireFired(t, cleared, "expected KnownNetwork to be reported as cleared after Forget")
+}
+
+// TestKnownNetworkMock_AbsentOptionalSingleGetter reads an absent optional property
+// through the single-property getter rather than the Properties() bundle.
+//
+// These are different code paths: Properties() uses GetAll, which simply omits an
+// absent key, while the single getter issues a Get and must recognize iwd's "no
+// value" error as absence. Only the bundle path was ever exercised, so the getter
+// path stayed broken against the mock — it reported absence with wording the client
+// does not match, turning a tolerated nil into a hard error.
+func TestKnownNetworkMock_AbsentOptionalSingleGetter(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	// GuestHotspot has never been connected to, so iwd omits LastConnectedTime.
+	hotspot := newPublicMockKnownNetwork(t, ctx, client, "GuestHotspot")
+
+	ts, err := hotspot.LastConnectedTime(ctx)
+	require.NoError(t, err, "an absent optional property must read as nil, not error")
+	require.Nil(t, ts)
+
+	// The CLI surfaces it as "never" rather than failing.
+	out, err := runSpider(t, "known-network", "GuestHotspot", "last-connected")
+	require.NoError(t, err, out)
 }

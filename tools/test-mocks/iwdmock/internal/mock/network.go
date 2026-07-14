@@ -170,6 +170,12 @@ func (n *Network) Connect() *dbus.Error {
 	}
 
 	n.Connected = true
+	// iwd writes a profile the first time a secured network is connected to, so a
+	// KnownNetwork object appears and the Network gains a link to it.
+	if n.Type != "open" {
+		provisionKnownNetwork(n)
+	}
+
 	emitPropertiesChanged(n.Path, iwdbus.IwdNetworkIface, map[string]dbus.Variant{"Connected": dbus.MakeVariant(true)}, []string{})
 	return nil
 }
@@ -191,7 +197,10 @@ func (n *Network) Get(iface, p string) (dbus.Variant, *dbus.Error) {
 	props := n.buildPropertyMap()
 	v, ok := props[p]
 	if !ok {
-		return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("unknown property %q", p))
+		// An absent optional property is reported the way iwd words it — the
+		// client's "is this just absent?" matcher keys off this text, and a
+		// different wording turns a tolerated absence into a hard error.
+		return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("getting property value failed"))
 	}
 	return v, nil
 }

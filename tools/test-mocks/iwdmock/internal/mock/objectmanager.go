@@ -9,13 +9,13 @@ import (
 const objectManagerPath = dbus.ObjectPath("/")
 
 // ObjectManager implements the mock D-Bus ObjectManager interface.
+//
+// It holds no object slices of its own: iwd's tree changes at runtime (a forgotten
+// network's object is destroyed, a provisioned one appears), so the tree is read
+// live from the registries on every call. Snapshotting them at export time would
+// freeze the tree and make every lifecycle transition invisible.
 type ObjectManager struct {
-	adapters      []*Adapter
-	devices       []*Device
-	bsses         []*BasicServiceSet
-	networks      []*Network
-	knownNetworks []*KnownNetwork
-	daemon        *Daemon
+	daemon *Daemon
 }
 
 // ExportObjectManager exports the mock ObjectManager on the D-Bus connection.
@@ -24,27 +24,18 @@ func ExportObjectManager(conn *dbus.Conn) error {
 	if !*omitDaemonFlag {
 		om.daemon = &Daemon{}
 	}
-	if exportedAdapters != nil {
-		om.adapters = exportedAdapters
-	}
-	if exportedDevices != nil {
-		om.devices = exportedDevices
-	}
-	if exportedBSSes != nil {
-		om.bsses = exportedBSSes
-	}
-	if exportedNetworks != nil {
-		om.networks = exportedNetworks
-	}
-	if exportedKnownNetworks != nil {
-		om.knownNetworks = exportedKnownNetworks
-	}
+	// Objects added or removed after startup need this connection to export or
+	// tear themselves down.
+	setMockConn(conn)
 	return conn.Export(om, objectManagerPath, iwdbus.DBusObjectManagerIface)
 }
 
 // GetManagedObjects returns the mock object tree in ObjectManager format.
 func (o *ObjectManager) GetManagedObjects() (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error) {
 	objects := map[dbus.ObjectPath]map[string]map[string]dbus.Variant{}
+
+	registryMu.RLock()
+	defer registryMu.RUnlock()
 
 	if o.daemon != nil {
 		props, _ := o.daemon.GetInfo()
@@ -53,13 +44,13 @@ func (o *ObjectManager) GetManagedObjects() (map[dbus.ObjectPath]map[string]map[
 		}
 	}
 
-	for _, adapter := range o.adapters {
+	for _, adapter := range exportedAdapters {
 		objects[adapter.Path] = map[string]map[string]dbus.Variant{
 			iwdbus.IwdAdapterIface: adapter.buildPropertyMap(),
 		}
 	}
 
-	for _, device := range o.devices {
+	for _, device := range exportedDevices {
 		ifaces := map[string]map[string]dbus.Variant{
 			iwdbus.IwdDeviceIface: device.buildPropertyMap(),
 		}
@@ -76,19 +67,19 @@ func (o *ObjectManager) GetManagedObjects() (map[dbus.ObjectPath]map[string]map[
 		objects[device.Path] = ifaces
 	}
 
-	for _, bss := range o.bsses {
+	for _, bss := range exportedBSSes {
 		objects[bss.Path] = map[string]map[string]dbus.Variant{
 			iwdbus.IwdBasicServiceSetIface: bss.buildPropertyMap(),
 		}
 	}
 
-	for _, network := range o.networks {
+	for _, network := range exportedNetworks {
 		objects[network.Path] = map[string]map[string]dbus.Variant{
 			iwdbus.IwdNetworkIface: network.buildPropertyMap(),
 		}
 	}
 
-	for _, known := range o.knownNetworks {
+	for _, known := range exportedKnownNetworks {
 		objects[known.Path] = map[string]map[string]dbus.Variant{
 			iwdbus.IwdKnownNetworkIface: known.buildPropertyMap(),
 		}
