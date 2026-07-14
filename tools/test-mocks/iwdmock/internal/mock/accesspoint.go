@@ -85,8 +85,9 @@ func (a *AccessPoint) GetOrderedNetworks() ([]map[string]dbus.Variant, *dbus.Err
 }
 
 // buildAccessPointPropertyMap returns the mock AccessPoint interface properties.
-// Started and Scanning are always present; the rest (Name/Frequency/ciphers) are
-// only present while the AP is running, mirroring iwd's optional properties.
+// Started is the only always-present property. Scanning belongs with the rest of
+// the optionals (Name/Frequency/ciphers): all of them appear only while the AP is
+// running, mirroring iwd. A stopped AP therefore reports Started and nothing else.
 func (d *Device) buildAccessPointPropertyMap() map[string]dbus.Variant {
 	d.apMu.Lock()
 	defer d.apMu.Unlock()
@@ -94,10 +95,9 @@ func (d *Device) buildAccessPointPropertyMap() map[string]dbus.Variant {
 		"Started": dbus.MakeVariant(d.APStarted),
 	}
 	if d.APStarted {
-		// Like real iwd, the optional properties appear only while the AP is
-		// running. Scanning is included here even though iwd's docs call it
-		// mandatory: in practice a stopped AP reports only Started, so the client
-		// must tolerate an absent Scanning (collapsing it to false).
+		// Scanning is listed here, with the optionals, even though iwd's docs call it
+		// mandatory: on hardware a stopped AP reports only Started, so the client must
+		// tolerate an absent Scanning (collapsing it to false).
 		props["Scanning"] = dbus.MakeVariant(d.APScanning)
 		props["Name"] = dbus.MakeVariant(d.APName)
 		props["Frequency"] = dbus.MakeVariant(d.APFrequency)
@@ -189,13 +189,19 @@ func (d *Device) apStop() *dbus.Error {
 }
 
 // apScan models the async AP scan: flip Scanning true, then false after
-// scanDuration, emitting on each transition. A scan already in progress is
-// rejected with InProgress (iwd's dbus_error_busy name).
+// scanDuration, emitting on each transition. A scan on a stopped AP is rejected
+// with NotAvailable ("Operation not available", confirmed on hardware) — an AP
+// that is not running has no radio configured to survey with. A scan already in
+// progress is rejected with InProgress (iwd's dbus_error_busy name).
 func (d *Device) apScan() *dbus.Error {
 	if !d.HasAccessPoint {
 		return dbus.MakeFailedError(fmt.Errorf("device has no access point interface"))
 	}
 	d.apMu.Lock()
+	if !d.APStarted {
+		d.apMu.Unlock()
+		return dbus.NewError(iwdbus.IwdErrorNotAvailable, []interface{}{"Operation not available"})
+	}
 	if d.APScanning {
 		d.apMu.Unlock()
 		return dbus.NewError(iwdbus.IwdErrorInProgress, []interface{}{"scan already in progress"})
@@ -215,6 +221,11 @@ func (d *Device) apScan() *dbus.Error {
 }
 
 // apOrderedNetworks returns the seeded AP scan result as aa{sv}.
+//
+// Unlike Scan, this is deliberately not gated on Started: iwd's behavior when
+// reading scan results from a stopped AP has not been confirmed on hardware, and
+// the mock does not guess. If it turns out iwd rejects it (likely NotAvailable,
+// as Scan does), gate it here and add the matching integration test.
 func (d *Device) apOrderedNetworks() ([]map[string]dbus.Variant, *dbus.Error) {
 	if !d.HasAccessPoint {
 		return nil, dbus.MakeFailedError(fmt.Errorf("device has no access point interface"))

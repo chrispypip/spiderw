@@ -191,6 +191,105 @@ func TestAccessPointMock_ScanLiveTransition(t *testing.T) {
 	requireFired(t, scanningFalse, "expected Scanning false")
 }
 
+// TestAccessPointMock_StartedLiveTransition drives Stop then Start and observes
+// the Started property transition true->false->true over live PropertiesChanged
+// signals, exercising SubscribeStartedChanged against a real bus.
+func TestAccessPointMock_StartedLiveTransition(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	ap, err := client.AccessPoint(ctx, apDevicePath)
+	require.NoError(t, err)
+
+	startedFalse := make(chan struct{}, 1)
+	startedTrue := make(chan struct{}, 1)
+	unsub, err := ap.SubscribeStartedChanged(ctx, func(started bool) {
+		target := startedFalse
+		if started {
+			target = startedTrue
+		}
+		select {
+		case target <- struct{}{}:
+		default:
+		}
+	})
+	require.NoError(t, err)
+	defer func() { _ = unsub.Unsubscribe() }()
+
+	require.NoError(t, ap.Stop(ctx))
+	requireFired(t, startedFalse, "expected Started false after Stop")
+
+	require.NoError(t, ap.Start(ctx, "FreshAP", "s3cretpass"))
+	requireFired(t, startedTrue, "expected Started true after Start")
+}
+
+// TestAccessPointMock_StopInvalidatesOptionals verifies the raw property-change
+// event a Stop produces: Started flips to false in Changed, and the properties
+// iwd drops when the AP goes down (Scanning and the hosted-network fields) are
+// reported in Invalidated so a subscriber knows to re-read them as absent.
+func TestAccessPointMock_StopInvalidatesOptionals(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	ap, err := client.AccessPoint(ctx, apDevicePath)
+	require.NoError(t, err)
+
+	events := make(chan spiderw.AccessPointPropertiesChanged, 4)
+	unsub, err := ap.SubscribePropertiesChanged(ctx, func(ev spiderw.AccessPointPropertiesChanged) {
+		select {
+		case events <- ev:
+		default:
+		}
+	})
+	require.NoError(t, err)
+	defer func() { _ = unsub.Unsubscribe() }()
+
+	require.NoError(t, ap.Stop(ctx))
+
+	var stopEvent spiderw.AccessPointPropertiesChanged
+	require.Eventually(t, func() bool {
+		select {
+		case ev := <-events:
+			if started, ok := ev.Changed["Started"]; ok && started == false {
+				stopEvent = ev
+				return true
+			}
+		default:
+		}
+		return false
+	}, signalTimeout, pollInterval, "expected a Started=false property-change event")
+
+	require.Equal(t, false, stopEvent.Changed["Started"])
+	require.ElementsMatch(t,
+		[]string{"Scanning", "Name", "Frequency", "PairwiseCiphers", "GroupCipher"},
+		stopEvent.Invalidated,
+		"a stopped AP must invalidate the properties iwd stops exposing")
+}
+
+// TestAccessPointMock_ScanWhenStopped is the guard for iwd's real behavior: an AP
+// that is not running has no radio configured to survey with, so Scan is rejected
+// with NotAvailable ("Operation not available", confirmed on hardware) rather
+// than silently succeeding.
+func TestAccessPointMock_ScanWhenStopped(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	ap, err := client.AccessPoint(ctx, apDevicePath)
+	require.NoError(t, err)
+	require.NoError(t, ap.Stop(ctx))
+
+	err = ap.Scan(ctx)
+	require.Error(t, err)
+	require.ErrorIs(t, err, spiderw.ErrNotAvailable)
+
+	// The CLI surfaces it rather than hanging in wait mode.
+	out, runErr := runSpider(t, "access-point", "wlan1", "scan")
+	require.Error(t, runErr, out)
+}
+
 // TestAccessPointMock_OrderedNetworks reads the seeded AP scan result end to end,
 // confirming the aa{sv} reply parses into resolved SSIDs, dBm signals, and types.
 // The final entry has an unclassifiable security, exercising the tolerant path
