@@ -197,7 +197,7 @@ func (n *Network) Get(iface, p string) (dbus.Variant, *dbus.Error) {
 	props := n.buildPropertyMap()
 	v, ok := props[p]
 	if !ok {
-		// An absent optional property is reported the way iwd words it — the
+		// An absent optional property is reported the way iwd words it - the
 		// client's "is this just absent?" matcher keys off this text, and a
 		// different wording turns a tolerated absence into a hard error.
 		return dbus.Variant{}, dbus.MakeFailedError(fmt.Errorf("getting property value failed"))

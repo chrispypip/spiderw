@@ -13,7 +13,7 @@ import (
 // TestWiring_Resolver pins how a Wiring selects its friendly-reference resolver.
 // The conn-backed resolver's Resolve (which dials the connection) is exercised by
 // the integration suite; here we lock the nil-safety and override wiring that
-// keeps fake-backed tests from touching a placeholder connection -- the exact
+// keeps fake-backed tests from touching a placeholder connection - the exact
 // contract that, when missing, panicked the race suite.
 func TestWiring_Resolver(t *testing.T) {
 	t.Parallel()

@@ -31,7 +31,7 @@ type accessPointRaw interface {
 
 // AccessPointProperties holds the normalized access-point properties. Only
 // Started is always present; the remaining fields are optional and left at their
-// zero value (nil, or false for Scanning) when iwd omits them — which it does
+// zero value (nil, or false for Scanning) when iwd omits them - which it does
 // while the AP is not running.
 type AccessPointProperties struct {
 	Started         bool

@@ -86,7 +86,7 @@ func (a *AccessPoint) Path() string {
 }
 
 // Name returns the underlying device's name (e.g. "wlan1"). This is the device
-// identity, not the hosted network's SSID — see SSID.
+// identity, not the hosted network's SSID - see SSID.
 func (a *AccessPoint) Name() string {
 	if a == nil {
 		return ""

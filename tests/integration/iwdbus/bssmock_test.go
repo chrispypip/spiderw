@@ -126,7 +126,7 @@ func TestBSSMock_AllBasicServiceSets_Empty(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// CLI (`spiderw bss …`) against the mock
+// CLI (`spiderw bss ...`) against the mock
 // -----------------------------------------------------------------------------
 
 func findBSSStatusEntry(t *testing.T, list []map[string]any, path string) map[string]any {
@@ -163,7 +163,7 @@ func TestBSSMock_StatusJSON(t *testing.T) {
 
 // TestBSSMock_CLI_SingleAddress drives the single-BSS lookup path end-to-end
 // (`spiderw bss <ref> address`), which resolves a ref and constructs one handle
-// via Client.BasicServiceSet — the realClient shim not exercised by the
+// via Client.BasicServiceSet - the realClient shim not exercised by the
 // enumeration-based `bss status` smoke.
 func TestBSSMock_CLI_SingleAddress(t *testing.T) {
 	iwdmock.StartMockNormal(t)

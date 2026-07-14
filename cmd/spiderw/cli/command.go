@@ -22,7 +22,7 @@ type Command struct {
 
 	// SubUsage maps a subcommand word to its own usage line. When --help is given
 	// and the final argument names one of these, that line is printed instead of
-	// the whole command's help — so `station <ref> monitor --help` answers "what can
+	// the whole command's help - so `station <ref> monitor --help` answers "what can
 	// I monitor?" rather than dumping every station command.
 	SubUsage map[string]string
 
@@ -90,7 +90,7 @@ func (c *Command) Run(app *App, args []string) error {
 		return fmt.Errorf("unknown subcommand for %s: %s", c.Name, rest[0])
 	}
 
-	// Leaf node: if global help was requested, show usage for this leaf — or, when
+	// Leaf node: if global help was requested, show usage for this leaf - or, when
 	// the args name a subcommand with its own usage, just that.
 	if app.Help {
 		if len(rest) > 0 {

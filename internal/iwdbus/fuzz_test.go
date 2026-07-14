@@ -149,7 +149,7 @@ func Fuzz_Iwdbus_ParseMode(f *testing.F) {
 	})
 }
 
-// Fuzz_Iwdbus_EnumParsers exercises the string→enum decoders of externally
+// Fuzz_Iwdbus_EnumParsers exercises the string->enum decoders of externally
 // supplied iwd property values. They must never panic on arbitrary input.
 func Fuzz_Iwdbus_EnumParsers(f *testing.F) {
 	f.Add("station")
@@ -325,7 +325,7 @@ func Fuzz_Iwdbus_AccessPointOptionalParsers(f *testing.F) {
 
 // Fuzz_Iwdbus_ParseAccessPointOrderedNetwork exercises the neighbor-dict decoder
 // for AccessPoint.GetOrderedNetworks. Every key is daemon-supplied and each may
-// be absent or of any D-Bus type, so the parser must never panic — it may only
+// be absent or of any D-Bus type, so the parser must never panic - it may only
 // return an error. The Type key (which carries the security) is the interesting
 // one: an unrecognized string is tolerated as unknown, while a non-string is an
 // error, and neither may crash.

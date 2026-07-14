@@ -61,7 +61,7 @@ func splitSignalName(name string) (string, string) {
 // property no longer has a value.
 //
 // iwd does not report "no longer connected" by sending the null path "/" in
-// Changed — it lists the property in Invalidated and sends nothing else. This was
+// Changed - it lists the property in Invalidated and sends nothing else. This was
 // confirmed on hardware: disconnecting a station produced no ConnectedNetwork or
 // ConnectedAccessPoint value at all, and forgetting a network produced no
 // KnownNetwork value. Any subscription over an optional property must therefore

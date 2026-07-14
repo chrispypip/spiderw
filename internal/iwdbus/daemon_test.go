@@ -621,7 +621,7 @@ func TestObjectNameFromManagedObject(t *testing.T) {
 }
 
 // TestDaemon_GetRefs covers the enumeration primitive shared by all seven Get*
-// enumerators. It needs a live *dbus.Conn, so the ObjectManager call is stubbed —
+// enumerators. It needs a live *dbus.Conn, so the ObjectManager call is stubbed -
 // otherwise only the nil-conn guard is reachable and the parts that decide what
 // `list` actually prints go untested.
 func TestDaemon_GetRefs(t *testing.T) {

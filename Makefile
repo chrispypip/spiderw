@@ -8,7 +8,7 @@
 #    make help      # Print out help info
 #    make <target>  # Run specified target
 #
-# This script is editor-agnostic--it does NOT mount any editor config.
+# This script is editor-agnostic - it does NOT mount any editor config.
 # The container runs using the project's Dockerfile.dev and docker-compose.yml.
 #
 #-------------------------------------------------------------------------------
@@ -163,6 +163,10 @@ lint: ## Run Go linting (golangci-lint) inside container
 	@$(RUN) bash -lc "golangci-lint run ./..."
 
 lint-check: lint
+
+ascii-check: ## Fail if any tracked file contains a non-ASCII character
+	@echo -e "$(BLUE)[ ascii ]$(RESET) Checking for non-ASCII characters..."
+	@$(RUN) ./scripts/ascii-check.sh
 
 codespell: ## Run codespell spell-check inside container
 	@echo -e "$(BLUE)[ codespell ]$(RESET) Running codespell..."

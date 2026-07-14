@@ -481,8 +481,8 @@ func testAccessPoint_GetOrderedNetworks(t *testing.T) {
 
 func testAccessPoint_GetOrderedNetworks_UnclassifiedType(t *testing.T) {
 	t.Parallel()
-	// A neighbor whose security iwd cannot classify — an empty or unrecognized
-	// string in the "Type" key — must parse to NetworkTypeUnknown, not fail the
+	// A neighbor whose security iwd cannot classify - an empty or unrecognized
+	// string in the "Type" key - must parse to NetworkTypeUnknown, not fail the
 	// whole reply. This is the hardware bug where one unclassifiable neighbor broke
 	// `access-point networks`. Note the deliberate asymmetry with
 	// MalformedEntries below: an unrecognized Type *string* is tolerated, while a

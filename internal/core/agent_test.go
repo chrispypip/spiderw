@@ -175,7 +175,7 @@ func testAgentCore_Unregister(t *testing.T) {
 func testAgentCore_UnregisterErrors(t *testing.T) {
 	t.Parallel()
 	// Unregister cancels any in-flight request, then joins the unregister and
-	// unexport failures — both wrapped as matchable core Errors.
+	// unexport failures - both wrapped as matchable core Errors.
 	mgr := &fakeAgentManager{unregisterErr: errors.New("unreg boom")}
 	a, _ := NewAgent(CredentialCallbacks{Passphrase: func(ctx context.Context, networkPath string) (string, error) { return "", nil }})
 	a.Bind(mgr, "/spiderw/agent", func() error { return errors.New("unexport boom") })

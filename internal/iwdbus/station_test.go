@@ -1153,7 +1153,7 @@ func testStation_SubscribeNewSubscribers_NilCallback(t *testing.T) {
 
 // testStation_SubscribeInvalidatedProperties is the regression guard for the
 // hardware bug: iwd does not report "no longer connected" by sending the null path
-// "/" in Changed — it lists the property in Invalidated and sends no value. A
+// "/" in Changed - it lists the property in Invalidated and sends no value. A
 // subscription that reads only Changed silently never fires on a disconnect, which
 // is exactly what happened on real hardware while the mock (which sent "/") looked
 // fine.

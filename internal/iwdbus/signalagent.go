@@ -8,7 +8,7 @@ import (
 
 // IwdSignalLevelAgentIface is the fully qualified D-Bus interface name for an
 // iwd signal-level agent. Like the credentials Agent, this is an object that
-// *we* export and iwd calls into — here to report when the connected network's
+// *we* export and iwd calls into - here to report when the connected network's
 // signal strength crosses a threshold. Unlike the credentials Agent it is
 // registered per-station (Station.RegisterSignalLevelAgent), not through the
 // AgentManager.
@@ -21,7 +21,7 @@ type SignalLevelAgentHandler struct {
 	// Changed is called when the connected network's signal strength crosses one
 	// of the thresholds the agent was registered with. device is the iwd device
 	// object path the report concerns; level is the index into that threshold
-	// list — 0 is the strongest band (stronger than the first threshold) and
+	// list - 0 is the strongest band (stronger than the first threshold) and
 	// higher values are progressively weaker.
 	Changed func(device dbus.ObjectPath, level uint8)
 

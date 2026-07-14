@@ -1,6 +1,6 @@
 // Command scan-and-connect runs the full "join a network" flow against the
 // first station: trigger a scan, wait for it to finish, list the visible
-// networks by signal strength, and — if -ssid is given — connect to one,
+// networks by signal strength, and - if -ssid is given - connect to one,
 // supplying a passphrase through a credentials agent when needed.
 //
 // With no -ssid it only scans and lists (read-only). Passing -ssid is the

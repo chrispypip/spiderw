@@ -320,7 +320,7 @@ func TestPrintDeviceLines(t *testing.T) {
 }
 
 // TestDeviceCmd_Monitor_BadArgs covers `device <ref> monitor`'s argument guard. The
-// monitor command itself blocks on an OS signal, but validation runs first — the
+// monitor command itself blocks on an OS signal, but validation runs first - the
 // station/access-point/network monitors have this test and device did not.
 func TestDeviceCmd_Monitor_BadArgs(t *testing.T) {
 	t.Parallel()

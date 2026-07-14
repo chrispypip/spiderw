@@ -65,6 +65,19 @@ jobs:
       - uses: codespell-project/actions-codespell@v2
 
   # ---------------------------------------------------------------------------
+  # This project writes plain ASCII: no em dashes, ellipses, arrows, or other
+  # typographic punctuation, in code, comments, docs, or printed strings. They
+  # are easy to introduce by copy-paste and awkward to grep for, so keep them out.
+  # ---------------------------------------------------------------------------
+  ascii:
+    name: ascii
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: ascii-check
+        run: ./scripts/ascii-check.sh
+
+  # ---------------------------------------------------------------------------
   # Native test suites that do NOT require D-Bus. One matrix leg per build tag
   # so each suite reports independently. (The `race` tag is intentionally not
   # here: internal/connect/race_test.go drives the iwd mock over a session bus,
@@ -138,7 +151,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Cross-compile check. Proves the CLI builds for every target platform
-  # without producing an artifact -- releasing the binary is a later step,
+  # without producing an artifact - releasing the binary is a later step,
   # gated on hardware testing that doesn't exist yet. This is pure build
   # confidence, so it runs on PRs too and feeds the gate below.
   # ---------------------------------------------------------------------------
@@ -167,7 +180,7 @@ jobs:
   # host/mock gate above passed. This is the anchor for branch protection and,
   # later, for the "release is ready" notification (a workflow_run keyed off
   # this job, once the hardware gate lands after Station). It deliberately does
-  # NOT cover real-iwd hardware testing -- that is a separate, later gate.
+  # NOT cover real-iwd hardware testing - that is a separate, later gate.
   # ---------------------------------------------------------------------------
   mock-gates:
     name: mock gates green

@@ -3,13 +3,13 @@
 // For an access point whose SSID, security mode, and credentials come from a
 // stored iwd provisioning profile, see the access-point-start-profile example.
 //
-// Note: on some FullMAC drivers — notably the Raspberry Pi's built-in brcmfmac
-// chip — the kernel rejects the inline Start with a generic "failed starting"
+// Note: on some FullMAC drivers - notably the Raspberry Pi's built-in brcmfmac
+// chip - the kernel rejects the inline Start with a generic "failed starting"
 // error even on an idle radio; access-point-start-profile is the reliable path
 // there. See examples/README.md for details.
 //
 // By default it only PRINTS the current access-point status and changes nothing.
-// Pass -ssid (with -passphrase) to start the AP, or -stop to tear it down — those
+// Pass -ssid (with -passphrase) to start the AP, or -stop to tear it down - those
 // CHANGE state, so they act only when named explicitly.
 //
 // The device must already be in AP mode (Device.SetMode "ap"); see the bring-up

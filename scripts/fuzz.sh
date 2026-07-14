@@ -3,7 +3,7 @@
 #
 # `go test -fuzz` accepts only one target per invocation, so enumerate them. The
 # fuzz tier is build-tagged, which means no other suite (or `go build`/`go vet`)
-# ever compiles it — running it here is what keeps it from rotting.
+# ever compiles it - running it here is what keeps it from rotting.
 set -euo pipefail
 
 fuzztime="${1:-20s}"

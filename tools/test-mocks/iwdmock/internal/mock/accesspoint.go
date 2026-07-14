@@ -42,7 +42,7 @@ var accessPointOrderedNetworks = []map[string]dbus.Variant{
 	},
 	{
 		// A neighbor whose security iwd could not classify: an empty Type field.
-		// Defensive — real iwd classifies scanned networks into a known type, but
+		// Defensive - real iwd classifies scanned networks into a known type, but
 		// the client must surface an unclassifiable one as unknown rather than
 		// failing the whole list.
 		"Name":           dbus.MakeVariant("MysteryNet"),
@@ -190,7 +190,7 @@ func (d *Device) apStop() *dbus.Error {
 
 // apScan models the async AP scan: flip Scanning true, then false after
 // scanDuration, emitting on each transition. A scan on a stopped AP is rejected
-// with NotAvailable ("Operation not available", confirmed on hardware) — an AP
+// with NotAvailable ("Operation not available", confirmed on hardware) - an AP
 // that is not running has no radio configured to survey with. A scan already in
 // progress is rejected with InProgress (iwd's dbus_error_busy name).
 func (d *Device) apScan() *dbus.Error {

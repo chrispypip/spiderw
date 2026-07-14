@@ -163,7 +163,7 @@ func TestStationMock_CLI_List(t *testing.T) {
 
 // TestStationMock_ScanLiveTransition is the headline S2 test: it drives a real
 // scan and observes the Scanning property transition true->false over live
-// PropertiesChanged signals -- the first end-to-end exercise of a subscription.
+// PropertiesChanged signals - the first end-to-end exercise of a subscription.
 func TestStationMock_ScanLiveTransition(t *testing.T) {
 	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
@@ -424,7 +424,7 @@ func TestStationMock_CLI_DisconnectHiddenAPs(t *testing.T) {
 // TestStationMock_SubscribeConnectedNetworkChanged drives a disconnect and
 // observes ConnectedNetwork over live signals. iwd reports "not connected" as the
 // null object path "/", so the value must reach the caller as nil rather than as
-// the literal path — the distinction a consumer branches on.
+// the literal path - the distinction a consumer branches on.
 func TestStationMock_SubscribeConnectedNetworkChanged(t *testing.T) {
 	iwdmock.StartMockNormal(t)
 	ctx := context.Background()

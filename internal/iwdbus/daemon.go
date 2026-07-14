@@ -264,7 +264,7 @@ func getRefs[T any](
 			continue
 		}
 		// makeRef receives every interface on the object (not just iface) so a
-		// ref can be enriched from a co-located interface -- e.g. a station reads
+		// ref can be enriched from a co-located interface - e.g. a station reads
 		// its Name from the Device interface it shares an object with.
 		ref, err := makeRef(path, ifaces)
 		if err != nil {

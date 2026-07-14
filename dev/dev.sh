@@ -9,7 +9,7 @@
 #   ./dev.sh nvim            # Run nvim inside the container
 #   ./dev.sh go test ./...   # Run Go tests inside the container
 #
-# This script is editor-agnostic--it does NOT mount any editor config.
+# This script is editor-agnostic - it does NOT mount any editor config.
 # The container runs using the project's Dockerfile.dev and docker-compose.yml.
 #
 #-------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ if [ $# -eq 0 ]; then
     set -- bash
 fi
 
-echo "[dev.sh] Entering development container…"
+echo "[dev.sh] Entering development container..."
 echo "[dev.sh] Running command inside container:"
 echo "         $*"
 echo

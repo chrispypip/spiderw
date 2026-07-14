@@ -12,7 +12,7 @@ import (
 // object; connecting to a secured network provisions one; switching a device
 // between station and AP mode swaps which of those interfaces the device object
 // carries. The mock used to export everything once at startup and never move it
-// again, so none of that was reachable — the mode switch in particular was faked
+// again, so none of that was reachable - the mode switch in particular was faked
 // by shipping two fixed devices, one station and one AP, which is not a shape a
 // real host ever has.
 //
@@ -166,7 +166,7 @@ func hexSSID(ssid string) string {
 // This is the transition a user actually makes (`device wlan0 mode ap`), and the
 // mock could not model it: it shipped two fixed devices, one station-only and one
 // AP-only, so the interfaces never moved. That also meant a Station handle held
-// across a mode switch — which must start failing, because the interface is gone —
+// across a mode switch - which must start failing, because the interface is gone -
 // was never exercised.
 func switchDeviceMode(d *Device, mode string) {
 	registryMu.Lock()

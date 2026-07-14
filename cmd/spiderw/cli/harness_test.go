@@ -944,9 +944,9 @@ func (f *fakeKnownNetwork) SubscribeLastConnectedTimeChanged(ctx context.Context
 
 // TestClientLookupFailure covers the path every `<resource> <ref> <cmd>` takes: the
 // ref resolves against the daemon's enumeration, and then the client is asked for a
-// live handle. That second call can fail on a real daemon — the object may be gone
+// live handle. That second call can fail on a real daemon - the object may be gone
 // between the enumeration and the lookup, which happens routinely right after a
-// scan — and every resource had the branch untested.
+// scan - and every resource had the branch untested.
 func TestClientLookupFailure(t *testing.T) {
 	t.Parallel()
 

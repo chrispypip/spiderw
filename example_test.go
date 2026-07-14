@@ -265,7 +265,7 @@ func ExampleClient_BasicServiceSet() {
 
 // ExampleClient_AllBasicServiceSets constructs a handle for every basic service
 // set iwd exposes and prints each one's address. A device typically sees many
-// BSSes — one per access point/radio heard during a scan.
+// BSSes - one per access point/radio heard during a scan.
 func ExampleClient_AllBasicServiceSets() {
 	ctx := context.Background()
 

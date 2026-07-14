@@ -348,7 +348,7 @@ func TestStreamNetworkProperty(t *testing.T) {
 	bssPath := "/net/connman/iwd/phy0/wlan0/ffeeddccbbaa"
 
 	// The open network has no KnownNetwork, so "known-network" seeds as "not saved"
-	// and then streams the saved path — the save transition, end to end.
+	// and then streams the saved path - the save transition, end to end.
 	newFake := func() *fakeNetwork {
 		n := fakeWithNetwork().networks["/net/connman/iwd/phy0/wlan0/open"].(*fakeNetwork)
 		n.knownNetEvent = &cliOptStringEvent{v: &knPath}
@@ -422,7 +422,7 @@ func TestParseNetworkMonitorTarget(t *testing.T) {
 	}
 }
 
-// TestNetworkCmd_Connect_ConnectFails covers iwd rejecting the connection itself —
+// TestNetworkCmd_Connect_ConnectFails covers iwd rejecting the connection itself -
 // a wrong passphrase, a timeout, an AP that refuses. The existing tests only cover
 // the agent *registration* failing, which is a different branch: there, Connect is
 // never reached.
@@ -441,7 +441,7 @@ func TestNetworkCmd_Connect_ConnectFails(t *testing.T) {
 
 // TestNetworkCmd_Connect_AgentUnregisterFails covers the teardown failing after a
 // successful connect. The connect still succeeded, so the command must not report
-// failure — but the unregister error must not be silently swallowed either.
+// failure - but the unregister error must not be silently swallowed either.
 func TestNetworkCmd_Connect_AgentUnregisterFails(t *testing.T) {
 	t.Parallel()
 

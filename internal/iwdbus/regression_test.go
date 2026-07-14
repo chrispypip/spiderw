@@ -119,7 +119,7 @@ func itoa(i int) string {
 // The tests below guard bugs found on real hardware (a Raspberry Pi running iwd
 // 3.12) that every mock-backed test missed. Each one shipped green because the mock
 // was more forgiving than the daemon; each is recorded here so the specific wire
-// behavior can never silently regress. They intentionally duplicate unit coverage —
+// behavior can never silently regress. They intentionally duplicate unit coverage -
 // the point is provenance, not novelty.
 
 // TestRegression_Iwdbus_StoppedAccessPointOmitsOptionalProperties: iwd documents
@@ -143,7 +143,7 @@ func TestRegression_Iwdbus_StoppedAccessPointOmitsOptionalProperties(t *testing.
 }
 
 // TestRegression_Iwdbus_OrderedNetworksSecurityKeyIsType: iwd's documentation calls
-// the security key in GetOrderedNetworks "Security". On the wire it is "Type" —
+// the security key in GetOrderedNetworks "Security". On the wire it is "Type" -
 // confirmed by calling the method with gdbus. Reading "Security" yielded an unknown
 // security for every neighbor.
 func TestRegression_Iwdbus_OrderedNetworksSecurityKeyIsType(t *testing.T) {
@@ -169,7 +169,7 @@ func TestRegression_Iwdbus_OrderedNetworksSecurityKeyIsType(t *testing.T) {
 // TestRegression_Iwdbus_OrderedNetworksToleratesUnclassifiedNeighbor: one neighbor
 // whose security iwd could not classify failed the entire `access-point networks`
 // listing on hardware. An unrecognized Type string must degrade to unknown, not
-// abort the reply — while a Type of the wrong D-Bus type is still an error.
+// abort the reply - while a Type of the wrong D-Bus type is still an error.
 func TestRegression_Iwdbus_OrderedNetworksToleratesUnclassifiedNeighbor(t *testing.T) {
 	a := &AccessPoint{call: &fakeCaller{
 		callFn: func(ctx context.Context, iface, method string, args ...interface{}) ([]interface{}, error) {
@@ -190,7 +190,7 @@ func TestRegression_Iwdbus_OrderedNetworksToleratesUnclassifiedNeighbor(t *testi
 }
 
 // TestRegression_Iwdbus_DisconnectInvalidatesRatherThanSendingNullPath: iwd does not
-// report "no longer connected" by sending the null path "/" in Changed — it lists
+// report "no longer connected" by sending the null path "/" in Changed - it lists
 // the property in Invalidated and sends no value. Subscriptions that read only
 // Changed were silent on every disconnect on hardware, while the mock (which sent
 // "/") looked correct.
@@ -261,8 +261,8 @@ func TestRegression_Iwdbus_ForgetInvalidatesKnownNetwork(t *testing.T) {
 // This is load-bearing and invisible: every optional property (Adapter Model/Vendor,
 // Network KnownNetwork, KnownNetwork LastConnectedTime, the AccessPoint fields on a
 // stopped AP, the Station fields when disconnected) reads through it. The mock got
-// this wrong for Network, KnownNetwork and BSS — it said `unknown property "X"`,
-// which the matcher does not recognize — so reading an unprovisioned network's
+// this wrong for Network, KnownNetwork and BSS - it said `unknown property "X"`,
+// which the matcher does not recognize - so reading an unprovisioned network's
 // KnownNetwork failed against the mock while it would have succeeded against iwd.
 // Nobody had read those properties in the absent case, so it sat there.
 //

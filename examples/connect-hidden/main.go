@@ -1,4 +1,4 @@
-// Command connect-hidden joins a hidden network — one that does not broadcast
+// Command connect-hidden joins a hidden network - one that does not broadcast
 // its SSID and so never appears in scan results. You name it explicitly and iwd
 // probes for it. A credentials agent supplies the passphrase.
 //

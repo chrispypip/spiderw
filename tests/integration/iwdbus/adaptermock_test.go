@@ -302,7 +302,7 @@ func TestAdapterMock_SecondAdapter(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// CLI (`spiderw adapter …`) against the mock — thin, CLI-specific coverage only
+// CLI (`spiderw adapter ...`) against the mock - thin, CLI-specific coverage only
 // -----------------------------------------------------------------------------
 
 // TestAdapterMock_Status exercises `adapter status`, which drives

@@ -7,7 +7,7 @@
 // error matching spiderw.ErrNotFound when no such profile exists.
 //
 // By default it only PRINTS the current access-point status and changes nothing.
-// Pass -profile to start from that profile, or -stop to tear it down — those
+// Pass -profile to start from that profile, or -stop to tear it down - those
 // CHANGE state, so they act only when named explicitly.
 //
 // The device must already be in AP mode (Device.SetMode "ap"); see the bring-up

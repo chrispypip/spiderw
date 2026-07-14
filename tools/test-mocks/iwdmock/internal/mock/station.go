@@ -63,7 +63,7 @@ func (d *Device) buildStationPropertyMap() map[string]dbus.Variant {
 
 // Scan implements net.connman.iwd.Station.Scan. It models the async scan: set
 // Scanning true and emit, then after scanDuration flip it back to false and emit
-// again -- so subscribers observe the transition. A scan already in progress is
+// again - so subscribers observe the transition. A scan already in progress is
 // rejected with Busy.
 func (d *Device) Scan() *dbus.Error {
 	if !d.HasStation {
@@ -161,7 +161,7 @@ func (d *Device) Disconnect() *dbus.Error {
 	d.StationConnectedNetwork = "/"
 	d.StationConnectedAccessPoint = "/"
 	d.stationMu.Unlock()
-	// iwd does not send the null path "/" for these on disconnect — it invalidates
+	// iwd does not send the null path "/" for these on disconnect - it invalidates
 	// them and sends no value at all (confirmed on hardware). The mock previously
 	// sent "/", which made every optional-path subscription look like it worked
 	// while it silently never fired on the real daemon.

@@ -135,7 +135,7 @@ func (s *Station) Path() string {
 	return s.path
 }
 
-// Name returns the station's human-friendly name — the Name of the device it
+// Name returns the station's human-friendly name - the Name of the device it
 // shares an object with (e.g. "wlan0"). A station has no Name property of its
 // own, so this is resolved when the station is constructed (best-effort) and may
 // be "" if it could not be resolved or for a nil receiver. Like Path, it is

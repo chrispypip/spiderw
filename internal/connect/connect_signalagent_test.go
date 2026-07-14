@@ -120,7 +120,7 @@ func TestWiring_NewSignalLevelAgent_FailurePaths(t *testing.T) {
 
 	t.Run("register_error_unexports", func(t *testing.T) {
 		// A zero *iwdbus.Station is uninitialized, so RegisterSignalLevelAgent
-		// fails — exercising the post-export cleanup path.
+		// fails - exercising the post-export cleanup path.
 		newIwdStationFn = func(ctx context.Context, conn *dbus.Conn, path dbus.ObjectPath) (*iwdbus.Station, error) {
 			return &iwdbus.Station{}, nil
 		}

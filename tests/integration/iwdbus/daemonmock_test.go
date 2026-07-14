@@ -120,7 +120,7 @@ func TestDaemonMock_ConcurrentInfo(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// CLI (`spiderw daemon …`) against the mock — thin, CLI-specific coverage only
+// CLI (`spiderw daemon ...`) against the mock - thin, CLI-specific coverage only
 // -----------------------------------------------------------------------------
 
 func TestDaemonMock_CLI_Info(t *testing.T) {
