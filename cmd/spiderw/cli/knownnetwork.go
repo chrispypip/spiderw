@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -375,9 +376,111 @@ func printKnownNetworkAutoConnectLine(app *App, ref string, auto bool, mu *sync.
 	return err
 }
 
+// knownNetworkHiddenResult reports the known network's Hidden property.
+type knownNetworkHiddenResult struct {
+	KnownNetwork string `json:"KnownNetwork"`
+	Hidden       bool   `json:"Hidden"`
+}
+
+func printKnownNetworkHiddenLine(app *App, ref string, hidden bool, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	out := knownNetworkHiddenResult{KnownNetwork: ref, Hidden: hidden}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	_, err := fmt.Fprintf(app.stdout(), "hidden=%t\n", hidden)
+	return err
+}
+
+// knownNetworkLastConnectedResult reports the known network's LastConnectedTime. A
+// nil value means the network has never been connected to.
+type knownNetworkLastConnectedResult struct {
+	KnownNetwork      string  `json:"KnownNetwork"`
+	LastConnectedTime *string `json:"LastConnectedTime"`
+}
+
+func printKnownNetworkLastConnectedLine(app *App, ref string, ts *string, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	out := knownNetworkLastConnectedResult{KnownNetwork: ref, LastConnectedTime: ts}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	_, err := fmt.Fprintf(app.stdout(), "last-connected=%s\n", optionalPathText(ts, "never"))
+	return err
+}
+
+const knownNetworkMonitorUsage = "usage: spiderw known-network <known-network> monitor <autoconnect|hidden|last-connected>"
+
+// knownNetworkMonitorTargets are the properties the monitor subcommand streams.
+var knownNetworkMonitorTargets = []string{"autoconnect", "hidden", "last-connected"}
+
+// parseKnownNetworkMonitorTarget validates the target before any iwd call.
+func parseKnownNetworkMonitorTarget(args []string) (string, error) {
+	// `monitor --help` should list what can be monitored, same as an invalid
+	// target does, rather than falling through to a generic error.
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help") {
+		return "", fmt.Errorf("%s", knownNetworkMonitorUsage)
+	}
+	if len(args) != 1 || !slices.Contains(knownNetworkMonitorTargets, args[0]) {
+		return "", fmt.Errorf("%s", knownNetworkMonitorUsage)
+	}
+	return args[0], nil
+}
+
+// streamKnownNetworkProperty prints the current value, then subscribes. It does
+// not block; monitorKnownNetwork owns the wait for Ctrl-C.
+func streamKnownNetworkProperty(ctx context.Context, app *App, ref, what string, k knownNetworkAPI, mu *sync.Mutex) (spiderw.UnsubscribeFunc, error) {
+	switch what {
+	case "autoconnect":
+		auto, err := k.AutoConnect(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := printKnownNetworkAutoConnectLine(app, ref, auto, mu); err != nil {
+			return nil, err
+		}
+		return k.SubscribeAutoConnectChanged(ctx, func(auto bool) {
+			_ = printKnownNetworkAutoConnectLine(app, ref, auto, mu)
+		})
+
+	case "hidden":
+		hidden, err := k.Hidden(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := printKnownNetworkHiddenLine(app, ref, hidden, mu); err != nil {
+			return nil, err
+		}
+		return k.SubscribeHiddenChanged(ctx, func(hidden bool) {
+			_ = printKnownNetworkHiddenLine(app, ref, hidden, mu)
+		})
+
+	case "last-connected":
+		ts, err := k.LastConnectedTime(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := printKnownNetworkLastConnectedLine(app, ref, ts, mu); err != nil {
+			return nil, err
+		}
+		// iwd rewrites the timestamp on each successful connection, so this line
+		// reprints once per connect to this network.
+		return k.SubscribeLastConnectedTimeChanged(ctx, func(ts *string) {
+			_ = printKnownNetworkLastConnectedLine(app, ref, ts, mu)
+		})
+	}
+
+	return nil, fmt.Errorf("%s", knownNetworkMonitorUsage)
+}
+
 func monitorKnownNetwork(app *App, ref string, args []string) error {
-	if len(args) != 1 || args[0] != "autoconnect" {
-		return fmt.Errorf("usage: spiderw known-network <known-network> monitor autoconnect")
+	what, err := parseKnownNetworkMonitorTarget(args)
+	if err != nil {
+		return err
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -397,18 +500,7 @@ func monitorKnownNetwork(app *App, ref string, args []string) error {
 	}
 
 	var printMu sync.Mutex
-
-	auto, err := k.AutoConnect(ctx)
-	if err != nil {
-		return err
-	}
-	if err := printKnownNetworkAutoConnectLine(app, ref, auto, &printMu); err != nil {
-		return err
-	}
-
-	unsubscribe, err := k.SubscribeAutoConnectChanged(ctx, func(auto bool) {
-		_ = printKnownNetworkAutoConnectLine(app, ref, auto, &printMu)
-	})
+	unsubscribe, err := streamKnownNetworkProperty(ctx, app, ref, what, k, &printMu)
 	if err != nil {
 		return err
 	}
@@ -488,13 +580,21 @@ const knownNetworkHelpText = `Commands:
   <known-network> last-connected             Show the last-connected timestamp, if any
   <known-network> autoconnect [true|false]   Get or set auto-connect
   <known-network> forget                     Forget (remove) the known network
-  <known-network> monitor autoconnect        Stream auto-connect changes`
+  <known-network> monitor autoconnect  Stream the auto-connect flag until Ctrl-C
+  <known-network> monitor hidden       Stream the hidden flag. This reports how
+                                      the profile was provisioned (connected to
+                                      by SSID because it was not broadcasting),
+                                      not whether the AP is hiding its SSID now
+  <known-network> monitor last-connected
+                                      Stream the last-connected timestamp; fires
+                                      on each successful connect`
 
 func knownNetworkCommand(app *App) *Command {
 	return &Command{
 		Name:        "known-network",
 		Description: "Inspect and manage iwd known networks",
 		HelpText:    knownNetworkHelpText,
+		SubUsage:    map[string]string{"monitor": knownNetworkMonitorUsage},
 		Execute: func(args []string) error {
 			return runKnownNetwork(app, args)
 		},

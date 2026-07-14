@@ -290,3 +290,81 @@ func TestNetwork_Core(t *testing.T) {
 		}
 	})
 }
+
+func TestNetwork_Core_NewSubscribes(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	kn := "/net/connman/iwd/known_network/abc"
+
+	t.Run("KnownNetworkChanged", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeIwdbusNetwork{}
+		f.knownNetEvnt.Store(&optStringEvent{v: &kn})
+
+		got := make(chan *string, 1)
+		_, err := NewNetwork(f).SubscribeKnownNetworkChanged(ctx, func(p *string) { got <- p })
+		require.NoError(t, err)
+		require.Equal(t, kn, *<-got)
+	})
+
+	t.Run("KnownNetworkChanged delivers nil when forgotten", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeIwdbusNetwork{}
+		f.knownNetEvnt.Store(&optStringEvent{v: nil})
+
+		got := make(chan *string, 1)
+		_, err := NewNetwork(f).SubscribeKnownNetworkChanged(ctx, func(p *string) { got <- p })
+		require.NoError(t, err)
+		require.Nil(t, <-got)
+	})
+
+	t.Run("ExtendedServiceSetChanged", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeIwdbusNetwork{}
+		f.essEvnt.Store(&stringSliceEvent{v: []string{"/bss/a", "/bss/b"}})
+
+		got := make(chan []string, 1)
+		_, err := NewNetwork(f).SubscribeExtendedServiceSetChanged(ctx, func(p []string) { got <- p })
+		require.NoError(t, err)
+		require.Equal(t, []string{"/bss/a", "/bss/b"}, <-got)
+	})
+
+	t.Run("Guards", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range []struct {
+			name    string
+			nilFn   func(*Network) error
+			backend func(*Network) error
+		}{
+			{"KnownNetworkChanged",
+				func(n *Network) error { _, err := n.SubscribeKnownNetworkChanged(ctx, nil); return err },
+				func(n *Network) error {
+					_, err := n.SubscribeKnownNetworkChanged(ctx, func(*string) {})
+					return err
+				}},
+			{"ExtendedServiceSetChanged",
+				func(n *Network) error { _, err := n.SubscribeExtendedServiceSetChanged(ctx, nil); return err },
+				func(n *Network) error {
+					_, err := n.SubscribeExtendedServiceSetChanged(ctx, func([]string) {})
+					return err
+				}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				err := tc.nilFn(NewNetwork(&fakeIwdbusNetwork{}))
+				require.Error(t, err)
+				var ce *Error
+				require.ErrorAs(t, err, &ce)
+				require.Equal(t, KindInvalidArgument, ce.Kind)
+
+				f := &fakeIwdbusNetwork{}
+				f.setErr(errors.New("subscribe failed"))
+				require.Error(t, tc.backend(NewNetwork(f)))
+
+				var nilNetwork *Network
+				require.Error(t, tc.backend(nilNetwork))
+			})
+		}
+	})
+}

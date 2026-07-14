@@ -3,8 +3,10 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -471,4 +473,113 @@ func TestAccessPointCmd_Networks_Empty(t *testing.T) {
 	out, code := driveCLI(accessPointClient(ap), nil, false, "access-point", testAPName, "networks")
 	require.Equal(t, 0, code, out)
 	require.Contains(t, out, "no networks available")
+}
+
+// TestPrintAccessPointMonitorLines covers the access-point monitor output helpers
+// directly (the monitor command blocks on an OS signal).
+func TestPrintAccessPointMonitorLines(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+
+	app, buf := appWithBuffer(false)
+	require.NoError(t, printAccessPointStartedLine(app, testAPName, true, &mu))
+	require.Equal(t, "started=true\n", buf.String())
+
+	appScan, bufScan := appWithBuffer(false)
+	require.NoError(t, printAccessPointScanningLine(appScan, testAPName, false, &mu))
+	require.Equal(t, "scanning=false\n", bufScan.String())
+
+	appJSON, bufJSON := appWithBuffer(true)
+	require.NoError(t, printAccessPointStartedLine(appJSON, testAPName, true, &mu))
+	require.Contains(t, bufJSON.String(), `"Started":true`)
+
+	appScanJSON, bufScanJSON := appWithBuffer(true)
+	require.NoError(t, printAccessPointScanningLine(appScanJSON, testAPName, true, &mu))
+	require.Contains(t, bufScanJSON.String(), `"Scanning":true`)
+}
+
+func TestAccessPointCmd_Monitor_BadArgs(t *testing.T) {
+	t.Parallel()
+
+	for _, args := range [][]string{
+		{"access-point", testAPName, "monitor"},
+		{"access-point", testAPName, "monitor", "bogus"},
+		{"access-point", testAPName, "monitor", "started", "extra"},
+	} {
+		fc, _ := fakeWithAccessPoint()
+		out, code := driveCLI(fc, nil, false, args...)
+		require.Equal(t, 1, code, out)
+		require.Contains(t, out, "usage:")
+	}
+}
+
+// TestStreamAccessPointProperty drives the monitor's non-blocking core: the
+// current value prints, and each target wires its own subscription.
+func TestStreamAccessPointProperty(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		what        string
+		wantSeed    string
+		wantSubcall string
+	}{
+		{"started", "started=true", "SubscribeStartedChanged"},
+		{"scanning", "scanning=false", "SubscribeScanningChanged"},
+	} {
+		t.Run(tc.what, func(t *testing.T) {
+			t.Parallel()
+			_, ap := fakeWithAccessPoint()
+			started := false
+			ap.startedEvent = &started
+
+			app, buf := appWithBuffer(false)
+			var mu sync.Mutex
+
+			unsubscribe, err := streamAccessPointProperty(ctx, app, testAPName, tc.what, ap, &mu)
+			require.NoError(t, err)
+			require.NoError(t, unsubscribe.Unsubscribe())
+
+			require.Contains(t, buf.String(), tc.wantSeed, "the current value must print first")
+			require.Equal(t, tc.wantSubcall, ap.subscribed,
+				"target %q must subscribe to its own property", tc.what)
+		})
+	}
+}
+
+func TestStreamAccessPointProperty_Errors(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	var mu sync.Mutex
+	app, _ := appWithBuffer(false)
+
+	ap := &fakeAccessPoint{path: testAPPath, name: testAPName, err: errors.New("read failed")}
+	_, err := streamAccessPointProperty(ctx, app, testAPName, "started", ap, &mu)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "read failed")
+
+	_, apOK := fakeWithAccessPoint()
+	apOK.subscribeErr = errors.New("subscribe failed")
+	_, err = streamAccessPointProperty(ctx, app, testAPName, "started", apOK, &mu)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "subscribe failed")
+
+	_, apBad := fakeWithAccessPoint()
+	_, err = streamAccessPointProperty(ctx, app, testAPName, "bogus", apBad, &mu)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "usage:")
+}
+
+func TestParseAccessPointMonitorTarget(t *testing.T) {
+	t.Parallel()
+
+	for _, what := range accessPointMonitorTargets {
+		got, err := parseAccessPointMonitorTarget([]string{what})
+		require.NoError(t, err)
+		require.Equal(t, what, got)
+	}
+	for _, args := range [][]string{nil, {"bogus"}, {"started", "extra"}} {
+		_, err := parseAccessPointMonitorTarget(args)
+		require.Error(t, err)
+	}
 }

@@ -24,6 +24,8 @@ type fakeIwdbusNetwork struct {
 	connectErr    atomic.Pointer[fakeNetworkError]
 	err           atomic.Pointer[fakeNetworkError]
 	connectedEvnt atomic.Pointer[bool]
+	knownNetEvnt  atomic.Pointer[optStringEvent]
+	essEvnt       atomic.Pointer[stringSliceEvent]
 }
 
 func (f *fakeIwdbusNetwork) setProps(p iwdbus.NetworkProperties) *fakeIwdbusNetwork {
@@ -152,4 +154,24 @@ func newTestNetwork(t *testing.T) *Network {
 	n := NewNetwork(f)
 	require.NotNil(t, n)
 	return n
+}
+
+func (f *fakeIwdbusNetwork) SubscribeKnownNetworkChanged(ctx context.Context, fn func(*string)) (iwdbus.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.knownNetEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
+	return func() error { return nil }, f.loadErr()
+}
+
+func (f *fakeIwdbusNetwork) SubscribeExtendedServiceSetChanged(ctx context.Context, fn func([]string)) (iwdbus.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.essEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
+	return func() error { return nil }, f.loadErr()
 }

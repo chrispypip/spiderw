@@ -15,6 +15,12 @@ import (
 // behavior (routing, output rendering, error mapping) can be unit-tested without
 // a D-Bus connection or the iwd mock.
 
+// cliOptStringEvent wraps an optional-path subscribe payload so a fake can tell
+// "no event configured" from "an event carrying nil" (disconnected / forgotten).
+type cliOptStringEvent struct{ v *string }
+
+type cliStringSliceEvent struct{ v []string }
+
 type fakeClient struct {
 	daemon            daemonAPI
 	adapters          map[string]adapterAPI      // keyed by Path
@@ -376,6 +382,16 @@ func (f *fakeDevice) SubscribeModeChanged(ctx context.Context, fn func(spiderw.M
 }
 
 type fakeStation struct {
+	// subscribeErr fails only the Subscribe* calls, so a test can exercise a
+	// failing subscription behind a successful property read.
+	subscribeErr error
+	// subscribed records which Subscribe* method the command called, so a test can
+	// prove the monitor switch wired the right property to the right printer.
+	subscribed          string
+	stateEvent          *spiderw.StationState
+	connNetEvent        *cliOptStringEvent
+	connAPEvent         *cliOptStringEvent
+	affinityEvent       *cliStringSliceEvent
 	path                string
 	name                string
 	props               *spiderw.StationProperties
@@ -452,6 +468,10 @@ func (f *fakeStation) HiddenAccessPoints(ctx context.Context) ([]spiderw.HiddenA
 }
 
 func (f *fakeStation) SubscribeScanningChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeScanningChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -481,6 +501,12 @@ func (f *fakeStation) SimpleConfiguration(ctx context.Context) (*spiderw.SimpleC
 }
 
 type fakeAccessPoint struct {
+	// subscribeErr fails only the Subscribe* calls, so a test can exercise a
+	// failing subscription behind a successful property read.
+	subscribeErr error
+	// subscribed records which Subscribe* method the command called, so a test can
+	// prove the monitor switch wired the right property to the right printer.
+	subscribed  string
 	path        string
 	name        string
 	props       *spiderw.AccessPointProperties
@@ -496,7 +522,9 @@ type fakeAccessPoint struct {
 	// scanNeverCompletes makes SubscribeScanningChanged emit only the true edge, so
 	// `access-point scan` (wait mode) blocks until --timeout in tests.
 	scanNeverCompletes bool
-	err                error
+	// startedEvent, when set, is delivered to a SubscribeStartedChanged callback.
+	startedEvent *bool
+	err          error
 }
 
 func (f *fakeAccessPoint) Path() string { return f.path }
@@ -543,7 +571,25 @@ func (f *fakeAccessPoint) OrderedNetworks(ctx context.Context) ([]spiderw.Access
 	return f.ordered, f.err
 }
 
+func (f *fakeAccessPoint) SubscribeStartedChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeStartedChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	if fn != nil && f.startedEvent != nil {
+		fn(*f.startedEvent)
+	}
+	return func() error { return nil }, nil
+}
+
 func (f *fakeAccessPoint) SubscribeScanningChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeScanningChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -578,10 +624,18 @@ func (f *fakeBSS) Properties(ctx context.Context) (*spiderw.BasicServiceSetPrope
 }
 
 type fakeNetwork struct {
-	path       string
-	props      *spiderw.NetworkProperties
-	connectErr error
-	err        error
+	// subscribeErr fails only the Subscribe* calls, so a test can exercise a
+	// failing subscription behind a successful property read.
+	subscribeErr error
+	// subscribed records which Subscribe* method the command called, so a test can
+	// prove the monitor switch wired the right property to the right printer.
+	subscribed    string
+	knownNetEvent *cliOptStringEvent
+	essEvent      *cliStringSliceEvent
+	path          string
+	props         *spiderw.NetworkProperties
+	connectErr    error
+	err           error
 }
 
 func (f *fakeNetwork) Path() string { return f.path }
@@ -645,14 +699,26 @@ func (f *fakeNetwork) Properties(ctx context.Context) (*spiderw.NetworkPropertie
 }
 
 func (f *fakeNetwork) SubscribeConnectedChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeConnectedChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
 	return func() error { return nil }, f.err
 }
 
 type fakeKnownNetwork struct {
-	path      string
-	props     *spiderw.KnownNetworkProperties
-	forgetErr error
-	err       error
+	// subscribeErr fails only the Subscribe* calls, so a test can exercise a
+	// failing subscription behind a successful property read.
+	subscribeErr error
+	// subscribed records which Subscribe* method the command called, so a test can
+	// prove the monitor switch wired the right property to the right printer.
+	subscribed    string
+	hiddenEvent   *bool
+	lastConnEvent *cliOptStringEvent
+	path          string
+	props         *spiderw.KnownNetworkProperties
+	forgetErr     error
+	err           error
 }
 
 func (f *fakeKnownNetwork) Path() string { return f.path }
@@ -709,6 +775,10 @@ func (f *fakeKnownNetwork) Properties(ctx context.Context) (*spiderw.KnownNetwor
 }
 
 func (f *fakeKnownNetwork) SubscribeAutoConnectChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeAutoConnectChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
 	return func() error { return nil }, f.err
 }
 
@@ -750,4 +820,120 @@ func driveConnect(fake clientAPI, stdin string, prompt func(string) (string, err
 	}
 	code := runApp(app, args)
 	return buf.String(), code
+}
+
+// The monitor subcommands' subscriptions. Each fake delivers a configured event
+// once, so a driveCLI run observes exactly one line per property and then blocks
+// on the context (which driveCLI cancels).
+
+func (f *fakeStation) SubscribeStateChanged(ctx context.Context, fn func(spiderw.StationState)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeStateChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	if fn != nil && f.stateEvent != nil {
+		fn(*f.stateEvent)
+	}
+	return func() error { return nil }, nil
+}
+
+func (f *fakeStation) SubscribeConnectedNetworkChanged(ctx context.Context, fn func(*string)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeConnectedNetworkChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	if fn != nil && f.connNetEvent != nil {
+		fn(f.connNetEvent.v)
+	}
+	return func() error { return nil }, nil
+}
+
+func (f *fakeStation) SubscribeConnectedAccessPointChanged(ctx context.Context, fn func(*string)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeConnectedAccessPointChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	if fn != nil && f.connAPEvent != nil {
+		fn(f.connAPEvent.v)
+	}
+	return func() error { return nil }, nil
+}
+
+func (f *fakeStation) SubscribeAffinitiesChanged(ctx context.Context, fn func([]string)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeAffinitiesChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	if fn != nil && f.affinityEvent != nil {
+		fn(f.affinityEvent.v)
+	}
+	return func() error { return nil }, nil
+}
+
+func (f *fakeNetwork) SubscribeKnownNetworkChanged(ctx context.Context, fn func(*string)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeKnownNetworkChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	if fn != nil && f.knownNetEvent != nil {
+		fn(f.knownNetEvent.v)
+	}
+	return func() error { return nil }, nil
+}
+
+func (f *fakeNetwork) SubscribeExtendedServiceSetChanged(ctx context.Context, fn func([]string)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeExtendedServiceSetChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	if fn != nil && f.essEvent != nil {
+		fn(f.essEvent.v)
+	}
+	return func() error { return nil }, nil
+}
+
+func (f *fakeKnownNetwork) SubscribeHiddenChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeHiddenChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	if fn != nil && f.hiddenEvent != nil {
+		fn(*f.hiddenEvent)
+	}
+	return func() error { return nil }, nil
+}
+
+func (f *fakeKnownNetwork) SubscribeLastConnectedTimeChanged(ctx context.Context, fn func(*string)) (spiderw.UnsubscribeFunc, error) {
+	f.subscribed = "SubscribeLastConnectedTimeChanged"
+	if f.subscribeErr != nil {
+		return nil, f.subscribeErr
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	if fn != nil && f.lastConnEvent != nil {
+		fn(f.lastConnEvent.v)
+	}
+	return func() error { return nil }, nil
 }

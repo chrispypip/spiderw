@@ -294,6 +294,51 @@ func (k *KnownNetwork) SubscribeAutoConnectChanged(ctx context.Context, fn func(
 	})
 }
 
+// SubscribeHiddenChanged registers fn for raw changes to the Hidden property.
+func (k *KnownNetwork) SubscribeHiddenChanged(ctx context.Context, fn func(bool)) (UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, fmt.Errorf("SubscribeHiddenChanged: fn cannot be nil")
+	}
+
+	return k.SubscribePropertiesChanged(ctx, func(ev KnownNetworkPropertiesChanged) {
+		variant, ok := ev.Changed["Hidden"]
+		if !ok {
+			return
+		}
+
+		b, ok := variant.Value().(bool)
+		if ok {
+			fn(b)
+		}
+	})
+}
+
+// SubscribeLastConnectedTimeChanged registers fn for raw changes to
+// LastConnectedTime, an ISO 8601 timestamp. iwd updates it on each successful
+// connection, so this fires once per connect to the network. fn receives nil if
+// iwd ever reports the property as absent (a network never connected to).
+func (k *KnownNetwork) SubscribeLastConnectedTimeChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, fmt.Errorf("SubscribeLastConnectedTimeChanged: fn cannot be nil")
+	}
+
+	return k.SubscribePropertiesChanged(ctx, func(ev KnownNetworkPropertiesChanged) {
+		variant, ok := ev.Changed["LastConnectedTime"]
+		if !ok {
+			if propertyCleared(ev.Invalidated, "LastConnectedTime") {
+				fn(nil)
+			}
+			return
+		}
+
+		t, err := parseOptionalString(variant.Value())
+		if err != nil {
+			return
+		}
+		fn(t)
+	})
+}
+
 // Firehose emits high-frequency known-network signals for stress and integration
 // tests.
 func (k *KnownNetwork) Firehose(ctx context.Context, fn func(FirehoseSignal)) error {

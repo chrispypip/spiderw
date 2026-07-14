@@ -113,8 +113,22 @@ func (k *KnownNetwork) buildPropertyMap() map[string]dbus.Variant {
 	return props
 }
 
-// Forget implements the mock KnownNetwork.Forget method.
+// Forget implements the mock KnownNetwork.Forget method: the known-network record
+// goes away, so every Network that referenced it loses its KnownNetwork property.
+//
+// iwd signals that loss by *invalidating* the property, not by sending the null
+// path "/" (confirmed on hardware: monitoring a network's known-network printed
+// nothing on forget). The mock previously did nothing at all here, which is why a
+// subscription that only read Changed looked correct.
 func (k *KnownNetwork) Forget() *dbus.Error {
+	for _, n := range exportedNetworks {
+		if n.KnownNetwork != k.Path {
+			continue
+		}
+		n.KnownNetwork = ""
+		emitPropertiesChanged(n.Path, iwdbus.IwdNetworkIface,
+			map[string]dbus.Variant{}, []string{"KnownNetwork"})
+	}
 	return nil
 }
 

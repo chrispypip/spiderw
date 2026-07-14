@@ -60,6 +60,9 @@ type stationRaw interface {
 	SubscribePropertiesChanged(ctx context.Context, fn func(iwdbus.StationPropertiesChanged)) (iwdbus.UnsubscribeFunc, error)
 	SubscribeStateChanged(ctx context.Context, fn func(iwdbus.StationState)) (iwdbus.UnsubscribeFunc, error)
 	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (iwdbus.UnsubscribeFunc, error)
+	SubscribeConnectedNetworkChanged(ctx context.Context, fn func(*string)) (iwdbus.UnsubscribeFunc, error)
+	SubscribeConnectedAccessPointChanged(ctx context.Context, fn func(*string)) (iwdbus.UnsubscribeFunc, error)
+	SubscribeAffinitiesChanged(ctx context.Context, fn func([]string)) (iwdbus.UnsubscribeFunc, error)
 }
 
 // StationIface defines the core station operations used by the public layer.
@@ -79,6 +82,9 @@ type StationIface interface {
 	SubscribePropertiesChanged(ctx context.Context, fn func(StationPropertiesChanged)) (UnsubscribeFunc, error)
 	SubscribeStateChanged(ctx context.Context, fn func(StationState)) (UnsubscribeFunc, error)
 	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (UnsubscribeFunc, error)
+	SubscribeConnectedNetworkChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error)
+	SubscribeConnectedAccessPointChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error)
+	SubscribeAffinitiesChanged(ctx context.Context, fn func([]string)) (UnsubscribeFunc, error)
 }
 
 // StationProperties holds normalized station properties read in a single backend
@@ -453,6 +459,67 @@ func (s *Station) SubscribeScanningChanged(ctx context.Context, fn func(bool)) (
 	}
 
 	unsub, err := rawStation.SubscribeScanningChanged(ctx, fn)
+	if err != nil {
+		return nil, WrapStationUnavailable(op, "failed to call iwd Station subscribe method", err)
+	}
+	return UnsubscribeFunc(unsub), nil
+}
+
+// SubscribeConnectedNetworkChanged registers fn for changes to the connected network. fn receives
+// the network object path, or nil when the station is not connected to one.
+func (s *Station) SubscribeConnectedNetworkChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	const op = "Station.SubscribeConnectedNetworkChanged"
+
+	raw, err := s.rawStation(op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, WrapInvalidArgument(ResourceStation, op, "callback cannot be nil", ErrCore)
+	}
+
+	unsub, err := raw.SubscribeConnectedNetworkChanged(ctx, fn)
+	if err != nil {
+		return nil, WrapStationUnavailable(op, "failed to call iwd Station subscribe method", err)
+	}
+	return UnsubscribeFunc(unsub), nil
+}
+
+// SubscribeConnectedAccessPointChanged registers fn for changes to the associated BSS. fn receives the BSS
+// object path, or nil when not associated. This is how a roam is observed: the
+// BSS changes while State stays connected.
+func (s *Station) SubscribeConnectedAccessPointChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	const op = "Station.SubscribeConnectedAccessPointChanged"
+
+	raw, err := s.rawStation(op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, WrapInvalidArgument(ResourceStation, op, "callback cannot be nil", ErrCore)
+	}
+
+	unsub, err := raw.SubscribeConnectedAccessPointChanged(ctx, fn)
+	if err != nil {
+		return nil, WrapStationUnavailable(op, "failed to call iwd Station subscribe method", err)
+	}
+	return UnsubscribeFunc(unsub), nil
+}
+
+// SubscribeAffinitiesChanged registers fn for changes to the station affinities. They are
+// writable, so another client or iwd itself may change them.
+func (s *Station) SubscribeAffinitiesChanged(ctx context.Context, fn func([]string)) (UnsubscribeFunc, error) {
+	const op = "Station.SubscribeAffinitiesChanged"
+
+	raw, err := s.rawStation(op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, WrapInvalidArgument(ResourceStation, op, "callback cannot be nil", ErrCore)
+	}
+
+	unsub, err := raw.SubscribeAffinitiesChanged(ctx, fn)
 	if err != nil {
 		return nil, WrapStationUnavailable(op, "failed to call iwd Station subscribe method", err)
 	}

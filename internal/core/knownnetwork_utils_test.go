@@ -24,6 +24,8 @@ type fakeIwdbusKnownNetwork struct {
 	err          atomic.Pointer[fakeKnownNetworkError]
 	forgetErr    atomic.Pointer[fakeKnownNetworkError]
 	autoConnEvnt atomic.Pointer[bool]
+	hiddenEvnt   atomic.Pointer[bool]
+	lastConnEvnt atomic.Pointer[optStringEvent]
 }
 
 func (f *fakeIwdbusKnownNetwork) setProps(p iwdbus.KnownNetworkProperties) *fakeIwdbusKnownNetwork {
@@ -154,4 +156,24 @@ func newTestKnownNetwork(t *testing.T) *KnownNetwork {
 	k := NewKnownNetwork(f)
 	require.NotNil(t, k)
 	return k
+}
+
+func (f *fakeIwdbusKnownNetwork) SubscribeHiddenChanged(ctx context.Context, fn func(bool)) (iwdbus.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.hiddenEvnt.Load(); ev != nil {
+		fn(*ev)
+	}
+	return func() error { return nil }, f.loadErr()
+}
+
+func (f *fakeIwdbusKnownNetwork) SubscribeLastConnectedTimeChanged(ctx context.Context, fn func(*string)) (iwdbus.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.lastConnEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
+	return func() error { return nil }, f.loadErr()
 }

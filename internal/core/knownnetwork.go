@@ -30,6 +30,8 @@ type knownNetworkRaw interface {
 	GetProperties(ctx context.Context) (*iwdbus.KnownNetworkProperties, error)
 	SubscribePropertiesChanged(ctx context.Context, fn func(iwdbus.KnownNetworkPropertiesChanged)) (iwdbus.UnsubscribeFunc, error)
 	SubscribeAutoConnectChanged(ctx context.Context, fn func(bool)) (iwdbus.UnsubscribeFunc, error)
+	SubscribeHiddenChanged(ctx context.Context, fn func(bool)) (iwdbus.UnsubscribeFunc, error)
+	SubscribeLastConnectedTimeChanged(ctx context.Context, fn func(*string)) (iwdbus.UnsubscribeFunc, error)
 }
 
 // KnownNetworkIface defines the core known-network operations used by the public
@@ -45,6 +47,8 @@ type KnownNetworkIface interface {
 	Properties(ctx context.Context) (*KnownNetworkProperties, error)
 	SubscribePropertiesChanged(ctx context.Context, fn func(KnownNetworkPropertiesChanged)) (UnsubscribeFunc, error)
 	SubscribeAutoConnectChanged(ctx context.Context, fn func(bool)) (UnsubscribeFunc, error)
+	SubscribeHiddenChanged(ctx context.Context, fn func(bool)) (UnsubscribeFunc, error)
+	SubscribeLastConnectedTimeChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error)
 }
 
 // KnownNetworkProperties holds normalized known-network properties read in a
@@ -286,6 +290,45 @@ func (k *KnownNetwork) SubscribeAutoConnectChanged(ctx context.Context, fn func(
 	}
 
 	unsub, err := raw.SubscribeAutoConnectChanged(ctx, fn)
+	if err != nil {
+		return nil, WrapKnownNetworkUnavailable(op, "failed to call iwd KnownNetwork subscribe method", err)
+	}
+	return UnsubscribeFunc(unsub), nil
+}
+
+// SubscribeHiddenChanged registers fn for changes to the Hidden property.
+func (k *KnownNetwork) SubscribeHiddenChanged(ctx context.Context, fn func(bool)) (UnsubscribeFunc, error) {
+	const op = "KnownNetwork.SubscribeHiddenChanged"
+
+	raw, err := k.rawKnownNetwork(op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, WrapInvalidArgument(ResourceKnownNetwork, op, "callback cannot be nil", ErrCore)
+	}
+
+	unsub, err := raw.SubscribeHiddenChanged(ctx, fn)
+	if err != nil {
+		return nil, WrapKnownNetworkUnavailable(op, "failed to call iwd KnownNetwork subscribe method", err)
+	}
+	return UnsubscribeFunc(unsub), nil
+}
+
+// SubscribeLastConnectedTimeChanged registers fn for changes to LastConnectedTime. iwd updates it on
+// each successful connection, so this fires once per connect.
+func (k *KnownNetwork) SubscribeLastConnectedTimeChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	const op = "KnownNetwork.SubscribeLastConnectedTimeChanged"
+
+	raw, err := k.rawKnownNetwork(op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, WrapInvalidArgument(ResourceKnownNetwork, op, "callback cannot be nil", ErrCore)
+	}
+
+	unsub, err := raw.SubscribeLastConnectedTimeChanged(ctx, fn)
 	if err != nil {
 		return nil, WrapKnownNetworkUnavailable(op, "failed to call iwd KnownNetwork subscribe method", err)
 	}

@@ -49,6 +49,9 @@ func TestKnownNetwork_Iwdbus(t *testing.T) {
 	t.Run("Subscribe", func(t *testing.T) {
 		t.Parallel()
 		t.Run("AutoConnectChanged", testKnownNetwork_SubscribeAutoConnectChanged)
+		t.Run("HiddenChanged", testKnownNetwork_SubscribeHiddenChanged)
+		t.Run("LastConnectedTimeChanged", testKnownNetwork_SubscribeLastConnectedTimeChanged)
+		t.Run("NewSubscribers_Guards", testKnownNetwork_SubscribeNew_SkipMalformedAndNilCallback)
 	})
 
 	t.Run("Firehose", func(t *testing.T) {
@@ -345,4 +348,75 @@ func testKnownNetwork_NoIntro(t *testing.T) {
 			require.Contains(t, err.Error(), "known network is not initialized")
 		})
 	}
+}
+
+func testKnownNetwork_SubscribeHiddenChanged(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeSignalSource(t)
+	k := &KnownNetwork{signals: fake}
+
+	got := make(chan bool, 1)
+	_, err := k.SubscribeHiddenChanged(context.Background(), func(b bool) { got <- b })
+	require.NoError(t, err)
+
+	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdKnownNetworkIface,
+		map[string]dbus.Variant{"Hidden": dbus.MakeVariant(true)}, []string{})
+
+	require.True(t, <-got)
+}
+
+func testKnownNetwork_SubscribeLastConnectedTimeChanged(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeSignalSource(t)
+	k := &KnownNetwork{signals: fake}
+
+	got := make(chan *string, 1)
+	_, err := k.SubscribeLastConnectedTimeChanged(context.Background(), func(s *string) { got <- s })
+	require.NoError(t, err)
+
+	// iwd updates the timestamp on each successful connection.
+	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdKnownNetworkIface,
+		map[string]dbus.Variant{"LastConnectedTime": dbus.MakeVariant("2026-07-13T10:04:00Z")}, []string{})
+
+	ts := <-got
+	require.NotNil(t, ts)
+	require.Equal(t, "2026-07-13T10:04:00Z", *ts)
+}
+
+func testKnownNetwork_SubscribeNew_SkipMalformedAndNilCallback(t *testing.T) {
+	t.Parallel()
+
+	t.Run("malformed skipped", func(t *testing.T) {
+		t.Parallel()
+		fake := newFakeSignalSource(t)
+		k := &KnownNetwork{signals: fake}
+
+		fired := make(chan struct{}, 1)
+		_, err := k.SubscribeLastConnectedTimeChanged(context.Background(), func(*string) { fired <- struct{}{} })
+		require.NoError(t, err)
+
+		fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdKnownNetworkIface,
+			map[string]dbus.Variant{"LastConnectedTime": dbus.MakeVariant(int64(1))}, []string{})
+
+		select {
+		case <-fired:
+			t.Fatal("callback fired for a malformed LastConnectedTime value")
+		default:
+		}
+	})
+
+	t.Run("nil callback", func(t *testing.T) {
+		t.Parallel()
+		k := &KnownNetwork{signals: newFakeSignalSource(t)}
+
+		_, err := k.SubscribeHiddenChanged(context.Background(), nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "fn cannot be nil")
+
+		_, err = k.SubscribeLastConnectedTimeChanged(context.Background(), nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "fn cannot be nil")
+	})
 }

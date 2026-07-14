@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -450,9 +451,108 @@ func printNetworkConnectedLine(app *App, ref string, connected bool, mu *sync.Mu
 	return err
 }
 
+// networkKnownNetworkResult reports the network's known-network association,
+// resolved to its name. A nil ref means the network is not saved.
+type networkKnownNetworkResult struct {
+	Network      string   `json:"Network"`
+	KnownNetwork *nameRef `json:"KnownNetwork"`
+}
+
+func printNetworkKnownNetworkLine(app *App, ref string, kn *nameRef, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	out := networkKnownNetworkResult{Network: ref, KnownNetwork: kn}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	_, err := fmt.Fprintf(app.stdout(), "known-network=%s\n", readableNameRef(kn, "none (not saved)"))
+	return err
+}
+
+func printNetworkBSSesLine(app *App, ref string, paths []string, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Reuse the `bsses` subcommand's result shape so the monitor stream and the
+	// one-shot read render identically.
+	out := networkBSSesResult{Network: ref, ExtendedServiceSet: paths}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	_, err := fmt.Fprintf(app.stdout(), "bsses=%s\n", pathListText(paths))
+	return err
+}
+
+const networkMonitorUsage = "usage: spiderw network <network> monitor <connected|known-network|bsses>"
+
+// networkMonitorTargets are the properties `network <network> monitor` streams.
+var networkMonitorTargets = []string{"connected", "known-network", "bsses"}
+
+// parseNetworkMonitorTarget validates the target before any iwd call.
+func parseNetworkMonitorTarget(args []string) (string, error) {
+	// `monitor --help` should list what can be monitored, same as an invalid
+	// target does, rather than falling through to a generic error.
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help") {
+		return "", fmt.Errorf("%s", networkMonitorUsage)
+	}
+	if len(args) != 1 || !slices.Contains(networkMonitorTargets, args[0]) {
+		return "", fmt.Errorf("%s", networkMonitorUsage)
+	}
+	return args[0], nil
+}
+
+// streamNetworkProperty prints the current value, then subscribes. It does not
+// block; monitorNetwork owns the wait for Ctrl-C.
+func streamNetworkProperty(ctx context.Context, app *App, ref, what string, n networkAPI, res monitorResolver, mu *sync.Mutex) (spiderw.UnsubscribeFunc, error) {
+	switch what {
+	case "connected":
+		connected, err := n.Connected(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := printNetworkConnectedLine(app, ref, connected, mu); err != nil {
+			return nil, err
+		}
+		return n.SubscribeConnectedChanged(ctx, func(connected bool) {
+			_ = printNetworkConnectedLine(app, ref, connected, mu)
+		})
+
+	case "known-network":
+		kn, err := n.KnownNetwork(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := printNetworkKnownNetworkLine(app, ref, res.knownNetworkRef(ctx, kn), mu); err != nil {
+			return nil, err
+		}
+		// Fires when the network is saved (gains a record) or forgotten (loses it).
+		// iwd signals a forget by invalidating the property, which the subscription
+		// delivers as nil.
+		return n.SubscribeKnownNetworkChanged(ctx, func(path *string) {
+			_ = printNetworkKnownNetworkLine(app, ref, res.knownNetworkRef(ctx, path), mu)
+		})
+
+	case "bsses":
+		ess, err := n.ExtendedServiceSet(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := printNetworkBSSesLine(app, ref, ess, mu); err != nil {
+			return nil, err
+		}
+		return n.SubscribeExtendedServiceSetChanged(ctx, func(paths []string) {
+			_ = printNetworkBSSesLine(app, ref, paths, mu)
+		})
+	}
+
+	return nil, fmt.Errorf("%s", networkMonitorUsage)
+}
+
 func monitorNetwork(app *App, networkRef string, args []string) error {
-	if len(args) != 1 || args[0] != "connected" {
-		return fmt.Errorf("usage: spiderw network <network> monitor connected")
+	what, err := parseNetworkMonitorTarget(args)
+	if err != nil {
+		return err
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -472,18 +572,7 @@ func monitorNetwork(app *App, networkRef string, args []string) error {
 	}
 
 	var printMu sync.Mutex
-
-	connected, err := n.Connected(ctx)
-	if err != nil {
-		return err
-	}
-	if err := printNetworkConnectedLine(app, networkRef, connected, &printMu); err != nil {
-		return err
-	}
-
-	unsubscribe, err := n.SubscribeConnectedChanged(ctx, func(connected bool) {
-		_ = printNetworkConnectedLine(app, networkRef, connected, &printMu)
-	})
+	unsubscribe, err := streamNetworkProperty(ctx, app, networkRef, what, n, monitorResolver{client: client}, &printMu)
 	if err != nil {
 		return err
 	}
@@ -570,13 +659,17 @@ const networkHelpText = `Commands:
   <network> name                   Show the network SSID
   <network> known-network          Show the known-network object path, if any
   <network> bsses                  List the network's basic service set paths
-  <network> monitor connected      Stream connected-state changes`
+  <network> monitor connected          Stream the connected flag until Ctrl-C
+  <network> monitor known-network      Stream the saved-profile link; fires when
+                                       the network is saved or forgotten
+  <network> monitor bsses              Stream the network's BSS list`
 
 func networkCommand(app *App) *Command {
 	return &Command{
 		Name:        "network",
 		Description: "Inspect, query, and connect to iwd networks",
 		HelpText:    networkHelpText,
+		SubUsage:    map[string]string{"monitor": networkMonitorUsage},
 		Execute: func(args []string) error {
 			return runNetwork(app, args)
 		},

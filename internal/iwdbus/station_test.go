@@ -76,6 +76,12 @@ func TestStation_Iwdbus(t *testing.T) {
 		t.Run("Station_SubscribeStateChanged", testStation_SubscribeStateChanged)
 		t.Run("Station_SubscribeStateChanged_IgnoresInvalid", testStation_SubscribeStateChanged_IgnoresInvalid)
 		t.Run("Station_SubscribeScanningChanged", testStation_SubscribeScanningChanged)
+		t.Run("Station_SubscribeConnectedNetworkChanged", testStation_SubscribeConnectedNetworkChanged)
+		t.Run("Station_SubscribeConnectedAccessPointChanged", testStation_SubscribeConnectedAccessPointChanged)
+		t.Run("Station_SubscribeAffinitiesChanged", testStation_SubscribeAffinitiesChanged)
+		t.Run("Station_SubscribeInvalidatedProperties", testStation_SubscribeInvalidatedProperties)
+		t.Run("Station_SubscribeNewSubscribers_SkipMalformed", testStation_SubscribeNewSubscribers_SkipMalformed)
+		t.Run("Station_SubscribeNewSubscribers_NilCallback", testStation_SubscribeNewSubscribers_NilCallback)
 		t.Run("Station_SubscribeScanningChanged_IgnoresUnrelated", testStation_SubscribeScanningChanged_IgnoresUnrelated)
 		t.Run("Station_SubscribeScanningChanged_Unsubscribe", testStation_SubscribeScanningChanged_Unsubscribe)
 	})
@@ -1007,4 +1013,215 @@ func testStation_UnregisterSignalLevelAgent_Uninitialized(t *testing.T) {
 	err := (&Station{}).UnregisterSignalLevelAgent(context.Background(), "/spiderw/signalagent")
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrStationUninitialized)
+}
+
+func testStation_SubscribeConnectedNetworkChanged(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeSignalSource(t)
+	station := &Station{signals: fake}
+
+	got := make(chan *string, 2)
+	_, err := station.SubscribeConnectedNetworkChanged(context.Background(), func(p *string) { got <- p })
+	require.NoError(t, err)
+
+	// Connecting reports the network path.
+	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdStationIface,
+		map[string]dbus.Variant{"ConnectedNetwork": dbus.MakeVariant(dbus.ObjectPath("/net/connman/iwd/0/3/ssid_psk"))}, []string{})
+	p := <-got
+	require.NotNil(t, p)
+	require.Equal(t, "/net/connman/iwd/0/3/ssid_psk", *p)
+
+	// Disconnecting reports iwd's null path "/" as nil, not as the literal "/".
+	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdStationIface,
+		map[string]dbus.Variant{"ConnectedNetwork": dbus.MakeVariant(dbus.ObjectPath("/"))}, []string{})
+	require.Nil(t, <-got, "the null path must surface as nil (disconnected)")
+}
+
+func testStation_SubscribeConnectedAccessPointChanged(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeSignalSource(t)
+	station := &Station{signals: fake}
+
+	got := make(chan *string, 1)
+	_, err := station.SubscribeConnectedAccessPointChanged(context.Background(), func(p *string) { got <- p })
+	require.NoError(t, err)
+
+	// A roam: the BSS changes while State and ConnectedNetwork stay put, so this
+	// subscription is the only thing that observes it.
+	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdStationIface,
+		map[string]dbus.Variant{"ConnectedAccessPoint": dbus.MakeVariant(dbus.ObjectPath("/net/connman/iwd/0/3/ssid_psk/aabbccddeeff"))}, []string{})
+
+	p := <-got
+	require.NotNil(t, p)
+	require.Equal(t, "/net/connman/iwd/0/3/ssid_psk/aabbccddeeff", *p)
+}
+
+func testStation_SubscribeAffinitiesChanged(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeSignalSource(t)
+	station := &Station{signals: fake}
+
+	got := make(chan []string, 2)
+	_, err := station.SubscribeAffinitiesChanged(context.Background(), func(p []string) { got <- p })
+	require.NoError(t, err)
+
+	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdStationIface,
+		map[string]dbus.Variant{"Affinities": dbus.MakeVariant([]dbus.ObjectPath{"/net/connman/iwd/0/3/ssid_psk/aabbccddeeff"})}, []string{})
+	require.Equal(t, []string{"/net/connman/iwd/0/3/ssid_psk/aabbccddeeff"}, <-got)
+
+	// iwd clearing the affinities reports an empty array, not an absent property.
+	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdStationIface,
+		map[string]dbus.Variant{"Affinities": dbus.MakeVariant([]dbus.ObjectPath{})}, []string{})
+	require.Empty(t, <-got, "a cleared affinity list must be delivered, not dropped")
+}
+
+func testStation_SubscribeNewSubscribers_SkipMalformed(t *testing.T) {
+	t.Parallel()
+
+	// A malformed value is skipped rather than delivered as a zero value, matching
+	// SubscribeStateChanged's contract.
+	for _, tc := range []struct {
+		name string
+		prop string
+		bad  dbus.Variant
+		sub  func(*Station, chan struct{}) error
+	}{
+		{"ConnectedNetwork", "ConnectedNetwork", dbus.MakeVariant(int32(7)), func(s *Station, c chan struct{}) error {
+			_, err := s.SubscribeConnectedNetworkChanged(context.Background(), func(*string) { c <- struct{}{} })
+			return err
+		}},
+		{"ConnectedAccessPoint", "ConnectedAccessPoint", dbus.MakeVariant("not-a-path"), func(s *Station, c chan struct{}) error {
+			_, err := s.SubscribeConnectedAccessPointChanged(context.Background(), func(*string) { c <- struct{}{} })
+			return err
+		}},
+		{"Affinities", "Affinities", dbus.MakeVariant("not-an-array"), func(s *Station, c chan struct{}) error {
+			_, err := s.SubscribeAffinitiesChanged(context.Background(), func([]string) { c <- struct{}{} })
+			return err
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fake := newFakeSignalSource(t)
+			station := &Station{signals: fake}
+
+			fired := make(chan struct{}, 1)
+			require.NoError(t, tc.sub(station, fired))
+
+			fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdStationIface,
+				map[string]dbus.Variant{tc.prop: tc.bad}, []string{})
+
+			select {
+			case <-fired:
+				t.Fatal("callback fired for a malformed property value")
+			default:
+			}
+		})
+	}
+}
+
+func testStation_SubscribeNewSubscribers_NilCallback(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		call func(*Station) error
+	}{
+		{"ConnectedNetworkChanged", func(s *Station) error {
+			_, err := s.SubscribeConnectedNetworkChanged(context.Background(), nil)
+			return err
+		}},
+		{"ConnectedAccessPointChanged", func(s *Station) error {
+			_, err := s.SubscribeConnectedAccessPointChanged(context.Background(), nil)
+			return err
+		}},
+		{"AffinitiesChanged", func(s *Station) error {
+			_, err := s.SubscribeAffinitiesChanged(context.Background(), nil)
+			return err
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := tc.call(&Station{signals: newFakeSignalSource(t)})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "fn cannot be nil")
+		})
+	}
+}
+
+// testStation_SubscribeInvalidatedProperties is the regression guard for the
+// hardware bug: iwd does not report "no longer connected" by sending the null path
+// "/" in Changed — it lists the property in Invalidated and sends no value. A
+// subscription that reads only Changed silently never fires on a disconnect, which
+// is exactly what happened on real hardware while the mock (which sent "/") looked
+// fine.
+func testStation_SubscribeInvalidatedProperties(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ConnectedNetwork", func(t *testing.T) {
+		t.Parallel()
+		fake := newFakeSignalSource(t)
+		station := &Station{signals: fake}
+
+		got := make(chan *string, 1)
+		_, err := station.SubscribeConnectedNetworkChanged(context.Background(), func(p *string) { got <- p })
+		require.NoError(t, err)
+
+		fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdStationIface,
+			map[string]dbus.Variant{"State": dbus.MakeVariant("disconnected")},
+			[]string{"ConnectedNetwork"})
+
+		require.Nil(t, <-got, "an invalidated ConnectedNetwork means disconnected")
+	})
+
+	t.Run("ConnectedAccessPoint", func(t *testing.T) {
+		t.Parallel()
+		fake := newFakeSignalSource(t)
+		station := &Station{signals: fake}
+
+		got := make(chan *string, 1)
+		_, err := station.SubscribeConnectedAccessPointChanged(context.Background(), func(p *string) { got <- p })
+		require.NoError(t, err)
+
+		fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdStationIface,
+			map[string]dbus.Variant{}, []string{"ConnectedAccessPoint"})
+
+		require.Nil(t, <-got, "an invalidated ConnectedAccessPoint means not associated")
+	})
+
+	t.Run("Affinities", func(t *testing.T) {
+		t.Parallel()
+		fake := newFakeSignalSource(t)
+		station := &Station{signals: fake}
+
+		got := make(chan []string, 1)
+		_, err := station.SubscribeAffinitiesChanged(context.Background(), func(p []string) { got <- p })
+		require.NoError(t, err)
+
+		fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdStationIface,
+			map[string]dbus.Variant{}, []string{"Affinities"})
+
+		require.Nil(t, <-got)
+	})
+
+	t.Run("an unrelated invalidation is ignored", func(t *testing.T) {
+		t.Parallel()
+		fake := newFakeSignalSource(t)
+		station := &Station{signals: fake}
+
+		fired := make(chan struct{}, 1)
+		_, err := station.SubscribeConnectedNetworkChanged(context.Background(), func(*string) { fired <- struct{}{} })
+		require.NoError(t, err)
+
+		fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdStationIface,
+			map[string]dbus.Variant{}, []string{"Scanning"})
+
+		select {
+		case <-fired:
+			t.Fatal("callback fired for an unrelated property's invalidation")
+		default:
+		}
+	})
 }

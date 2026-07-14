@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -225,4 +226,129 @@ func TestPrintKnownNetworkAutoConnectLine(t *testing.T) {
 	appJSON, bufJSON := appWithBuffer(true)
 	require.NoError(t, printKnownNetworkAutoConnectLine(appJSON, "HomeNet", false, &mu))
 	require.Contains(t, bufJSON.String(), `"AutoConnect":false`)
+}
+
+// TestPrintKnownNetworkMonitorLines covers the new known-network monitor output
+// helpers directly (the monitor command blocks on an OS signal).
+func TestPrintKnownNetworkMonitorLines(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	ts := "2026-07-13T10:04:00Z"
+
+	app, buf := appWithBuffer(false)
+	require.NoError(t, printKnownNetworkHiddenLine(app, "MyNet", true, &mu))
+	require.Equal(t, "hidden=true\n", buf.String())
+
+	appTS, bufTS := appWithBuffer(false)
+	require.NoError(t, printKnownNetworkLastConnectedLine(appTS, "MyNet", &ts, &mu))
+	require.Equal(t, "last-connected="+ts+"\n", bufTS.String())
+
+	// A network never connected to reports nil.
+	appNever, bufNever := appWithBuffer(false)
+	require.NoError(t, printKnownNetworkLastConnectedLine(appNever, "MyNet", nil, &mu))
+	require.Equal(t, "last-connected=never\n", bufNever.String())
+
+	appJSON, bufJSON := appWithBuffer(true)
+	require.NoError(t, printKnownNetworkLastConnectedLine(appJSON, "MyNet", nil, &mu))
+	require.Contains(t, bufJSON.String(), `"LastConnectedTime":null`)
+
+	appHidJSON, bufHidJSON := appWithBuffer(true)
+	require.NoError(t, printKnownNetworkHiddenLine(appHidJSON, "MyNet", true, &mu))
+	require.Contains(t, bufHidJSON.String(), `"Hidden":true`)
+}
+
+func TestKnownNetworkCmd_Monitor_BadArgs(t *testing.T) {
+	t.Parallel()
+
+	for _, args := range [][]string{
+		{"known-network", "/net/connman/iwd/known_networks/1", "monitor"},
+		{"known-network", "/net/connman/iwd/known_networks/1", "monitor", "bogus"},
+		{"known-network", "/net/connman/iwd/known_networks/1", "monitor", "hidden", "extra"},
+	} {
+		out, code := driveCLI(fakeWithKnownNetwork(), nil, false, args...)
+		require.Equal(t, 1, code, out)
+		require.Contains(t, out, "usage:")
+	}
+}
+
+// TestStreamKnownNetworkProperty drives the monitor's non-blocking core: the
+// current value prints, and each target wires its own subscription.
+func TestStreamKnownNetworkProperty(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	ts := "2026-07-13T10:04:00Z"
+
+	newFake := func() *fakeKnownNetwork {
+		k := fakeWithKnownNetwork().knownNetworks["/net/connman/iwd/known_networks/1"].(*fakeKnownNetwork)
+		hidden := true
+		k.hiddenEvent = &hidden
+		k.lastConnEvent = &cliOptStringEvent{v: &ts}
+		return k
+	}
+
+	for _, tc := range []struct {
+		what        string
+		wantSeed    string
+		wantEvent   string
+		wantSubcall string
+	}{
+		{"autoconnect", "true", "true", "SubscribeAutoConnectChanged"},
+		{"hidden", "hidden=false", "hidden=true", "SubscribeHiddenChanged"},
+		{"last-connected", "last-connected=2024-01-02T03:04:05Z", "last-connected=" + ts, "SubscribeLastConnectedTimeChanged"},
+	} {
+		t.Run(tc.what, func(t *testing.T) {
+			t.Parallel()
+			k := newFake()
+			app, buf := appWithBuffer(false)
+			var mu sync.Mutex
+
+			unsubscribe, err := streamKnownNetworkProperty(ctx, app, "KnownNet", tc.what, k, &mu)
+			require.NoError(t, err)
+			require.NoError(t, unsubscribe.Unsubscribe())
+
+			out := buf.String()
+			require.Contains(t, out, tc.wantSeed, "the current value must print first")
+			require.Contains(t, out, tc.wantEvent, "a subsequent change must print")
+			require.Equal(t, tc.wantSubcall, k.subscribed,
+				"target %q must subscribe to its own property", tc.what)
+		})
+	}
+}
+
+func TestStreamKnownNetworkProperty_Errors(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	var mu sync.Mutex
+	app, _ := appWithBuffer(false)
+
+	bad := &fakeKnownNetwork{path: "/k", err: errors.New("read failed")}
+	_, err := streamKnownNetworkProperty(ctx, app, "KnownNet", "hidden", bad, &mu)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "read failed")
+
+	sub := fakeWithKnownNetwork().knownNetworks["/net/connman/iwd/known_networks/1"].(*fakeKnownNetwork)
+	sub.subscribeErr = errors.New("subscribe failed")
+	_, err = streamKnownNetworkProperty(ctx, app, "KnownNet", "last-connected", sub, &mu)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "subscribe failed")
+
+	ok := fakeWithKnownNetwork().knownNetworks["/net/connman/iwd/known_networks/1"].(*fakeKnownNetwork)
+	_, err = streamKnownNetworkProperty(ctx, app, "KnownNet", "bogus", ok, &mu)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "usage:")
+}
+
+func TestParseKnownNetworkMonitorTarget(t *testing.T) {
+	t.Parallel()
+
+	for _, what := range knownNetworkMonitorTargets {
+		got, err := parseKnownNetworkMonitorTarget([]string{what})
+		require.NoError(t, err)
+		require.Equal(t, what, got)
+	}
+	for _, args := range [][]string{nil, {"bogus"}, {"hidden", "extra"}} {
+		_, err := parseKnownNetworkMonitorTarget(args)
+		require.Error(t, err)
+	}
 }

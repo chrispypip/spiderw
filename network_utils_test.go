@@ -25,6 +25,8 @@ type fakeCoreNetwork struct {
 	connectErr    atomic.Pointer[fakeCoreNetworkError]
 	err           atomic.Pointer[fakeCoreNetworkError]
 	connectedEvnt atomic.Pointer[bool]
+	knownNetEvnt  atomic.Pointer[optStringEvent]
+	essEvnt       atomic.Pointer[stringSliceEvent]
 }
 
 func (f *fakeCoreNetwork) setProps(p core.NetworkProperties) *fakeCoreNetwork {
@@ -170,4 +172,24 @@ func newTestNetworkClient(t *testing.T) *Client {
 	c, err := newClientFromWiring(wire)
 	require.NoError(t, err)
 	return c
+}
+
+func (f *fakeCoreNetwork) SubscribeKnownNetworkChanged(ctx context.Context, fn func(*string)) (core.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.knownNetEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
+	return func() error { return nil }, f.loadErr()
+}
+
+func (f *fakeCoreNetwork) SubscribeExtendedServiceSetChanged(ctx context.Context, fn func([]string)) (core.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.essEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
+	return func() error { return nil }, f.loadErr()
 }

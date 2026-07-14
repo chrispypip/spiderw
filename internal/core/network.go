@@ -58,6 +58,8 @@ type networkRaw interface {
 	Connect(ctx context.Context) error
 	SubscribePropertiesChanged(ctx context.Context, fn func(iwdbus.NetworkPropertiesChanged)) (iwdbus.UnsubscribeFunc, error)
 	SubscribeConnectedChanged(ctx context.Context, fn func(bool)) (iwdbus.UnsubscribeFunc, error)
+	SubscribeKnownNetworkChanged(ctx context.Context, fn func(*string)) (iwdbus.UnsubscribeFunc, error)
+	SubscribeExtendedServiceSetChanged(ctx context.Context, fn func([]string)) (iwdbus.UnsubscribeFunc, error)
 }
 
 // NetworkIface defines the core network operations used by the public layer.
@@ -72,6 +74,8 @@ type NetworkIface interface {
 	Connect(ctx context.Context) error
 	SubscribePropertiesChanged(ctx context.Context, fn func(NetworkPropertiesChanged)) (UnsubscribeFunc, error)
 	SubscribeConnectedChanged(ctx context.Context, fn func(bool)) (UnsubscribeFunc, error)
+	SubscribeKnownNetworkChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error)
+	SubscribeExtendedServiceSetChanged(ctx context.Context, fn func([]string)) (UnsubscribeFunc, error)
 }
 
 // NetworkProperties holds normalized network properties read in a single backend
@@ -373,4 +377,45 @@ func normalizePathList(op string, paths []string) ([]string, error) {
 		out = append(out, trimmed)
 	}
 	return out, nil
+}
+
+// SubscribeKnownNetworkChanged registers fn for changes to the KnownNetwork association. fn receives
+// the known-network object path, or nil when the network is not known. This is
+// how a network being saved or forgotten is observed.
+func (n *Network) SubscribeKnownNetworkChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	const op = "Network.SubscribeKnownNetworkChanged"
+
+	raw, err := n.rawNetwork(op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, WrapInvalidArgument(ResourceNetwork, op, "callback cannot be nil", ErrCore)
+	}
+
+	unsub, err := raw.SubscribeKnownNetworkChanged(ctx, fn)
+	if err != nil {
+		return nil, WrapNetworkUnavailable(op, "failed to call iwd Network subscribe method", err)
+	}
+	return UnsubscribeFunc(unsub), nil
+}
+
+// SubscribeExtendedServiceSetChanged registers fn for changes to the network BSS list, which changes as
+// access points come and go across scans.
+func (n *Network) SubscribeExtendedServiceSetChanged(ctx context.Context, fn func([]string)) (UnsubscribeFunc, error) {
+	const op = "Network.SubscribeExtendedServiceSetChanged"
+
+	raw, err := n.rawNetwork(op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, WrapInvalidArgument(ResourceNetwork, op, "callback cannot be nil", ErrCore)
+	}
+
+	unsub, err := raw.SubscribeExtendedServiceSetChanged(ctx, fn)
+	if err != nil {
+		return nil, WrapNetworkUnavailable(op, "failed to call iwd Network subscribe method", err)
+	}
+	return UnsubscribeFunc(unsub), nil
 }

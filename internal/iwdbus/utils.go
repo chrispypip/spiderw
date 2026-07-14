@@ -3,6 +3,7 @@ package iwdbus
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
@@ -54,4 +55,18 @@ func splitSignalName(name string) (string, string) {
 	iface := strings.Join(parts[:len(parts)-1], ".")
 	member := parts[len(parts)-1]
 	return iface, member
+}
+
+// propertyCleared reports whether a PropertiesChanged event says the named
+// property no longer has a value.
+//
+// iwd does not report "no longer connected" by sending the null path "/" in
+// Changed — it lists the property in Invalidated and sends nothing else. This was
+// confirmed on hardware: disconnecting a station produced no ConnectedNetwork or
+// ConnectedAccessPoint value at all, and forgetting a network produced no
+// KnownNetwork value. Any subscription over an optional property must therefore
+// treat invalidation as the "gone" signal, or it silently never fires on the
+// transition that matters most.
+func propertyCleared(invalidated []string, name string) bool {
+	return slices.Contains(invalidated, name)
 }

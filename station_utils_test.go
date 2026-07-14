@@ -13,6 +13,13 @@ type fakeCoreStationError struct {
 	err error
 }
 
+// optStringEvent and stringSliceEvent wrap subscribe payloads so a fake can
+// distinguish "no event configured" (nil pointer) from "an event carrying nil"
+// (e.g. ConnectedNetwork when disconnected).
+type optStringEvent struct{ v *string }
+
+type stringSliceEvent struct{ v []string }
+
 type fakeCoreStation struct {
 	state                atomic.Value // core.StationState
 	scanning             atomic.Bool
@@ -22,6 +29,9 @@ type fakeCoreStation struct {
 	orderedNetworks      atomic.Pointer[[]core.OrderedNetwork]
 	hiddenAPs            atomic.Pointer[[]core.HiddenAccessPoint]
 	subPropsEvent        atomic.Value // core.StationPropertiesChanged
+	connNetEvnt          atomic.Pointer[optStringEvent]
+	connAPEvnt           atomic.Pointer[optStringEvent]
+	affinityEvnt         atomic.Pointer[stringSliceEvent]
 
 	scanCalled        atomic.Bool
 	disconnectCalled  atomic.Bool
@@ -184,5 +194,35 @@ func (f *fakeCoreStation) SubscribeScanningChanged(ctx context.Context, fn func(
 		}
 	}
 
+	return func() error { return nil }, f.loadErr()
+}
+
+func (f *fakeCoreStation) SubscribeConnectedNetworkChanged(ctx context.Context, fn func(*string)) (core.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.connNetEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
+	return func() error { return nil }, f.loadErr()
+}
+
+func (f *fakeCoreStation) SubscribeConnectedAccessPointChanged(ctx context.Context, fn func(*string)) (core.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.connAPEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
+	return func() error { return nil }, f.loadErr()
+}
+
+func (f *fakeCoreStation) SubscribeAffinitiesChanged(ctx context.Context, fn func([]string)) (core.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.affinityEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
 	return func() error { return nil }, f.loadErr()
 }

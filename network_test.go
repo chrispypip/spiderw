@@ -359,3 +359,77 @@ func TestClient_AllNetworks(t *testing.T) {
 		require.ErrorIs(t, err, ErrInternal)
 	})
 }
+
+func TestNetwork_NewSubscribes(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	kn := "/net/connman/iwd/known_network/abc"
+
+	t.Run("KnownNetworkChanged", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeCoreNetwork{}
+		f.knownNetEvnt.Store(&optStringEvent{v: &kn})
+
+		got := make(chan *string, 1)
+		_, err := newNetwork(f, "/n").SubscribeKnownNetworkChanged(ctx, func(p *string) { got <- p })
+		require.NoError(t, err)
+		require.Equal(t, kn, *<-got)
+	})
+
+	t.Run("KnownNetworkChanged delivers nil when forgotten", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeCoreNetwork{}
+		f.knownNetEvnt.Store(&optStringEvent{v: nil})
+
+		got := make(chan *string, 1)
+		_, err := newNetwork(f, "/n").SubscribeKnownNetworkChanged(ctx, func(p *string) { got <- p })
+		require.NoError(t, err)
+		require.Nil(t, <-got)
+	})
+
+	t.Run("ExtendedServiceSetChanged", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeCoreNetwork{}
+		f.essEvnt.Store(&stringSliceEvent{v: []string{"/bss/a"}})
+
+		got := make(chan []string, 1)
+		_, err := newNetwork(f, "/n").SubscribeExtendedServiceSetChanged(ctx, func(p []string) { got <- p })
+		require.NoError(t, err)
+		require.Equal(t, []string{"/bss/a"}, <-got)
+	})
+
+	t.Run("Guards", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range []struct {
+			name    string
+			nilFn   func(*Network) error
+			backend func(*Network) error
+		}{
+			{"KnownNetworkChanged",
+				func(n *Network) error { _, err := n.SubscribeKnownNetworkChanged(ctx, nil); return err },
+				func(n *Network) error {
+					_, err := n.SubscribeKnownNetworkChanged(ctx, func(*string) {})
+					return err
+				}},
+			{"ExtendedServiceSetChanged",
+				func(n *Network) error { _, err := n.SubscribeExtendedServiceSetChanged(ctx, nil); return err },
+				func(n *Network) error {
+					_, err := n.SubscribeExtendedServiceSetChanged(ctx, func([]string) {})
+					return err
+				}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				require.Error(t, tc.nilFn(newNetwork(&fakeCoreNetwork{}, "/n")))
+
+				f := &fakeCoreNetwork{}
+				f.setErr(errors.New("subscribe failed"))
+				require.Error(t, tc.backend(newNetwork(f, "/n")))
+
+				var nilNetwork *Network
+				require.Error(t, tc.backend(nilNetwork))
+			})
+		}
+	})
+}

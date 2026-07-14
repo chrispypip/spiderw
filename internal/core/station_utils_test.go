@@ -17,6 +17,13 @@ type fakeStationError struct {
 	err error
 }
 
+// optStringEvent and stringSliceEvent wrap subscribe payloads so a fake can
+// distinguish "no event configured" (nil pointer) from "an event carrying nil"
+// (e.g. ConnectedNetwork when disconnected).
+type optStringEvent struct{ v *string }
+
+type stringSliceEvent struct{ v []string }
+
 type fakeIwdbusStation struct {
 	state                atomic.Value // iwdbus.StationState
 	scanning             atomic.Bool
@@ -26,6 +33,9 @@ type fakeIwdbusStation struct {
 	orderedNetworks      atomic.Pointer[[]iwdbus.OrderedNetwork]
 	hiddenAPs            atomic.Pointer[[]iwdbus.HiddenAccessPoint]
 	subPropsEvent        atomic.Value // iwdbus.StationPropertiesChanged
+	connNetEvnt          atomic.Pointer[optStringEvent]
+	connAPEvnt           atomic.Pointer[optStringEvent]
+	affinityEvnt         atomic.Pointer[stringSliceEvent]
 
 	scanCalled        atomic.Bool
 	disconnectCalled  atomic.Bool
@@ -205,4 +215,34 @@ func newTestStation(t *testing.T) *Station {
 	require.NotNil(t, s)
 
 	return s
+}
+
+func (f *fakeIwdbusStation) SubscribeConnectedNetworkChanged(ctx context.Context, fn func(*string)) (iwdbus.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.connNetEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
+	return func() error { return nil }, f.loadErr()
+}
+
+func (f *fakeIwdbusStation) SubscribeConnectedAccessPointChanged(ctx context.Context, fn func(*string)) (iwdbus.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.connAPEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
+	return func() error { return nil }, f.loadErr()
+}
+
+func (f *fakeIwdbusStation) SubscribeAffinitiesChanged(ctx context.Context, fn func([]string)) (iwdbus.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.affinityEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
+	return func() error { return nil }, f.loadErr()
 }

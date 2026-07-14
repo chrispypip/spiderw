@@ -45,6 +45,10 @@ func TestNetwork_Iwdbus(t *testing.T) {
 	t.Run("Subscribe", func(t *testing.T) {
 		t.Parallel()
 		t.Run("ConnectedChanged", testNetwork_SubscribeConnectedChanged)
+		t.Run("KnownNetworkChanged", testNetwork_SubscribeKnownNetworkChanged)
+		t.Run("KnownNetworkInvalidated", testNetwork_SubscribeKnownNetworkInvalidated)
+		t.Run("ExtendedServiceSetChanged", testNetwork_SubscribeExtendedServiceSetChanged)
+		t.Run("NewSubscribers_Guards", testNetwork_SubscribeNew_SkipMalformedAndNilCallback)
 	})
 
 	t.Run("Firehose", func(t *testing.T) {
@@ -365,4 +369,104 @@ func testNetwork_NoIntro(t *testing.T) {
 			require.Contains(t, err.Error(), "network is not initialized")
 		})
 	}
+}
+
+func testNetwork_SubscribeKnownNetworkChanged(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeSignalSource(t)
+	n := &Network{signals: fake}
+
+	got := make(chan *string, 2)
+	_, err := n.SubscribeKnownNetworkChanged(context.Background(), func(p *string) { got <- p })
+	require.NoError(t, err)
+
+	// Saving the network gives it a known-network record.
+	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdNetworkIface,
+		map[string]dbus.Variant{"KnownNetwork": dbus.MakeVariant(dbus.ObjectPath("/net/connman/iwd/known_network/abc"))}, []string{})
+	p := <-got
+	require.NotNil(t, p)
+	require.Equal(t, "/net/connman/iwd/known_network/abc", *p)
+
+	// Forgetting it takes the record away; iwd reports the null path.
+	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdNetworkIface,
+		map[string]dbus.Variant{"KnownNetwork": dbus.MakeVariant(dbus.ObjectPath("/"))}, []string{})
+	require.Nil(t, <-got, "a forgotten network must surface as nil, not the literal null path")
+}
+
+func testNetwork_SubscribeExtendedServiceSetChanged(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeSignalSource(t)
+	n := &Network{signals: fake}
+
+	got := make(chan []string, 1)
+	_, err := n.SubscribeExtendedServiceSetChanged(context.Background(), func(p []string) { got <- p })
+	require.NoError(t, err)
+
+	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdNetworkIface,
+		map[string]dbus.Variant{"ExtendedServiceSet": dbus.MakeVariant([]dbus.ObjectPath{
+			"/net/connman/iwd/0/3/ssid_psk/aabbccddeeff",
+			"/net/connman/iwd/0/3/ssid_psk/112233445566",
+		})}, []string{})
+
+	require.Equal(t, []string{
+		"/net/connman/iwd/0/3/ssid_psk/aabbccddeeff",
+		"/net/connman/iwd/0/3/ssid_psk/112233445566",
+	}, <-got)
+}
+
+func testNetwork_SubscribeNew_SkipMalformedAndNilCallback(t *testing.T) {
+	t.Parallel()
+
+	t.Run("malformed skipped", func(t *testing.T) {
+		t.Parallel()
+		fake := newFakeSignalSource(t)
+		n := &Network{signals: fake}
+
+		fired := make(chan struct{}, 1)
+		_, err := n.SubscribeKnownNetworkChanged(context.Background(), func(*string) { fired <- struct{}{} })
+		require.NoError(t, err)
+
+		fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdNetworkIface,
+			map[string]dbus.Variant{"KnownNetwork": dbus.MakeVariant(int64(1))}, []string{})
+
+		select {
+		case <-fired:
+			t.Fatal("callback fired for a malformed KnownNetwork value")
+		default:
+		}
+	})
+
+	t.Run("nil callback", func(t *testing.T) {
+		t.Parallel()
+		n := &Network{signals: newFakeSignalSource(t)}
+
+		_, err := n.SubscribeKnownNetworkChanged(context.Background(), nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "fn cannot be nil")
+
+		_, err = n.SubscribeExtendedServiceSetChanged(context.Background(), nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "fn cannot be nil")
+	})
+}
+
+// testNetwork_SubscribeKnownNetworkInvalidated guards the hardware behavior:
+// forgetting a network invalidates the KnownNetwork property rather than sending
+// the null path, so a subscription that reads only Changed never sees the forget.
+func testNetwork_SubscribeKnownNetworkInvalidated(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeSignalSource(t)
+	n := &Network{signals: fake}
+
+	got := make(chan *string, 1)
+	_, err := n.SubscribeKnownNetworkChanged(context.Background(), func(p *string) { got <- p })
+	require.NoError(t, err)
+
+	fake.emit("org.freedesktop.DBus.Properties", "PropertiesChanged", IwdNetworkIface,
+		map[string]dbus.Variant{}, []string{"KnownNetwork"})
+
+	require.Nil(t, <-got, "an invalidated KnownNetwork means the network was forgotten")
 }

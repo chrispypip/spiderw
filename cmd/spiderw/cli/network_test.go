@@ -277,3 +277,147 @@ func TestPrintNetworkConnectedLine(t *testing.T) {
 	require.NoError(t, printNetworkConnectedLine(appJSON, "OpenNet", false, &mu))
 	require.Contains(t, bufJSON.String(), `"Connected":false`)
 }
+
+// TestPrintNetworkMonitorLines covers the new network monitor output helpers
+// directly (the monitor command blocks on an OS signal).
+func TestPrintNetworkMonitorLines(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	kn := "/net/connman/iwd/known_network/abc"
+
+	t.Run("known-network", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		// Human output shows the resolved name, not the raw path.
+		require.NoError(t, printNetworkKnownNetworkLine(app, "MyNet", &nameRef{Name: "KnownNet", Path: kn}, &mu))
+		require.Equal(t, "known-network=KnownNet\n", buf.String())
+
+		// An unresolvable ref falls back to the path rather than printing blank.
+		appPath, bufPath := appWithBuffer(false)
+		require.NoError(t, printNetworkKnownNetworkLine(appPath, "MyNet", &nameRef{Path: kn}, &mu))
+		require.Equal(t, "known-network="+kn+"\n", bufPath.String())
+
+		// A forgotten network reports nil, which must read as words rather than an
+		// empty value.
+		appOff, bufOff := appWithBuffer(false)
+		require.NoError(t, printNetworkKnownNetworkLine(appOff, "MyNet", nil, &mu))
+		require.Equal(t, "known-network=none (not saved)\n", bufOff.String())
+
+		appJSON, bufJSON := appWithBuffer(true)
+		require.NoError(t, printNetworkKnownNetworkLine(appJSON, "MyNet", nil, &mu))
+		require.Contains(t, bufJSON.String(), `"KnownNetwork":null`)
+	})
+
+	t.Run("bsses", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		require.NoError(t, printNetworkBSSesLine(app, "MyNet", []string{"/bss/a", "/bss/b"}, &mu))
+		require.Equal(t, "bsses=/bss/a, /bss/b\n", buf.String())
+
+		appOff, bufOff := appWithBuffer(false)
+		require.NoError(t, printNetworkBSSesLine(appOff, "MyNet", nil, &mu))
+		require.Equal(t, "bsses=none\n", bufOff.String())
+
+		appJSON, bufJSON := appWithBuffer(true)
+		require.NoError(t, printNetworkBSSesLine(appJSON, "MyNet", []string{"/bss/a"}, &mu))
+		require.Contains(t, bufJSON.String(), `"ExtendedServiceSet":["/bss/a"]`)
+	})
+}
+
+func TestNetworkCmd_Monitor_BadArgs(t *testing.T) {
+	t.Parallel()
+
+	for _, args := range [][]string{
+		{"network", "/net/connman/iwd/phy0/wlan0/open", "monitor"},
+		{"network", "/net/connman/iwd/phy0/wlan0/open", "monitor", "bogus"},
+		{"network", "/net/connman/iwd/phy0/wlan0/open", "monitor", "connected", "extra"},
+	} {
+		out, code := driveCLI(fakeWithNetwork(), nil, false, args...)
+		require.Equal(t, 1, code, out)
+		require.Contains(t, out, "usage:")
+	}
+}
+
+// TestStreamNetworkProperty drives the monitor's non-blocking core: the current
+// value prints, and each target wires its own subscription.
+func TestStreamNetworkProperty(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	knPath := "/net/connman/iwd/known_network/evented"
+	bssPath := "/net/connman/iwd/phy0/wlan0/ffeeddccbbaa"
+
+	// The open network has no KnownNetwork, so "known-network" seeds as "not saved"
+	// and then streams the saved path — the save transition, end to end.
+	newFake := func() *fakeNetwork {
+		n := fakeWithNetwork().networks["/net/connman/iwd/phy0/wlan0/open"].(*fakeNetwork)
+		n.knownNetEvent = &cliOptStringEvent{v: &knPath}
+		n.essEvent = &cliStringSliceEvent{v: []string{bssPath}}
+		return n
+	}
+
+	for _, tc := range []struct {
+		what        string
+		wantSeed    string
+		wantEvent   string
+		wantSubcall string
+	}{
+		{"connected", "connected=", "connected=", "SubscribeConnectedChanged"},
+		{"known-network", "known-network=none (not saved)", "known-network=" + knPath, "SubscribeKnownNetworkChanged"},
+		{"bsses", "bsses=", "bsses=" + bssPath, "SubscribeExtendedServiceSetChanged"},
+	} {
+		t.Run(tc.what, func(t *testing.T) {
+			t.Parallel()
+			n := newFake()
+			app, buf := appWithBuffer(false)
+			var mu sync.Mutex
+
+			unsubscribe, err := streamNetworkProperty(ctx, app, "OpenNet", tc.what, n, monitorResolver{}, &mu)
+			require.NoError(t, err)
+			require.NoError(t, unsubscribe.Unsubscribe())
+
+			out := buf.String()
+			require.Contains(t, out, tc.wantSeed, "the current value must print first")
+			require.Contains(t, out, tc.wantEvent, "a subsequent change must print")
+			require.Equal(t, tc.wantSubcall, n.subscribed,
+				"target %q must subscribe to its own property", tc.what)
+		})
+	}
+}
+
+func TestStreamNetworkProperty_Errors(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	var mu sync.Mutex
+	app, _ := appWithBuffer(false)
+
+	bad := &fakeNetwork{path: "/n", err: errors.New("read failed")}
+	_, err := streamNetworkProperty(ctx, app, "OpenNet", "known-network", bad, monitorResolver{}, &mu)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "read failed")
+
+	sub := fakeWithNetwork().networks["/net/connman/iwd/phy0/wlan0/open"].(*fakeNetwork)
+	sub.subscribeErr = errors.New("subscribe failed")
+	_, err = streamNetworkProperty(ctx, app, "OpenNet", "bsses", sub, monitorResolver{}, &mu)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "subscribe failed")
+
+	ok := fakeWithNetwork().networks["/net/connman/iwd/phy0/wlan0/open"].(*fakeNetwork)
+	_, err = streamNetworkProperty(ctx, app, "OpenNet", "bogus", ok, monitorResolver{}, &mu)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "usage:")
+}
+
+func TestParseNetworkMonitorTarget(t *testing.T) {
+	t.Parallel()
+
+	for _, what := range networkMonitorTargets {
+		got, err := parseNetworkMonitorTarget([]string{what})
+		require.NoError(t, err)
+		require.Equal(t, what, got)
+	}
+	for _, args := range [][]string{nil, {"bogus"}, {"connected", "extra"}} {
+		_, err := parseNetworkMonitorTarget(args)
+		require.Error(t, err)
+	}
+}

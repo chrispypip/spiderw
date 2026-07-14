@@ -708,3 +708,261 @@ func TestStationCmd_WSC_HandleUnavailable(t *testing.T) {
 	require.NotEqual(t, 0, code)
 	require.Contains(t, out, "wsc not available")
 }
+
+// TestPrintStationMonitorLines covers the station monitor output helpers directly
+// (the monitor command itself blocks on an OS signal and is not drivable
+// in-process). The optional-path lines are the interesting ones: iwd's null path
+// arrives as nil, and "disconnected" must read as a word, not an empty value.
+func TestPrintStationMonitorLines(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	path := "/net/connman/iwd/0/3/ssid_psk"
+
+	t.Run("state", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		require.NoError(t, printStationStateLine(app, "wlan0", spiderw.StationStateConnected, &mu))
+		require.Equal(t, "state=connected\n", buf.String())
+
+		appJSON, bufJSON := appWithBuffer(true)
+		require.NoError(t, printStationStateLine(appJSON, "wlan0", spiderw.StationStateRoaming, &mu))
+		require.Contains(t, bufJSON.String(), `"State":"roaming"`)
+	})
+
+	t.Run("scanning", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		require.NoError(t, printStationScanningLine(app, "wlan0", true, &mu))
+		require.Equal(t, "scanning=true\n", buf.String())
+
+		appJSON, bufJSON := appWithBuffer(true)
+		require.NoError(t, printStationScanningLine(appJSON, "wlan0", true, &mu))
+		require.Contains(t, bufJSON.String(), `"Scanning":true`)
+	})
+
+	t.Run("network", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		require.NoError(t, printStationConnectedNetworkLine(app, "wlan0", &nameRef{Name: "MySSID", Path: path}, &mu))
+		require.Equal(t, "network=MySSID\n", buf.String(), "the SSID is shown, not the path")
+
+		appOff, bufOff := appWithBuffer(false)
+		require.NoError(t, printStationConnectedNetworkLine(appOff, "wlan0", nil, &mu))
+		require.Equal(t, "network=none (disconnected)\n", bufOff.String())
+
+		appJSON, bufJSON := appWithBuffer(true)
+		require.NoError(t, printStationConnectedNetworkLine(appJSON, "wlan0", nil, &mu))
+		require.Contains(t, bufJSON.String(), `"ConnectedNetwork":null`)
+	})
+
+	t.Run("access-point", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		require.NoError(t, printStationConnectedAPLine(app, "wlan0", &addrRef{Address: testStationMAC, Path: path}, &mu))
+		require.Equal(t, "access-point="+testStationMAC+"\n", buf.String(), "the MAC is shown, not the path")
+
+		appOff, bufOff := appWithBuffer(false)
+		require.NoError(t, printStationConnectedAPLine(appOff, "wlan0", nil, &mu))
+		require.Equal(t, "access-point=none (not associated)\n", bufOff.String())
+
+		appJSON, bufJSON := appWithBuffer(true)
+		require.NoError(t, printStationConnectedAPLine(appJSON, "wlan0", &addrRef{Address: testStationMAC, Path: path}, &mu))
+		require.Contains(t, bufJSON.String(), `"Address":"`+testStationMAC+`"`)
+		require.Contains(t, bufJSON.String(), `"Path":"`+path+`"`, "JSON keeps the path alongside the MAC")
+	})
+
+	t.Run("affinities", func(t *testing.T) {
+		t.Parallel()
+		app, buf := appWithBuffer(false)
+		require.NoError(t, printStationAffinitiesLine(app, "wlan0", []addrRef{{Address: "aa:bb", Path: "/a"}, {Address: "cc:dd", Path: "/b"}}, &mu))
+		require.Equal(t, "affinities=aa:bb, cc:dd\n", buf.String(), "MACs, not paths")
+
+		appOff, bufOff := appWithBuffer(false)
+		require.NoError(t, printStationAffinitiesLine(appOff, "wlan0", nil, &mu))
+		require.Equal(t, "affinities=none\n", bufOff.String(), "a cleared list must read as none, not blank")
+
+		appJSON, bufJSON := appWithBuffer(true)
+		require.NoError(t, printStationAffinitiesLine(appJSON, "wlan0", []addrRef{{Address: "aa:bb", Path: "/a"}}, &mu))
+		require.Contains(t, bufJSON.String(), `"Address":"aa:bb"`)
+	})
+}
+
+func TestStationCmd_Monitor_BadArgs(t *testing.T) {
+	t.Parallel()
+
+	// Argument validation runs before the command blocks on a signal, so these are
+	// drivable in-process.
+	for _, args := range [][]string{
+		{"station", testStationPath, "monitor"},
+		{"station", testStationPath, "monitor", "bogus"},
+		{"station", testStationPath, "monitor", "state", "extra"},
+	} {
+		out, code := driveCLI(fakeWithStation(), nil, false, args...)
+		require.Equal(t, 1, code, out)
+		require.Contains(t, out, "usage:")
+	}
+}
+
+// TestStreamStationProperty drives the monitor's non-blocking core directly: it
+// prints the current value and wires the matching subscription. The `subscribed`
+// assertion is the point — it proves each target reaches its own Subscribe method,
+// so swapping two branches of the switch (network <-> access-point, an easy
+// copy-paste slip) fails here instead of shipping.
+func TestStreamStationProperty(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	netPath := "/net/connman/iwd/phy0/wlan0/evented_psk"
+	apPath := "/net/connman/iwd/phy0/wlan0/112233445566"
+
+	// A fully-populated station whose subscribe events carry values distinct from
+	// its Properties(), so the streamed line cannot be confused with the seed line.
+	newFake := func() *fakeStation {
+		st := &fakeStation{
+			path:  testStationPath,
+			name:  testStationName,
+			props: fakeWithStation().allStations[0].(*fakeStation).props,
+		}
+		state := spiderw.StationStateRoaming
+		st.stateEvent = &state
+		st.connNetEvent = &cliOptStringEvent{v: &netPath}
+		st.connAPEvent = &cliOptStringEvent{v: &apPath}
+		st.affinityEvent = &cliStringSliceEvent{v: []string{apPath}}
+		return st
+	}
+
+	// The seed line renders the ref Properties() already resolved (SSID / MAC). The
+	// streamed line goes through the resolver, which here has no client, so it falls
+	// back to the raw path — proving the fallback never prints blank.
+	for _, tc := range []struct {
+		what        string
+		wantSeed    string
+		wantEvent   string
+		wantSubcall string
+	}{
+		{"state", "state=connected", "state=roaming", "SubscribeStateChanged"},
+		{"scanning", "scanning=false", "scanning=", "SubscribeScanningChanged"},
+		{"network", "network=KnownNet", "network=" + netPath, "SubscribeConnectedNetworkChanged"},
+		{"access-point", "access-point=" + testStationMAC, "access-point=" + apPath, "SubscribeConnectedAccessPointChanged"},
+		{"affinities", "affinities=" + testStationMAC, "affinities=" + apPath, "SubscribeAffinitiesChanged"},
+	} {
+		t.Run(tc.what, func(t *testing.T) {
+			t.Parallel()
+			st := newFake()
+			app, buf := appWithBuffer(false)
+			var mu sync.Mutex
+
+			unsubscribe, err := streamStationProperty(ctx, app, testStationName, tc.what, st, monitorResolver{}, &mu)
+			require.NoError(t, err)
+			require.NotNil(t, unsubscribe)
+			require.NoError(t, unsubscribe.Unsubscribe())
+
+			out := buf.String()
+			require.Contains(t, out, tc.wantSeed, "the current value must print first")
+			require.Contains(t, out, tc.wantEvent, "a subsequent change must print")
+			require.Equal(t, tc.wantSubcall, st.subscribed,
+				"target %q must subscribe to its own property", tc.what)
+		})
+	}
+}
+
+func TestStreamStationProperty_Errors(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	var mu sync.Mutex
+
+	t.Run("properties error", func(t *testing.T) {
+		t.Parallel()
+		st := &fakeStation{path: testStationPath, err: errors.New("read failed")}
+		app, _ := appWithBuffer(false)
+		_, err := streamStationProperty(ctx, app, testStationName, "state", st, monitorResolver{}, &mu)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "read failed")
+	})
+
+	t.Run("subscribe error", func(t *testing.T) {
+		t.Parallel()
+		// Properties succeeds, the subscription does not.
+		st := &fakeStation{path: testStationPath, subscribeErr: errors.New("subscribe failed")}
+		st.props = fakeWithStation().allStations[0].(*fakeStation).props
+		app, _ := appWithBuffer(false)
+		_, err := streamStationProperty(ctx, app, testStationName, "state", st, monitorResolver{}, &mu)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "subscribe failed")
+	})
+
+	t.Run("unknown target", func(t *testing.T) {
+		t.Parallel()
+		st := &fakeStation{path: testStationPath}
+		st.props = fakeWithStation().allStations[0].(*fakeStation).props
+		app, _ := appWithBuffer(false)
+		_, err := streamStationProperty(ctx, app, testStationName, "bogus", st, monitorResolver{}, &mu)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "usage:")
+	})
+}
+
+func TestParseStationMonitorTarget(t *testing.T) {
+	t.Parallel()
+
+	for _, what := range stationMonitorTargets {
+		got, err := parseStationMonitorTarget([]string{what})
+		require.NoError(t, err)
+		require.Equal(t, what, got)
+	}
+	for _, args := range [][]string{nil, {}, {"bogus"}, {"state", "extra"}} {
+		_, err := parseStationMonitorTarget(args)
+		require.Error(t, err)
+	}
+}
+
+// TestStreamStationProperty_ResolvesNames proves the streamed value — which the
+// subscription delivers as a bare object path — is rendered as the SSID (and the
+// BSS as a MAC), matching what `station status` shows. Without the resolver the
+// user would see /net/connman/iwd/0/3/<hex-ssid>_psk instead of the SSID.
+func TestStreamStationProperty_ResolvesNames(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	fc := fakeWithStation()
+	st := fc.allStations[0].(*fakeStation)
+	netPath := "/net/connman/iwd/phy0/wlan0/open"
+	st.connNetEvent = &cliOptStringEvent{v: &netPath}
+
+	// The client can resolve that path to a network with an SSID.
+	fc.networks = map[string]networkAPI{
+		netPath: &fakeNetwork{path: netPath, props: &spiderw.NetworkProperties{Name: "OpenNet"}},
+	}
+
+	app, buf := appWithBuffer(false)
+	var mu sync.Mutex
+
+	unsubscribe, err := streamStationProperty(ctx, app, testStationName, "network", st, monitorResolver{client: fc}, &mu)
+	require.NoError(t, err)
+	require.NoError(t, unsubscribe.Unsubscribe())
+
+	require.Contains(t, buf.String(), "network=OpenNet", "the streamed path must render as its SSID")
+	require.NotContains(t, buf.String(), netPath, "the raw path must not leak into human output")
+}
+
+// TestStreamStationProperty_DisconnectClearsLine covers the hardware bug end to
+// end at the CLI: iwd invalidates ConnectedNetwork on a disconnect rather than
+// sending a value, and the monitor must print the disconnected line rather than
+// staying silent.
+func TestStreamStationProperty_DisconnectClearsLine(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	fc := fakeWithStation()
+	st := fc.allStations[0].(*fakeStation)
+	st.connNetEvent = &cliOptStringEvent{v: nil} // the invalidation, delivered as nil
+
+	app, buf := appWithBuffer(false)
+	var mu sync.Mutex
+
+	unsubscribe, err := streamStationProperty(ctx, app, testStationName, "network", st, monitorResolver{client: fc}, &mu)
+	require.NoError(t, err)
+	require.NoError(t, unsubscribe.Unsubscribe())
+
+	require.Contains(t, buf.String(), "network=none (disconnected)")
+}

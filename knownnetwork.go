@@ -213,3 +213,43 @@ func (k *KnownNetwork) SubscribeAutoConnectChanged(ctx context.Context, fn func(
 	}
 	return UnsubscribeFunc(unsubscribe), nil
 }
+
+// SubscribeHiddenChanged registers fn for changes to the Hidden property.
+func (k *KnownNetwork) SubscribeHiddenChanged(ctx context.Context, fn func(bool)) (UnsubscribeFunc, error) {
+	const op = "KnownNetwork.SubscribeHiddenChanged"
+
+	coreKnownNetwork, err := k.coreKnownNetwork(ctx, op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, &Error{Kind: KindInvalidArgument, Resource: ResourceKnownNetwork, Op: op, Details: "callback cannot be nil", Err: ErrInvalidArgument}
+	}
+
+	unsubscribe, err := coreKnownNetwork.SubscribeHiddenChanged(ctx, fn)
+	if err != nil {
+		return nil, wrapPublicError(op, err)
+	}
+	return UnsubscribeFunc(unsubscribe), nil
+}
+
+// SubscribeLastConnectedTimeChanged registers fn for changes to
+// LastConnectedTime, an ISO 8601 timestamp. iwd updates it on each successful
+// connection, so this fires once per connect to the network.
+func (k *KnownNetwork) SubscribeLastConnectedTimeChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	const op = "KnownNetwork.SubscribeLastConnectedTimeChanged"
+
+	coreKnownNetwork, err := k.coreKnownNetwork(ctx, op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, &Error{Kind: KindInvalidArgument, Resource: ResourceKnownNetwork, Op: op, Details: "callback cannot be nil", Err: ErrInvalidArgument}
+	}
+
+	unsubscribe, err := coreKnownNetwork.SubscribeLastConnectedTimeChanged(ctx, fn)
+	if err != nil {
+		return nil, wrapPublicError(op, err)
+	}
+	return UnsubscribeFunc(unsubscribe), nil
+}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -900,6 +901,8 @@ func runStationWithRef(app *App, args []string) error {
 		return runStationMonitorSignal(app, ctx, stationRef, rest)
 	case "wsc":
 		return runStationWSC(app, ctx, stationRef, rest)
+	case "monitor":
+		return monitorStation(app, stationRef, rest)
 	default:
 		printStationUsage(app)
 		return fmt.Errorf("unknown station command %q for station %q", op, stationRef)
@@ -938,6 +941,14 @@ const stationHelpText = `Commands:
   <station> affinities                  Show the station's affinity BSSes (MACs)
   <station> affinities set <bss>...     Set affinities by BSS MAC or object path
   <station> affinities clear            Remove all affinities
+  <station> monitor state               Stream the connection state until Ctrl-C
+  <station> monitor scanning            Stream the scanning flag
+  <station> monitor network             Stream the connected network's SSID
+  <station> monitor access-point        Stream the associated BSS (MAC). This is
+                                        how roaming is watched: the BSS changes
+                                        while the state stays connected and the
+                                        network does not change
+  <station> monitor affinities          Stream the roaming affinity BSSes (MACs)
   <station> monitor-signal <dBm>...     Monitor connected-network signal. Args
                                         are RSSI thresholds in dBm, highest
                                         first (e.g. -60 -70 -80); prints the band
@@ -958,6 +969,7 @@ func stationCommand(app *App) *Command {
 		Name:        "station",
 		Description: "Inspect iwd station (station-mode device) connection state",
 		HelpText:    stationHelpText,
+		SubUsage:    map[string]string{"monitor": stationMonitorUsage},
 		Execute: func(args []string) error {
 			return runStation(app, args)
 		},
@@ -966,4 +978,220 @@ func stationCommand(app *App) *Command {
 
 func printStationUsage(app *App) {
 	stationCommand(app).printUsage(app)
+}
+
+// stationStateResult reports the station's connection state.
+type stationStateResult struct {
+	Station string `json:"Station"`
+	State   string `json:"State"`
+}
+
+func printStationStateLine(app *App, ref string, state spiderw.StationState, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	out := stationStateResult{Station: ref, State: state.String()}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	_, err := fmt.Fprintf(app.stdout(), "state=%s\n", state)
+	return err
+}
+
+// stationScanningResult reports whether the station is scanning.
+type stationScanningResult struct {
+	Station  string `json:"Station"`
+	Scanning bool   `json:"Scanning"`
+}
+
+func printStationScanningLine(app *App, ref string, scanning bool, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	out := stationScanningResult{Station: ref, Scanning: scanning}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	_, err := fmt.Fprintf(app.stdout(), "scanning=%t\n", scanning)
+	return err
+}
+
+// stationConnectedNetworkResult reports the network the station is on, resolved to
+// its SSID. A nil ref means disconnected.
+type stationConnectedNetworkResult struct {
+	Station          string   `json:"Station"`
+	ConnectedNetwork *nameRef `json:"ConnectedNetwork"`
+}
+
+func printStationConnectedNetworkLine(app *App, ref string, net *nameRef, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	out := stationConnectedNetworkResult{Station: ref, ConnectedNetwork: net}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	// Human output shows the SSID (falling back to the path if it could not be
+	// resolved); JSON carries both.
+	_, err := fmt.Fprintf(app.stdout(), "network=%s\n", readableNameRef(net, "none (disconnected)"))
+	return err
+}
+
+// stationConnectedAPResult reports the BSS the station is associated with,
+// resolved to its MAC. A nil ref means not associated.
+type stationConnectedAPResult struct {
+	Station              string   `json:"Station"`
+	ConnectedAccessPoint *addrRef `json:"ConnectedAccessPoint"`
+}
+
+func printStationConnectedAPLine(app *App, ref string, bss *addrRef, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	out := stationConnectedAPResult{Station: ref, ConnectedAccessPoint: bss}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	_, err := fmt.Fprintf(app.stdout(), "access-point=%s\n", readableAddrRef(bss, "none (not associated)"))
+	return err
+}
+
+// stationAffinitiesMonitorResult reports the station's roaming affinities,
+// resolved to MACs.
+type stationAffinitiesMonitorResult struct {
+	Station    string    `json:"Station"`
+	Affinities []addrRef `json:"Affinities"`
+}
+
+func printStationAffinitiesLine(app *App, ref string, bsses []addrRef, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	out := stationAffinitiesMonitorResult{Station: ref, Affinities: bsses}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	text := "none"
+	if len(bsses) > 0 {
+		text = readableAddrRefs(bsses)
+	}
+	_, err := fmt.Fprintf(app.stdout(), "affinities=%s\n", text)
+	return err
+}
+
+const stationMonitorUsage = "usage: spiderw station <station> monitor <state|scanning|network|access-point|affinities>"
+
+// stationMonitorTargets are the properties `station <ref> monitor` can stream.
+var stationMonitorTargets = []string{"state", "scanning", "network", "access-point", "affinities"}
+
+// parseStationMonitorTarget validates the monitor target before any iwd call.
+func parseStationMonitorTarget(args []string) (string, error) {
+	// `monitor --help` should list what can be monitored, same as an invalid
+	// target does, rather than falling through to a generic error.
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help") {
+		return "", fmt.Errorf("%s", stationMonitorUsage)
+	}
+	if len(args) != 1 || !slices.Contains(stationMonitorTargets, args[0]) {
+		return "", fmt.Errorf("%s", stationMonitorUsage)
+	}
+	return args[0], nil
+}
+
+// streamStationProperty prints the property's current value, then subscribes so
+// subsequent changes print too. It returns the subscription so the caller can
+// unsubscribe; it does not block, which is what makes it testable — the blocking
+// wait for Ctrl-C lives in monitorStation.
+func streamStationProperty(ctx context.Context, app *App, ref, what string, s stationAPI, res monitorResolver, mu *sync.Mutex) (spiderw.UnsubscribeFunc, error) {
+	// One Properties read seeds every branch's current value, so the stream opens
+	// with a complete picture rather than only deltas.
+	props, err := s.Properties(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	switch what {
+	case "state":
+		if err := printStationStateLine(app, ref, props.State, mu); err != nil {
+			return nil, err
+		}
+		return s.SubscribeStateChanged(ctx, func(state spiderw.StationState) {
+			_ = printStationStateLine(app, ref, state, mu)
+		})
+
+	case "scanning":
+		if err := printStationScanningLine(app, ref, props.Scanning, mu); err != nil {
+			return nil, err
+		}
+		return s.SubscribeScanningChanged(ctx, func(scanning bool) {
+			_ = printStationScanningLine(app, ref, scanning, mu)
+		})
+
+	case "network":
+		// Properties() already hands back a resolved ref; the subscription delivers a
+		// raw path, so resolve that to the same shape.
+		if err := printStationConnectedNetworkLine(app, ref, netRefOf(props.ConnectedNetwork), mu); err != nil {
+			return nil, err
+		}
+		return s.SubscribeConnectedNetworkChanged(ctx, func(path *string) {
+			_ = printStationConnectedNetworkLine(app, ref, res.networkRef(ctx, path), mu)
+		})
+
+	case "access-point":
+		if err := printStationConnectedAPLine(app, ref, bssAddrRefOf(props.ConnectedAccessPoint), mu); err != nil {
+			return nil, err
+		}
+		return s.SubscribeConnectedAccessPointChanged(ctx, func(path *string) {
+			_ = printStationConnectedAPLine(app, ref, res.bssRef(ctx, path), mu)
+		})
+
+	case "affinities":
+		if err := printStationAffinitiesLine(app, ref, toAddrRefs(props.Affinities), mu); err != nil {
+			return nil, err
+		}
+		return s.SubscribeAffinitiesChanged(ctx, func(paths []string) {
+			_ = printStationAffinitiesLine(app, ref, res.bssRefs(ctx, paths), mu)
+		})
+	}
+
+	return nil, fmt.Errorf("%s", stationMonitorUsage)
+}
+
+// monitorStation streams one station property until Ctrl-C.
+//
+// "access-point" is how a roam is watched: the associated BSS changes while the
+// state stays connected and the network does not change at all, so neither
+// "state" nor "network" shows it.
+func monitorStation(app *App, stationRef string, args []string) error {
+	what, err := parseStationMonitorTarget(args)
+	if err != nil {
+		return err
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	client, err := app.newClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = client.Close()
+	}()
+
+	s, err := stationByRef(ctx, client, stationRef)
+	if err != nil {
+		return err
+	}
+
+	var printMu sync.Mutex
+	unsubscribe, err := streamStationProperty(ctx, app, stationRef, what, s, monitorResolver{client: client}, &printMu)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = unsubscribe.Unsubscribe()
+	}()
+
+	<-ctx.Done()
+	return nil
 }

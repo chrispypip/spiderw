@@ -75,6 +75,8 @@ func TestHelp_ListsCommands(t *testing.T) {
 		{"bss", []string{"Usage:", "spiderw bss", "Commands:", "list", "status", "<bss> status", "<bss> address"}},
 		{"network", []string{"Usage:", "spiderw network", "Commands:", "list", "status", "<network> connect", "connected", "type", "bsses", "monitor"}},
 		{"known-network", []string{"Usage:", "spiderw known-network", "Commands:", "list", "status", "autoconnect", "forget", "last-connected", "monitor"}},
+		{"station", []string{"Usage:", "spiderw station", "Commands:", "list", "status", "scan", "networks", "disconnect", "affinities", "monitor", "monitor-signal", "wsc"}},
+		{"access-point", []string{"Usage:", "spiderw access-point", "Commands:", "list", "status", "start", "start-profile", "stop", "scan", "networks", "monitor"}},
 	}
 
 	for _, tc := range cases {
@@ -89,6 +91,36 @@ func TestHelp_ListsCommands(t *testing.T) {
 			for _, w := range tc.want {
 				require.Contains(t, out, w, "help output:\n%s", out)
 			}
+		})
+	}
+}
+
+// TestMonitorSubUsage covers the SubUsage hook: `<resource> <ref> monitor --help`
+// answers "what can I monitor?" with just the target list, instead of dumping the
+// resource's entire help. The full command help is unaffected.
+func TestMonitorSubUsage(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"station", []string{"station", "wlan0", "monitor", "--help"}, "state|scanning|network|access-point|affinities"},
+		{"access-point", []string{"access-point", "wlan1", "monitor", "--help"}, "started|scanning"},
+		{"network", []string{"network", "MyNet", "monitor", "--help"}, "connected|known-network|bsses"},
+		{"known-network", []string{"known-network", "MyNet", "monitor", "--help"}, "autoconnect|hidden|last-connected"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+			cli := Run(tc.args, &buf, &buf)
+			require.Equal(t, 0, cli, buf.String())
+
+			out := buf.String()
+			require.Contains(t, out, tc.want)
+			require.NotContains(t, out, "Commands:", "the full command help must not be dumped")
 		})
 	}
 }

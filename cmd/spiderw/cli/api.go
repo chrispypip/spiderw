@@ -93,6 +93,10 @@ type stationAPI interface {
 	ConnectHiddenNetwork(ctx context.Context, name string) error
 	HiddenAccessPoints(ctx context.Context) ([]spiderw.HiddenAccessPoint, error)
 	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
+	SubscribeStateChanged(ctx context.Context, fn func(spiderw.StationState)) (spiderw.UnsubscribeFunc, error)
+	SubscribeConnectedNetworkChanged(ctx context.Context, fn func(*string)) (spiderw.UnsubscribeFunc, error)
+	SubscribeConnectedAccessPointChanged(ctx context.Context, fn func(*string)) (spiderw.UnsubscribeFunc, error)
+	SubscribeAffinitiesChanged(ctx context.Context, fn func([]string)) (spiderw.UnsubscribeFunc, error)
 	MonitorSignalLevel(ctx context.Context, cfg spiderw.SignalLevelConfig) (*spiderw.SignalLevelAgent, error)
 	SimpleConfiguration(ctx context.Context) (*spiderw.SimpleConfiguration, error)
 }
@@ -107,6 +111,7 @@ type accessPointAPI interface {
 	Scan(ctx context.Context) error
 	OrderedNetworks(ctx context.Context) ([]spiderw.AccessPointOrderedNetwork, error)
 	SubscribeScanningChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
+	SubscribeStartedChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
 }
 
 type bssAPI interface {
@@ -126,6 +131,8 @@ type networkAPI interface {
 	Connect(ctx context.Context) error
 	Properties(ctx context.Context) (*spiderw.NetworkProperties, error)
 	SubscribeConnectedChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
+	SubscribeKnownNetworkChanged(ctx context.Context, fn func(*string)) (spiderw.UnsubscribeFunc, error)
+	SubscribeExtendedServiceSetChanged(ctx context.Context, fn func([]string)) (spiderw.UnsubscribeFunc, error)
 }
 
 type knownNetworkAPI interface {
@@ -139,6 +146,8 @@ type knownNetworkAPI interface {
 	Forget(ctx context.Context) error
 	Properties(ctx context.Context) (*spiderw.KnownNetworkProperties, error)
 	SubscribeAutoConnectChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
+	SubscribeHiddenChanged(ctx context.Context, fn func(bool)) (spiderw.UnsubscribeFunc, error)
+	SubscribeLastConnectedTimeChanged(ctx context.Context, fn func(*string)) (spiderw.UnsubscribeFunc, error)
 }
 
 // realClient adapts a concrete *spiderw.Client to clientAPI, converting the

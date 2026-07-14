@@ -324,6 +324,58 @@ func (n *Network) SubscribeConnectedChanged(ctx context.Context, fn func(bool)) 
 	})
 }
 
+// SubscribeKnownNetworkChanged registers fn for raw changes to the network's
+// KnownNetwork association. fn receives the KnownNetwork object path, or nil when
+// the network is not known (iwd reports that as the null path "/").
+//
+// This is how a network being saved or forgotten is observed: provisioning a
+// network gives it a KnownNetwork, and forgetting it takes it away.
+func (n *Network) SubscribeKnownNetworkChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, fmt.Errorf("SubscribeKnownNetworkChanged: fn cannot be nil")
+	}
+
+	return n.SubscribePropertiesChanged(ctx, func(ev NetworkPropertiesChanged) {
+		variant, ok := ev.Changed["KnownNetwork"]
+		if !ok {
+			// Forgetting a network clears the record by invalidating the property,
+			// not by sending "/", so invalidation is how a forget arrives.
+			if propertyCleared(ev.Invalidated, "KnownNetwork") {
+				fn(nil)
+			}
+			return
+		}
+
+		path, err := parseOptionalObjectPath(variant.Value())
+		if err != nil {
+			return
+		}
+		fn(path)
+	})
+}
+
+// SubscribeExtendedServiceSetChanged registers fn for raw changes to the
+// network's BSS list. fn receives the BSS object paths, which change as access
+// points for the network come and go across scans.
+func (n *Network) SubscribeExtendedServiceSetChanged(ctx context.Context, fn func([]string)) (UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, fmt.Errorf("SubscribeExtendedServiceSetChanged: fn cannot be nil")
+	}
+
+	return n.SubscribePropertiesChanged(ctx, func(ev NetworkPropertiesChanged) {
+		variant, ok := ev.Changed["ExtendedServiceSet"]
+		if !ok {
+			return
+		}
+
+		paths, err := parseObjectPathList(variant.Value())
+		if err != nil {
+			return
+		}
+		fn(paths)
+	})
+}
+
 // Firehose emits high-frequency network signals for stress and integration tests.
 func (n *Network) Firehose(ctx context.Context, fn func(FirehoseSignal)) error {
 	if fn == nil {

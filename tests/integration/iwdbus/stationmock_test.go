@@ -420,3 +420,97 @@ func TestStationMock_CLI_DisconnectHiddenAPs(t *testing.T) {
 		require.Contains(t, out, "psk")
 	})
 }
+
+// TestStationMock_SubscribeConnectedNetworkChanged drives a disconnect and
+// observes ConnectedNetwork over live signals. iwd reports "not connected" as the
+// null object path "/", so the value must reach the caller as nil rather than as
+// the literal path — the distinction a consumer branches on.
+func TestStationMock_SubscribeConnectedNetworkChanged(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	station, err := client.Station(ctx, devicePath)
+	require.NoError(t, err)
+
+	paths := make(chan *string, 4)
+	unsubscribe, err := station.SubscribeConnectedNetworkChanged(ctx, func(p *string) { paths <- p })
+	require.NoError(t, err)
+	defer func() { _ = unsubscribe.Unsubscribe() }()
+
+	require.NoError(t, station.Disconnect(ctx))
+
+	select {
+	case got := <-paths:
+		require.Nil(t, got, "a disconnect must deliver nil, not the null path %q", "/")
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for a ConnectedNetwork change")
+	}
+}
+
+// TestStationMock_SubscribeConnectedAccessPointChanged observes the BSS the
+// station is associated with. This is the only way to see a roam: the BSS changes
+// while State stays connected and the network does not change at all.
+func TestStationMock_SubscribeConnectedAccessPointChanged(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	station, err := client.Station(ctx, devicePath)
+	require.NoError(t, err)
+
+	paths := make(chan *string, 4)
+	unsubscribe, err := station.SubscribeConnectedAccessPointChanged(ctx, func(p *string) { paths <- p })
+	require.NoError(t, err)
+	defer func() { _ = unsubscribe.Unsubscribe() }()
+
+	require.NoError(t, station.Disconnect(ctx))
+
+	select {
+	case got := <-paths:
+		require.Nil(t, got, "a disconnect must deliver nil for the associated BSS")
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for a ConnectedAccessPoint change")
+	}
+}
+
+// TestStationMock_SubscribeAffinitiesChanged verifies affinities changes are
+// observable. Affinities are writable, so they can be set by another client or
+// cleared by iwd; a subscriber is the only way to notice.
+func TestStationMock_SubscribeAffinitiesChanged(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	station, err := client.Station(ctx, devicePath)
+	require.NoError(t, err)
+
+	updates := make(chan []string, 4)
+	unsubscribe, err := station.SubscribeAffinitiesChanged(ctx, func(p []string) { updates <- p })
+	require.NoError(t, err)
+	defer func() { _ = unsubscribe.Unsubscribe() }()
+
+	bsses, err := station.Properties(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, bsses.ConnectedAccessPoint, "the mock station is connected to a BSS")
+	bssPath := bsses.ConnectedAccessPoint.Path
+
+	require.NoError(t, station.SetAffinities(ctx, []string{bssPath}))
+
+	select {
+	case got := <-updates:
+		require.Equal(t, []string{bssPath}, got)
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for an Affinities change")
+	}
+
+	// Clearing them is delivered as an empty list, not dropped.
+	require.NoError(t, station.SetAffinities(ctx, nil))
+
+	select {
+	case got := <-updates:
+		require.Empty(t, got, "a cleared affinity list must be delivered")
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for the affinities to clear")
+	}
+}

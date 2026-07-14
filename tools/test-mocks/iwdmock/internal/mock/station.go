@@ -161,11 +161,13 @@ func (d *Device) Disconnect() *dbus.Error {
 	d.StationConnectedNetwork = "/"
 	d.StationConnectedAccessPoint = "/"
 	d.stationMu.Unlock()
-	d.emitStationPropertiesChanged(map[string]dbus.Variant{
-		"State":                dbus.MakeVariant("disconnected"),
-		"ConnectedNetwork":     dbus.MakeVariant(dbus.ObjectPath("/")),
-		"ConnectedAccessPoint": dbus.MakeVariant(dbus.ObjectPath("/")),
-	})
+	// iwd does not send the null path "/" for these on disconnect — it invalidates
+	// them and sends no value at all (confirmed on hardware). The mock previously
+	// sent "/", which made every optional-path subscription look like it worked
+	// while it silently never fired on the real daemon.
+	emitPropertiesChanged(d.Path, iwdbus.IwdStationIface,
+		map[string]dbus.Variant{"State": dbus.MakeVariant("disconnected")},
+		[]string{"ConnectedNetwork", "ConnectedAccessPoint"})
 	return nil
 }
 

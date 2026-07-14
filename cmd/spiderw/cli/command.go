@@ -20,6 +20,12 @@ type Command struct {
 	// Execute runs a leaf command with parsed positional arguments.
 	Execute func(args []string) error
 
+	// SubUsage maps a subcommand word to its own usage line. When --help is given
+	// and the final argument names one of these, that line is printed instead of
+	// the whole command's help — so `station <ref> monitor --help` answers "what can
+	// I monitor?" rather than dumping every station command.
+	SubUsage map[string]string
+
 	// Subcommands contains child commands keyed by command name.
 	Subcommands map[string]*Command
 
@@ -84,8 +90,15 @@ func (c *Command) Run(app *App, args []string) error {
 		return fmt.Errorf("unknown subcommand for %s: %s", c.Name, rest[0])
 	}
 
-	// Leaf node: if global help was requested, show usage for this leaf.
+	// Leaf node: if global help was requested, show usage for this leaf — or, when
+	// the args name a subcommand with its own usage, just that.
 	if app.Help {
+		if len(rest) > 0 {
+			if usage, ok := c.SubUsage[rest[len(rest)-1]]; ok {
+				fmt.Fprintln(app.stdout(), usage)
+				return ErrHelpShown
+			}
+		}
 		c.printUsage(app)
 		return ErrHelpShown
 	}

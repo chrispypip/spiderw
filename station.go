@@ -445,3 +445,71 @@ func convertStationStateCoreToPublic(state core.StationState) (StationState, err
 	}
 	return StationState(state), nil
 }
+
+// SubscribeConnectedNetworkChanged registers fn for changes to the network the
+// station is connected to. fn receives the network's object path, or nil when the
+// station is not connected to one.
+func (s *Station) SubscribeConnectedNetworkChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	const op = "Station.SubscribeConnectedNetworkChanged"
+
+	coreStation, err := s.coreStation(ctx, op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, &Error{Kind: KindInvalidArgument, Resource: ResourceStation, Op: op, Details: "callback cannot be nil", Err: ErrInvalidArgument}
+	}
+
+	unsubscribe, err := coreStation.SubscribeConnectedNetworkChanged(ctx, fn)
+	if err != nil {
+		return nil, wrapPublicError(op, err)
+	}
+	return UnsubscribeFunc(unsubscribe), nil
+}
+
+// SubscribeConnectedAccessPointChanged registers fn for changes to the BSS the
+// station is associated with. fn receives the BSS object path, or nil when not
+// associated.
+//
+// This is how a roam is observed: the station moves between access points of the
+// same network, so the BSS changes while State stays StationStateConnected and
+// the connected network does not change at all.
+func (s *Station) SubscribeConnectedAccessPointChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	const op = "Station.SubscribeConnectedAccessPointChanged"
+
+	coreStation, err := s.coreStation(ctx, op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, &Error{Kind: KindInvalidArgument, Resource: ResourceStation, Op: op, Details: "callback cannot be nil", Err: ErrInvalidArgument}
+	}
+
+	unsubscribe, err := coreStation.SubscribeConnectedAccessPointChanged(ctx, fn)
+	if err != nil {
+		return nil, wrapPublicError(op, err)
+	}
+	return UnsubscribeFunc(unsubscribe), nil
+}
+
+// SubscribeAffinitiesChanged registers fn for changes to the station's roaming
+// affinities. Affinities are writable, so they can change without this process
+// doing anything: another client may set them, or iwd may clear them. This is the
+// only way to observe that.
+func (s *Station) SubscribeAffinitiesChanged(ctx context.Context, fn func([]string)) (UnsubscribeFunc, error) {
+	const op = "Station.SubscribeAffinitiesChanged"
+
+	coreStation, err := s.coreStation(ctx, op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, &Error{Kind: KindInvalidArgument, Resource: ResourceStation, Op: op, Details: "callback cannot be nil", Err: ErrInvalidArgument}
+	}
+
+	unsubscribe, err := coreStation.SubscribeAffinitiesChanged(ctx, fn)
+	if err != nil {
+		return nil, wrapPublicError(op, err)
+	}
+	return UnsubscribeFunc(unsubscribe), nil
+}

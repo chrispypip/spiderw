@@ -25,6 +25,8 @@ type fakeCoreKnownNetwork struct {
 	err          atomic.Pointer[fakeCoreKnownNetworkError]
 	forgetErr    atomic.Pointer[fakeCoreKnownNetworkError]
 	autoConnEvnt atomic.Pointer[bool]
+	hiddenEvnt   atomic.Pointer[bool]
+	lastConnEvnt atomic.Pointer[optStringEvent]
 }
 
 func (f *fakeCoreKnownNetwork) setProps(p core.KnownNetworkProperties) *fakeCoreKnownNetwork {
@@ -176,4 +178,24 @@ func newTestKnownNetworkClient(t *testing.T) *Client {
 	c, err := newClientFromWiring(wire)
 	require.NoError(t, err)
 	return c
+}
+
+func (f *fakeCoreKnownNetwork) SubscribeHiddenChanged(ctx context.Context, fn func(bool)) (core.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.hiddenEvnt.Load(); ev != nil {
+		fn(*ev)
+	}
+	return func() error { return nil }, f.loadErr()
+}
+
+func (f *fakeCoreKnownNetwork) SubscribeLastConnectedTimeChanged(ctx context.Context, fn func(*string)) (core.UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, f.loadErr()
+	}
+	if ev := f.lastConnEvnt.Load(); ev != nil {
+		fn(ev.v)
+	}
+	return func() error { return nil }, f.loadErr()
 }

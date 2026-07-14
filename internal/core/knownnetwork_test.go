@@ -282,3 +282,71 @@ func TestKnownNetwork_Core(t *testing.T) {
 		require.Nil(t, NewKnownNetwork(nil))
 	})
 }
+
+func TestKnownNetwork_Core_NewSubscribes(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	ts := "2026-07-13T10:04:00Z"
+
+	t.Run("HiddenChanged", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeIwdbusKnownNetwork{}
+		hidden := true
+		f.hiddenEvnt.Store(&hidden)
+
+		got := make(chan bool, 1)
+		_, err := NewKnownNetwork(f).SubscribeHiddenChanged(ctx, func(b bool) { got <- b })
+		require.NoError(t, err)
+		require.True(t, <-got)
+	})
+
+	t.Run("LastConnectedTimeChanged", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeIwdbusKnownNetwork{}
+		f.lastConnEvnt.Store(&optStringEvent{v: &ts})
+
+		got := make(chan *string, 1)
+		_, err := NewKnownNetwork(f).SubscribeLastConnectedTimeChanged(ctx, func(s *string) { got <- s })
+		require.NoError(t, err)
+		require.Equal(t, ts, *<-got)
+	})
+
+	t.Run("Guards", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range []struct {
+			name    string
+			nilFn   func(*KnownNetwork) error
+			backend func(*KnownNetwork) error
+		}{
+			{"HiddenChanged",
+				func(k *KnownNetwork) error { _, err := k.SubscribeHiddenChanged(ctx, nil); return err },
+				func(k *KnownNetwork) error {
+					_, err := k.SubscribeHiddenChanged(ctx, func(bool) {})
+					return err
+				}},
+			{"LastConnectedTimeChanged",
+				func(k *KnownNetwork) error { _, err := k.SubscribeLastConnectedTimeChanged(ctx, nil); return err },
+				func(k *KnownNetwork) error {
+					_, err := k.SubscribeLastConnectedTimeChanged(ctx, func(*string) {})
+					return err
+				}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				err := tc.nilFn(NewKnownNetwork(&fakeIwdbusKnownNetwork{}))
+				require.Error(t, err)
+				var ce *Error
+				require.ErrorAs(t, err, &ce)
+				require.Equal(t, KindInvalidArgument, ce.Kind)
+
+				f := &fakeIwdbusKnownNetwork{}
+				f.setErr(errors.New("subscribe failed"))
+				require.Error(t, tc.backend(NewKnownNetwork(f)))
+
+				var nilKN *KnownNetwork
+				require.Error(t, tc.backend(nilKN))
+			})
+		}
+	})
+}

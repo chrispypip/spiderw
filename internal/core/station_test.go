@@ -624,3 +624,101 @@ func TestStation_Core(t *testing.T) {
 		})
 	})
 }
+
+func TestStation_Core_NewSubscribes(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	path := "/net/connman/iwd/0/3/ssid_psk"
+
+	t.Run("ConnectedNetworkChanged", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeIwdbusStation{}
+		f.connNetEvnt.Store(&optStringEvent{v: &path})
+
+		got := make(chan *string, 1)
+		_, err := NewStation(f).SubscribeConnectedNetworkChanged(ctx, func(p *string) { got <- p })
+		require.NoError(t, err)
+		require.Equal(t, path, *<-got)
+	})
+
+	t.Run("ConnectedNetworkChanged delivers nil on disconnect", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeIwdbusStation{}
+		f.connNetEvnt.Store(&optStringEvent{v: nil})
+
+		got := make(chan *string, 1)
+		_, err := NewStation(f).SubscribeConnectedNetworkChanged(ctx, func(p *string) { got <- p })
+		require.NoError(t, err)
+		require.Nil(t, <-got)
+	})
+
+	t.Run("ConnectedAccessPointChanged", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeIwdbusStation{}
+		f.connAPEvnt.Store(&optStringEvent{v: &path})
+
+		got := make(chan *string, 1)
+		_, err := NewStation(f).SubscribeConnectedAccessPointChanged(ctx, func(p *string) { got <- p })
+		require.NoError(t, err)
+		require.Equal(t, path, *<-got)
+	})
+
+	t.Run("AffinitiesChanged", func(t *testing.T) {
+		t.Parallel()
+		f := &fakeIwdbusStation{}
+		f.affinityEvnt.Store(&stringSliceEvent{v: []string{path}})
+
+		got := make(chan []string, 1)
+		_, err := NewStation(f).SubscribeAffinitiesChanged(ctx, func(p []string) { got <- p })
+		require.NoError(t, err)
+		require.Equal(t, []string{path}, <-got)
+	})
+
+	t.Run("Guards", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range []struct {
+			name    string
+			nilFn   func(*Station) error
+			backend func(*Station) error
+		}{
+			{"ConnectedNetworkChanged",
+				func(s *Station) error { _, err := s.SubscribeConnectedNetworkChanged(ctx, nil); return err },
+				func(s *Station) error {
+					_, err := s.SubscribeConnectedNetworkChanged(ctx, func(*string) {})
+					return err
+				}},
+			{"ConnectedAccessPointChanged",
+				func(s *Station) error { _, err := s.SubscribeConnectedAccessPointChanged(ctx, nil); return err },
+				func(s *Station) error {
+					_, err := s.SubscribeConnectedAccessPointChanged(ctx, func(*string) {})
+					return err
+				}},
+			{"AffinitiesChanged",
+				func(s *Station) error { _, err := s.SubscribeAffinitiesChanged(ctx, nil); return err },
+				func(s *Station) error {
+					_, err := s.SubscribeAffinitiesChanged(ctx, func([]string) {})
+					return err
+				}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				// nil callback
+				err := tc.nilFn(NewStation(&fakeIwdbusStation{}))
+				require.Error(t, err)
+				var ce *Error
+				require.ErrorAs(t, err, &ce)
+				require.Equal(t, KindInvalidArgument, ce.Kind)
+
+				// backend error
+				f := &fakeIwdbusStation{}
+				f.setErr(errors.New("subscribe failed"))
+				require.Error(t, tc.backend(NewStation(f)))
+
+				// nil receiver
+				var nilStation *Station
+				require.Error(t, tc.backend(nilStation))
+			})
+		}
+	})
+}

@@ -488,6 +488,92 @@ func (s *Station) SubscribeScanningChanged(ctx context.Context, fn func(bool)) (
 	})
 }
 
+// SubscribeConnectedNetworkChanged registers fn for raw changes to the connected
+// network. fn receives the network's object path, or nil when the station is not
+// connected to one (iwd reports that as the null path "/"). A malformed path is
+// skipped rather than surfaced.
+func (s *Station) SubscribeConnectedNetworkChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, fmt.Errorf("SubscribeConnectedNetworkChanged: fn cannot be nil")
+	}
+
+	return s.SubscribePropertiesChanged(ctx, func(ev StationPropertiesChanged) {
+		variant, ok := ev.Changed["ConnectedNetwork"]
+		if !ok {
+			// iwd clears this property by invalidating it, not by sending "/", so
+			// invalidation is how a disconnect arrives.
+			if propertyCleared(ev.Invalidated, "ConnectedNetwork") {
+				fn(nil)
+			}
+			return
+		}
+
+		path, err := parseStationObjectPath("ConnectedNetwork", variant.Value())
+		if err != nil {
+			return
+		}
+		fn(path)
+	})
+}
+
+// SubscribeConnectedAccessPointChanged registers fn for raw changes to the BSS the
+// station is associated with. fn receives the BSS object path, or nil when not
+// associated.
+//
+// This is how a roam is observed: the station moves between BSSes of the same
+// network, so ConnectedAccessPoint changes while State stays "connected" and
+// ConnectedNetwork does not change at all.
+func (s *Station) SubscribeConnectedAccessPointChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, fmt.Errorf("SubscribeConnectedAccessPointChanged: fn cannot be nil")
+	}
+
+	return s.SubscribePropertiesChanged(ctx, func(ev StationPropertiesChanged) {
+		variant, ok := ev.Changed["ConnectedAccessPoint"]
+		if !ok {
+			// iwd clears this property by invalidating it, not by sending "/", so
+			// invalidation is how a disconnect arrives.
+			if propertyCleared(ev.Invalidated, "ConnectedAccessPoint") {
+				fn(nil)
+			}
+			return
+		}
+
+		path, err := parseStationObjectPath("ConnectedAccessPoint", variant.Value())
+		if err != nil {
+			return
+		}
+		fn(path)
+	})
+}
+
+// SubscribeAffinitiesChanged registers fn for raw changes to the station's
+// affinities. Affinities are writable, so they can change from under a caller —
+// another client (iwctl, a second spiderw process) may set them, and iwd itself
+// may clear them. This is the only way to observe that.
+func (s *Station) SubscribeAffinitiesChanged(ctx context.Context, fn func([]string)) (UnsubscribeFunc, error) {
+	if fn == nil {
+		return nil, fmt.Errorf("SubscribeAffinitiesChanged: fn cannot be nil")
+	}
+
+	return s.SubscribePropertiesChanged(ctx, func(ev StationPropertiesChanged) {
+		variant, ok := ev.Changed["Affinities"]
+		if !ok {
+			// iwd drops the affinities on disconnect by invalidating the property.
+			if propertyCleared(ev.Invalidated, "Affinities") {
+				fn(nil)
+			}
+			return
+		}
+
+		paths, err := parseStationAffinities(variant.Value())
+		if err != nil {
+			return
+		}
+		fn(paths)
+	})
+}
+
 // Firehose emits high-frequency station signals for stress and integration tests.
 func (s *Station) Firehose(ctx context.Context, fn func(FirehoseSignal)) error {
 	if fn == nil {

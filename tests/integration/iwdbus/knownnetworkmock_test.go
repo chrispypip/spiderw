@@ -209,3 +209,41 @@ func TestKnownNetworkMock_StatusJSON(t *testing.T) {
 	require.Equal(t, "psk", jsonGetString(t, known, "Type"))
 	require.True(t, jsonGetBool(t, known, "AutoConnect"))
 }
+
+// TestKnownNetworkMock_ForgetInvalidatesNetworkLink is the regression guard for the
+// hardware bug: forgetting a known network does not send the null path "/" for the
+// Network's KnownNetwork property — iwd invalidates it and sends no value. A
+// subscription that reads only Changed never fires, which is exactly what happened
+// on real hardware (monitoring known-network printed nothing on forget) while the
+// mock's no-op Forget hid it.
+func TestKnownNetworkMock_ForgetInvalidatesNetworkLink(t *testing.T) {
+	iwdmock.StartMockNormal(t)
+	ctx := context.Background()
+	client := newMockClient(t, ctx)
+
+	network, err := client.Network(ctx, "/net/connman/iwd/0/3/4b6e6f776e4e6574_psk")
+	require.NoError(t, err)
+
+	// The network starts out saved.
+	kn, err := network.KnownNetwork(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, kn)
+
+	cleared := make(chan struct{}, 1)
+	unsubscribe, err := network.SubscribeKnownNetworkChanged(ctx, func(path *string) {
+		if path == nil {
+			select {
+			case cleared <- struct{}{}:
+			default:
+			}
+		}
+	})
+	require.NoError(t, err)
+	defer func() { _ = unsubscribe.Unsubscribe() }()
+
+	known, err := client.KnownNetwork(ctx, *kn)
+	require.NoError(t, err)
+	require.NoError(t, known.Forget(ctx))
+
+	requireFired(t, cleared, "expected KnownNetwork to be reported as cleared after Forget")
+}

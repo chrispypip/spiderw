@@ -2,9 +2,15 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"slices"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/chrispypip/spiderw"
@@ -419,6 +425,8 @@ func runAccessPointWithRef(app *App, args []string) error {
 		return runAccessPointScan(app, ctx, apRef, rest)
 	case "networks":
 		return runAccessPointNetworks(app, ctx, apRef, rest)
+	case "monitor":
+		return monitorAccessPoint(app, apRef, rest)
 	default:
 		printAccessPointUsage(app)
 		return fmt.Errorf("unknown access-point command %q for access point %q", op, apRef)
@@ -453,6 +461,8 @@ const accessPointHelpText = `Commands:
                                         --no-wait; --timeout bounds the wait,
                                         default 15s)
   <ap> networks                         List networks from the last scan
+  <ap> monitor started                  Stream the started flag until Ctrl-C
+  <ap> monitor scanning                 Stream the scanning flag until Ctrl-C
 
 An access point is a device in AP mode (Device.SetMode "ap"); it is referenced by
 its device name (e.g. "wlan1") or object path.`
@@ -462,6 +472,7 @@ func accessPointCommand(app *App) *Command {
 		Name:        "access-point",
 		Description: "Inspect and control iwd access points (AP-mode devices)",
 		HelpText:    accessPointHelpText,
+		SubUsage:    map[string]string{"monitor": accessPointMonitorUsage},
 		Execute: func(args []string) error {
 			return runAccessPoint(app, args)
 		},
@@ -470,4 +481,123 @@ func accessPointCommand(app *App) *Command {
 
 func printAccessPointUsage(app *App) {
 	accessPointCommand(app).printUsage(app)
+}
+
+// accessPointStartedResult reports whether the access point is running.
+type accessPointStartedResult struct {
+	AccessPoint string `json:"AccessPoint"`
+	Started     bool   `json:"Started"`
+}
+
+func printAccessPointStartedLine(app *App, ref string, started bool, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	out := accessPointStartedResult{AccessPoint: ref, Started: started}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	_, err := fmt.Fprintf(app.stdout(), "started=%t\n", started)
+	return err
+}
+
+// accessPointScanningResult reports whether the access point is scanning.
+type accessPointScanningResult struct {
+	AccessPoint string `json:"AccessPoint"`
+	Scanning    bool   `json:"Scanning"`
+}
+
+func printAccessPointScanningLine(app *App, ref string, scanning bool, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	out := accessPointScanningResult{AccessPoint: ref, Scanning: scanning}
+	if app != nil && app.Output.JSON {
+		return json.NewEncoder(app.stdout()).Encode(out)
+	}
+	_, err := fmt.Fprintf(app.stdout(), "scanning=%t\n", scanning)
+	return err
+}
+
+const accessPointMonitorUsage = "usage: spiderw access-point <ap> monitor <started|scanning>"
+
+// accessPointMonitorTargets are the properties `access-point <ap> monitor` streams.
+var accessPointMonitorTargets = []string{"started", "scanning"}
+
+// parseAccessPointMonitorTarget validates the target before any iwd call.
+func parseAccessPointMonitorTarget(args []string) (string, error) {
+	// `monitor --help` should list what can be monitored, same as an invalid
+	// target does, rather than falling through to a generic error.
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help") {
+		return "", fmt.Errorf("%s", accessPointMonitorUsage)
+	}
+	if len(args) != 1 || !slices.Contains(accessPointMonitorTargets, args[0]) {
+		return "", fmt.Errorf("%s", accessPointMonitorUsage)
+	}
+	return args[0], nil
+}
+
+// streamAccessPointProperty prints the current value, then subscribes. It does not
+// block; monitorAccessPoint owns the wait for Ctrl-C.
+func streamAccessPointProperty(ctx context.Context, app *App, ref, what string, a accessPointAPI, mu *sync.Mutex) (spiderw.UnsubscribeFunc, error) {
+	props, err := a.Properties(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	switch what {
+	case "started":
+		if err := printAccessPointStartedLine(app, ref, props.Started, mu); err != nil {
+			return nil, err
+		}
+		return a.SubscribeStartedChanged(ctx, func(started bool) {
+			_ = printAccessPointStartedLine(app, ref, started, mu)
+		})
+
+	case "scanning":
+		if err := printAccessPointScanningLine(app, ref, props.Scanning, mu); err != nil {
+			return nil, err
+		}
+		return a.SubscribeScanningChanged(ctx, func(scanning bool) {
+			_ = printAccessPointScanningLine(app, ref, scanning, mu)
+		})
+	}
+
+	return nil, fmt.Errorf("%s", accessPointMonitorUsage)
+}
+
+// monitorAccessPoint streams one access-point property until Ctrl-C.
+func monitorAccessPoint(app *App, apRef string, args []string) error {
+	what, err := parseAccessPointMonitorTarget(args)
+	if err != nil {
+		return err
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	client, err := app.newClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = client.Close()
+	}()
+
+	a, err := accessPointByRef(ctx, client, apRef)
+	if err != nil {
+		return err
+	}
+
+	var printMu sync.Mutex
+	unsubscribe, err := streamAccessPointProperty(ctx, app, apRef, what, a, &printMu)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = unsubscribe.Unsubscribe()
+	}()
+
+	<-ctx.Done()
+	return nil
 }

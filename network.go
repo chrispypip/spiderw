@@ -287,3 +287,48 @@ func convertNetworkType(t core.NetworkType) (NetworkType, error) {
 	}
 	return NetworkType(t), nil
 }
+
+// SubscribeKnownNetworkChanged registers fn for changes to the network's
+// known-network association. fn receives the known-network object path, or nil
+// when the network is not known.
+//
+// This is how a network being saved or forgotten is observed: provisioning gives
+// the network a known-network record, and forgetting it takes it away.
+func (n *Network) SubscribeKnownNetworkChanged(ctx context.Context, fn func(*string)) (UnsubscribeFunc, error) {
+	const op = "Network.SubscribeKnownNetworkChanged"
+
+	coreNetwork, err := n.coreNetwork(ctx, op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, &Error{Kind: KindInvalidArgument, Resource: ResourceNetwork, Op: op, Details: "callback cannot be nil", Err: ErrInvalidArgument}
+	}
+
+	unsubscribe, err := coreNetwork.SubscribeKnownNetworkChanged(ctx, fn)
+	if err != nil {
+		return nil, wrapPublicError(op, err)
+	}
+	return UnsubscribeFunc(unsubscribe), nil
+}
+
+// SubscribeExtendedServiceSetChanged registers fn for changes to the network's
+// BSS list. fn receives the BSS object paths, which change as access points for
+// the network come and go across scans.
+func (n *Network) SubscribeExtendedServiceSetChanged(ctx context.Context, fn func([]string)) (UnsubscribeFunc, error) {
+	const op = "Network.SubscribeExtendedServiceSetChanged"
+
+	coreNetwork, err := n.coreNetwork(ctx, op)
+	if err != nil {
+		return nil, err
+	}
+	if fn == nil {
+		return nil, &Error{Kind: KindInvalidArgument, Resource: ResourceNetwork, Op: op, Details: "callback cannot be nil", Err: ErrInvalidArgument}
+	}
+
+	unsubscribe, err := coreNetwork.SubscribeExtendedServiceSetChanged(ctx, fn)
+	if err != nil {
+		return nil, wrapPublicError(op, err)
+	}
+	return UnsubscribeFunc(unsubscribe), nil
+}
