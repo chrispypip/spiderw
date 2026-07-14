@@ -220,15 +220,19 @@ func (d *Device) apScan() *dbus.Error {
 	return nil
 }
 
-// apOrderedNetworks returns the seeded AP scan result as aa{sv}.
-//
-// Unlike Scan, this is deliberately not gated on Started: iwd's behavior when
-// reading scan results from a stopped AP has not been confirmed on hardware, and
-// the mock does not guess. If it turns out iwd rejects it (likely NotAvailable,
-// as Scan does), gate it here and add the matching integration test.
+// apOrderedNetworks returns the seeded AP scan result as aa{sv}. Reading scan
+// results from a stopped AP is rejected with NotAvailable ("Operation not
+// available", confirmed on hardware), exactly as Scan is: a stopped AP has no
+// scan state to report.
 func (d *Device) apOrderedNetworks() ([]map[string]dbus.Variant, *dbus.Error) {
 	if !d.HasAccessPoint {
 		return nil, dbus.MakeFailedError(fmt.Errorf("device has no access point interface"))
+	}
+	d.apMu.Lock()
+	started := d.APStarted
+	d.apMu.Unlock()
+	if !started {
+		return nil, dbus.NewError(iwdbus.IwdErrorNotAvailable, []interface{}{"Operation not available"})
 	}
 	return accessPointOrderedNetworks, nil
 }

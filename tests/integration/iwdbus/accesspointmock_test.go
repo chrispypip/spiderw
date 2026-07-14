@@ -269,9 +269,10 @@ func TestAccessPointMock_StopInvalidatesOptionals(t *testing.T) {
 }
 
 // TestAccessPointMock_ScanWhenStopped is the guard for iwd's real behavior: an AP
-// that is not running has no radio configured to survey with, so Scan is rejected
-// with NotAvailable ("Operation not available", confirmed on hardware) rather
-// than silently succeeding.
+// that is not running has no radio configured to survey with and no scan state to
+// report, so both Scan and GetOrderedNetworks are rejected with NotAvailable
+// ("Operation not available", confirmed on hardware) rather than silently
+// succeeding.
 func TestAccessPointMock_ScanWhenStopped(t *testing.T) {
 	iwdmock.StartMockNormal(t)
 	ctx := context.Background()
@@ -285,9 +286,20 @@ func TestAccessPointMock_ScanWhenStopped(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, spiderw.ErrNotAvailable)
 
-	// The CLI surfaces it rather than hanging in wait mode.
+	nets, err := ap.OrderedNetworks(ctx)
+	require.Error(t, err)
+	require.ErrorIs(t, err, spiderw.ErrNotAvailable)
+	require.Nil(t, nets)
+
+	// The CLI surfaces both rather than hanging in wait mode or printing an
+	// empty result set.
 	out, runErr := runSpider(t, "access-point", "wlan1", "scan")
 	require.Error(t, runErr, out)
+
+	out, runErr = runSpider(t, "access-point", "wlan1", "networks")
+	require.Error(t, runErr, out)
+	require.NotContains(t, out, "no networks available",
+		"a stopped AP must report the error, not an empty scan result")
 }
 
 // TestAccessPointMock_OrderedNetworks reads the seeded AP scan result end to end,
