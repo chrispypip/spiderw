@@ -51,7 +51,8 @@ RESET := \033[0m
 .PHONY: bootstrap preflight dev image rebuild-image up down logs shell
 .PHONY: lint lint-check codespell fmt fmt-check check-fmt check
 .PHONY: test test-unit test-regression test-stress test-race test-stress-race
-.PHONY: test-race-stress test-bench test-mock test-integration test-all
+.PHONY: test-race-stress test-bench test-fuzz test-fuzz-seed test-mock
+.PHONY: test-integration test-all
 .PHONY: build amd64 arm64
 .PHONY: clean all
 
@@ -178,9 +179,11 @@ fmt-check: ## Run check of gofmt/goimports inside container
 
 check-fmt: fmt-check
 
-test: ## Run Go tests inside container
-	@echo -e "$(BLUE)[ test ]$(RESET) Running Go tests..."
-	@$(RUN) go test -v ./...
+# Every test file in this repo carries a build tag, so a bare `go test ./...`
+# matches nothing and exits green having run zero tests. `test` therefore runs the
+# tiers explicitly.
+test: test-unit test-race test-stress test-regression test-fuzz-seed test-integration ## Run every test tier inside container
+	@echo -e "$(BLUE)[ test ]$(RESET) All test tiers passed."
 
 test-unit: ## Run Go unit tests inside container
 	@echo -e "$(BLUE)[ test ]$(RESET) Running Go unit tests..."
@@ -208,13 +211,23 @@ test-bench: ## Run Go benchmarks inside container
 	@echo -e "$(BLUE)[ test ]$(RESET) Running Go benchmark tests..."
 	@$(RUN) go test -v -bench=. -benchmem -tags=bench ./...
 
+# The fuzz tier is build-tagged, so no other target (and neither `go build` nor
+# `go vet`) ever compiles it. Without these it can rot unnoticed.
+test-fuzz-seed: ## Run the fuzz seed corpus (compiles + executes every target once)
+	@echo -e "$(BLUE)[ test ]$(RESET) Running fuzz seed corpus..."
+	@$(RUN) go test -tags=fuzz ./...
+
+test-fuzz: ## Fuzz every target briefly (FUZZTIME=30s make test-fuzz)
+	@echo -e "$(BLUE)[ test ]$(RESET) Fuzzing all targets for $(or $(FUZZTIME),20s)..."
+	@$(RUN) ./scripts/fuzz.sh $(or $(FUZZTIME),20s)
+
 test-mock: ## Run mock iwd integration tests inside container
 	@echo -e "$(BLUE)[ mock-test ]$(RESET) Running iwd mock tests..."
 	@$(RUN) go test -v -tags=integration ./...
 
 test-integration: test-mock
 
-test-all: test-unit test-regression test-stress test-race test-stress-race test-bench test-mock ## Run all Go tests inside container
+test-all: test-unit test-regression test-stress test-race test-stress-race test-bench test-fuzz-seed test-mock ## Run all Go tests inside container
 
 
 # -----------------------------------------------------------------------------------
