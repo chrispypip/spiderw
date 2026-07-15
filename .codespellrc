@@ -1,5 +1,6 @@
 [codespell]
 # Skip generated/binary/vendored paths that would produce noise or false hits.
 skip = .git,go.sum,dist,tools/test-mocks/*/go.sum,*.svg,*.png,*.jpg
-# To silence a legitimate term that gets flagged, add:
-#   ignore-words-list = word1,word2
+# Silence legitimate terms codespell flags. libell = iwd's ell library ("no
+# libell needed"), not a misspelling of "libel".
+ignore-words-list = libell
