@@ -6,14 +6,14 @@
   "semanticCommits": "enabled",
   "semanticCommitType": "build",
   "semanticCommitScope": "deps",
-  "docker": {
-    "pinDigests": true
-  },
   "customManagers": [
     {
       "customType": "regex",
       "description": "golangci-lint pinned in the dev Dockerfile and CI",
-      "fileMatch": ["^dev/Dockerfile\\.dev$", "^\\.github/workflows/ci\\.yml$"],
+      "managerFilePatterns": [
+        "/^dev/Dockerfile\\.dev$/",
+        "/^\\.github/workflows/ci\\.yml$/"
+      ],
       "matchStrings": [
         "GOLANGCI_LINT_VERSION[=:\\s\"]+(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"
       ],
@@ -23,7 +23,9 @@
     {
       "customType": "regex",
       "description": "Go version pinned in the dev Dockerfile (CI reads go.mod instead)",
-      "fileMatch": ["^dev/Dockerfile\\.dev$"],
+      "managerFilePatterns": [
+        "/^dev/Dockerfile\\.dev$/"
+      ],
       "matchStrings": [
         "ARG GO_VERSION=(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"
       ],
@@ -33,7 +35,9 @@
     {
       "customType": "regex",
       "description": "goimports (golang.org/x/tools) pinned in the dev Dockerfile",
-      "fileMatch": ["^dev/Dockerfile\\.dev$"],
+      "managerFilePatterns": [
+        "/^dev/Dockerfile\\.dev$/"
+      ],
       "matchStrings": [
         "ARG GOIMPORTS_VERSION=(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"
       ],
@@ -43,8 +47,16 @@
   ],
   "packageRules": [
     {
+      "matchCategories": [
+        "docker"
+      ],
+      "pinDigests": true
+    },
+    {
       "description": "One PR for golangci-lint across the Dockerfile and CI",
-      "matchDepNames": ["golangci/golangci-lint"],
+      "matchDepNames": [
+        "golangci/golangci-lint"
+      ],
       "groupName": "golangci-lint"
     },
     {
