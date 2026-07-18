@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
   "labels": ["dependencies"],
   "description": "Commit/PR titles follow CONTRIBUTING.md's Conventional Commits style: build(deps): <summary>.",
   "semanticCommits": "enabled",
@@ -29,6 +29,16 @@
       ],
       "datasourceTemplate": "golang-version",
       "depNameTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "goimports (golang.org/x/tools) pinned in the dev Dockerfile",
+      "fileMatch": ["^dev/Dockerfile\\.dev$"],
+      "matchStrings": [
+        "ARG GOIMPORTS_VERSION=(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"
+      ],
+      "datasourceTemplate": "go",
+      "depNameTemplate": "golang.org/x/tools"
     }
   ],
   "packageRules": [
