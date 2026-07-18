@@ -1,0 +1,13 @@
+# Keep the build context to what the image actually needs: the Go sources for
+# the CLI, and tests/hwsim's scripts.
+#
+# Excluding .git matters most. A fresh `git clone` produces a different .git
+# every time (new pack files, new refs), so with it in the context `COPY . .`
+# misses the layer cache on every CI run - rebuilding the toolchain stage and
+# leaving a fresh set of dangling images behind each time.
+.git
+.github
+docs
+dev
+examples
+*.md
