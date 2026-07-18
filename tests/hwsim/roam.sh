@@ -60,15 +60,30 @@ echo "[roam] AP1=$AP1 ($BSS1)  AP2=$AP2 ($BSS2)  STA=$STA"
 
 # --- connect the station ----------------------------------------------------
 spiderw device "$STA" mode station || fail "$STA -> station mode"
-found=0
+
+# iwd creates a Network object per station device, so any radio beyond the three
+# this tier claims would sit in station mode and produce a second object with the
+# same SSID, making an SSID reference ambiguous. Resolve the one under OUR
+# station and address it by path.
+STA_PATH=$(spiderw device list | awk -F'\t' -v d="$STA" '$1 == d {print $2}')
+[ -n "$STA_PATH" ] || fail "could not resolve the device path for $STA"
+
+net_path() {
+    spiderw network list \
+      | awk -F'\t' -v ssid="$SSID" -v pfx="$STA_PATH/" \
+            '$1 == ssid && index($2, pfx) == 1 { print $2; exit }'
+}
+
+NET=""
 for try in $(seq 1 "$SCAN_TRIES"); do
     step "station $STA scan (try $try/$SCAN_TRIES)"
     spiderw station "$STA" scan || true
-    if spiderw network list | cut -f1 | grep -qxF "$SSID"; then found=1; break; fi
+    NET=$(net_path)
+    [ -n "$NET" ] && break
     sleep 1
 done
-[ "$found" -eq 1 ] || fail "station never saw $SSID after $SCAN_TRIES scans"
-spiderw network "$SSID" connect --passphrase="$PASSPHRASE" || fail "connect failed"
+[ -n "$NET" ] || fail "station $STA never saw $SSID after $SCAN_TRIES scans"
+spiderw network "$NET" connect --passphrase="$PASSPHRASE" || fail "connect failed"
 
 cur_bss() { spiderw station "$STA" status | awk '/ConnectedAccessPoint:/{print $2}'; }
 cur=""
@@ -90,7 +105,7 @@ echo "[roam] connected to $cur; driving a roam to $other"
 # auto-scan ("operation already in progress"), which is harmless - silence it.
 spiderw station "$STA" scan >/dev/null 2>&1 || true
 echo "[roam] BSSes iwd knows for $SSID:"
-spiderw network "$SSID" bsses | sed 's/^/  /' || true
+spiderw network "$NET" bsses | sed 's/^/  /' || true
 
 # --- watch the association through spiderw, across the roam ------------------
 MON=/tmp/roam-monitor.log

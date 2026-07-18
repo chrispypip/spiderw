@@ -29,6 +29,20 @@ AP="${DEVICES[0]}"
 STA="${DEVICES[1]}"
 echo "[connect] AP=$AP  STA=$STA  SSID=$SSID"
 
+# iwd creates a Network object per station device. Any OTHER radio left in
+# station mode (the roam tier needs three radios, and this tier claims only two)
+# scans on its own and produces a second object with the same SSID, which makes
+# an SSID reference ambiguous. So resolve the network belonging to OUR station
+# and address it by path.
+STA_PATH=$(spiderw device list | awk -F'\t' -v d="$STA" '$1 == d {print $2}')
+[ -n "$STA_PATH" ] || fail "could not resolve the device path for $STA"
+
+net_path() {
+    spiderw network list \
+      | awk -F'\t' -v ssid="$SSID" -v pfx="$STA_PATH/" \
+            '$1 == ssid && index($2, pfx) == 1 { print $2; exit }'
+}
+
 # --- bring up the access point ----------------------------------------------
 step "device $AP mode ap"
 spiderw device "$AP" mode ap || fail "could not set $AP to ap mode"
@@ -44,25 +58,26 @@ spiderw access-point "$AP" status || true
 step "device $STA mode station"
 spiderw device "$STA" mode station || fail "could not set $STA to station mode"
 
-found=0
+NET=""
 for try in $(seq 1 "$SCAN_TRIES"); do
     step "station $STA scan (try $try/$SCAN_TRIES)"
     spiderw station "$STA" scan || true
-    if spiderw network list | cut -f1 | grep -qxF "$SSID"; then
-        found=1
-        break
-    fi
-    echo "[connect] $SSID not visible yet"
+    # Only count a hit under OUR station: another station seeing the SSID says
+    # nothing about whether this one can connect to it.
+    NET=$(net_path)
+    [ -n "$NET" ] && break
+    echo "[connect] $SSID not visible to $STA yet"
     sleep 1
 done
-[ "$found" -eq 1 ] || fail "station never saw SSID $SSID after $SCAN_TRIES scans"
+[ -n "$NET" ] || fail "station $STA never saw SSID $SSID after $SCAN_TRIES scans"
+echo "[connect] network object under $STA: $NET"
 
 # --- connect ----------------------------------------------------------------
 step "network $SSID connect"
-spiderw network "$SSID" connect --passphrase="$PASSPHRASE" || fail "connect failed"
+spiderw network "$NET" connect --passphrase="$PASSPHRASE" || fail "connect failed"
 
 # The one assertion that matters: iwd reports the network connected.
-connected=$(spiderw network "$SSID" connected)
+connected=$(spiderw network "$NET" connected)
 [ "$connected" = "true" ] || fail "network $SSID connected=$connected (want true)"
 echo "[connect] connected to $SSID"
 spiderw station "$STA" status || true
@@ -70,7 +85,7 @@ spiderw station "$STA" status || true
 # --- disconnect (exercise the teardown write path too) ----------------------
 step "station $STA disconnect"
 spiderw station "$STA" disconnect || fail "disconnect failed"
-connected=$(spiderw network "$SSID" connected)
+connected=$(spiderw network "$NET" connected)
 [ "$connected" = "false" ] || fail "still connected after disconnect (connected=$connected)"
 echo "[connect] disconnected from $SSID"
 
