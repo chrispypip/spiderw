@@ -12,6 +12,10 @@ set -euo pipefail
 status=0
 while IFS= read -r file; do
     [ -f "$file" ] || continue
+    # Skip binary files (images, fixtures): they are bytes we did not write, and
+    # every one of them would trip the check. `grep -I` treats a binary file as
+    # non-matching, so this succeeds only for text.
+    grep -Iq . "$file" 2>/dev/null || continue
     if LC_ALL=C grep -nP '[^\x00-\x7F]' "$file" >/dev/null 2>&1; then
         echo "non-ASCII characters in ${file}:"
         LC_ALL=C grep -nP '[^\x00-\x7F]' "$file" | sed 's/^/  /'

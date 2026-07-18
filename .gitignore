@@ -32,3 +32,6 @@ dist/
 
 # Go fuzzing artifacts
 **/testdata/fuzz/
+
+# Editor backups
+*~

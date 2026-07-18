@@ -1,4 +1,9 @@
-# spiderw
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/spiderw-lockup-dark.svg">
+    <img src="docs/assets/spiderw-lockup-light.svg" alt="spiderw" width="600">
+  </picture>
+</p>
 
 [![CI](https://github.com/chrispypip/spiderw/actions/workflows/ci.yml/badge.svg)](https://github.com/chrispypip/spiderw/actions/workflows/ci.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/chrispypip/spiderw/badge)](https://scorecard.dev/viewer/?uri=github.com/chrispypip/spiderw)
