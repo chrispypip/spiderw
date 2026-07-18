@@ -91,8 +91,8 @@ func TestStationMock_AllStations(t *testing.T) {
 }
 
 // TestStationMock_SubscribeRegisters verifies the property-change subscriptions
-// wire up over real D-Bus. No S1 operation mutates station state (Scan/Connect/
-// Disconnect are later sub-slices), so this asserts clean registration and
+// wire up over real D-Bus. It does not mutate station state (Scan/Connect/
+// Disconnect are exercised elsewhere), so it asserts clean registration and
 // teardown; the fires-and-maps behavior is covered by the unit suites.
 func TestStationMock_SubscribeRegisters(t *testing.T) {
 	iwdmock.StartMockNormal(t)
@@ -161,8 +161,8 @@ func TestStationMock_CLI_List(t *testing.T) {
 	require.Contains(t, out, devicePath)
 }
 
-// TestStationMock_ScanLiveTransition is the headline S2 test: it drives a real
-// scan and observes the Scanning property transition true->false over live
+// TestStationMock_ScanLiveTransition is the headline integration test: it drives a
+// real scan and observes the Scanning property transition true->false over live
 // PropertiesChanged signals - the first end-to-end exercise of a subscription.
 func TestStationMock_ScanLiveTransition(t *testing.T) {
 	iwdmock.StartMockNormal(t)
