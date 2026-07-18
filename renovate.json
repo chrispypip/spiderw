@@ -6,6 +6,9 @@
   "semanticCommits": "enabled",
   "semanticCommitType": "build",
   "semanticCommitScope": "deps",
+  "docker": {
+    "pinDigests": true
+  },
   "customManagers": [
     {
       "customType": "regex",

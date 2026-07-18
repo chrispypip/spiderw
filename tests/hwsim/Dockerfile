@@ -13,7 +13,7 @@
 # the base image happens to package. The iwd tarball bundles the exact ell it was
 # released with (in ./ell), so there is no separate ell version to track.
 
-FROM golang:1.26-bookworm AS build
+FROM golang:1.26-bookworm@sha256:1ecb7edf62a0408027bd5729dfd6b1b8766e578e8df93995b225dfd0944eb651 AS build
 WORKDIR /src
 COPY . .
 # Pure-Go (godbus), so a static binary runs on any base without glibc surprises.
@@ -29,7 +29,7 @@ RUN CGO_ENABLED=0 go build -trimpath -o /out/spiderw ./cmd/spiderw
 # --disable-systemd-service avoids a second, identical pkg-config lookup we do not
 # need, since the entrypoint starts iwd directly. --enable-hwsim also builds the
 # `hwsim` medium-control tool (net.connman.hwsim) the roam tier drives.
-FROM ubuntu:24.04 AS iwd
+FROM ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90 AS iwd
 ARG IWD_VERSION=3.12
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -46,7 +46,7 @@ RUN wget -qO- "https://mirrors.edge.kernel.org/pub/linux/network/wireless/iwd-${
  && make install DESTDIR=/iwd-root
 
 # --- runtime ----------------------------------------------------------------
-FROM ubuntu:24.04
+FROM ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90
 # No iwd package: the daemon comes from the source build above. dbus is the system
 # bus; iw/iproute2 for inspection; readline for the copied iwctl client.
 RUN apt-get update \
