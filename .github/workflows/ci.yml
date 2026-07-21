@@ -1,6 +1,7 @@
 ---
 name: CI
 
+# yamllint disable-line rule:truthy
 on:
   push:
     branches: [main]
@@ -29,8 +30,10 @@ jobs:
     name: build & vet
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # yamllint disable-line rule:line-length
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: go.mod
       - run: go build ./...
@@ -44,11 +47,14 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # yamllint disable-line rule:line-length
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+      # yamllint disable-line rule:line-length
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a  # v9
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
@@ -61,19 +67,23 @@ jobs:
     name: spell
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: codespell-project/actions-codespell@406322ec52dd7b488e48c1c4b82e2a8b3a1bf630 # v2
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # yamllint disable-line rule:line-length
+      - uses: codespell-project/actions-codespell@406322ec52dd7b488e48c1c4b82e2a8b3a1bf630  # v2
 
   # ---------------------------------------------------------------------------
   # This project writes plain ASCII: no em dashes, ellipses, arrows, or other
   # typographic punctuation, in code, comments, docs, or printed strings. They
-  # are easy to introduce by copy-paste and awkward to grep for, so keep them out.
+  # are easy to introduce by copy-paste and awkward to grep for, so keep them
+  # out.
   # ---------------------------------------------------------------------------
   ascii:
     name: ascii
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: ascii-check
         run: ./scripts/ascii-check.sh
 
@@ -93,10 +103,11 @@ jobs:
         suite:
           - name: unit
             cmd: go test -tags=unit ./...
-          # NOTE: no -race here. The -race flag also enables the `race` BUILD TAG,
-          # which pulls in the race-tagged files - and internal/connect's drive the
-          # iwd mock over a session bus, which this job does not have. Stress runs
-          # under the race detector in the D-Bus job below, where a bus exists.
+          # NOTE: no -race here. The -race flag also enables the `race` BUILD
+          # TAG, which pulls in the race-tagged files - and internal/connect's
+          # drive the iwd mock over a session bus, which this job does not have.
+          # Stress runs under the race detector in the D-Bus job below, where a
+          # bus exists.
           - name: stress
             cmd: go test -tags=stress -timeout=1m ./...
           - name: regression
@@ -112,8 +123,10 @@ jobs:
           - name: fuzz
             cmd: go test -tags=fuzz ./... && ./scripts/fuzz.sh 1s
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # yamllint disable-line rule:line-length
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: go.mod
       - name: ${{ matrix.suite.name }}
@@ -132,18 +145,21 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # yamllint disable-line rule:line-length
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: go.mod
       - name: Install D-Bus
         run: sudo apt-get update && sudo apt-get install -y dbus
       - name: Race suite under a session bus
         run: dbus-run-session -- go test -race -tags=race ./...
-      # Stress tests carry no assertions by design - they hammer the fakes and rely
-      # on the runtime to complain - so without the race detector they only catch
-      # panics and deadlocks. They run under it here, not in the native matrix,
-      # because -race also enables the `race` build tag and those tests need a bus.
+      # Stress tests carry no assertions by design - they hammer the fakes and
+      # rely on the runtime to complain - so without the race detector they only
+      # catch panics and deadlocks. They run under it here, not in the native
+      # matrix, because -race also enables the `race` build tag and those tests
+      # need a bus.
       - name: Stress suite under the race detector and a session bus
         run: dbus-run-session -- go test -race -tags=stress -timeout=5m ./...
       - name: Integration suite under a session bus
@@ -164,8 +180,10 @@ jobs:
       matrix:
         goarch: [amd64, arm64]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # yamllint disable-line rule:line-length
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: go.mod
       - name: Build CLI for linux/${{ matrix.goarch }}

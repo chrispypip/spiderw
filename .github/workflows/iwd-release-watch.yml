@@ -13,6 +13,7 @@ name: iwd release watch
 # NOTE: scheduled + workflow_dispatch runs only fire from the DEFAULT branch,
 # so this takes effect once merged to main.
 
+# yamllint disable-line rule:truthy
 on:
   schedule:
     - cron: "0 9 * * 1"  # Mondays 09:00 UTC
