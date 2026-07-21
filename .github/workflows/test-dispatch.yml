@@ -1,0 +1,61 @@
+---
+name: test dispatch
+
+# After a change lands on main, run the out-of-tree tests in the PRIVATE
+# spiderw-test repo against that exact commit. Those tests need real iwd on real
+# or simulated radios, which GitHub-hosted runners cannot provide, and their
+# self-hosted runner lives in that private repo (a runner on a public repo would
+# be exposed to untrusted fork PRs). So the public repo cannot run them
+# directly; it dispatches them.
+#
+# This triggers the PER-MERGE tier: the hwsim (virtual-radio) tier today.
+# Real-hardware testing runs on its own schedule inside spiderw-test, not from
+# here - it is too slow to gate every merge.
+#
+# This runs ONLY on merged code - never on a pull request - so the code is
+# already trusted by the time it reaches the runner. Path filters skip docs- and
+# workflow-only pushes.
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "tests/hwsim/**"
+
+permissions:
+  contents: read
+
+# Serialize so a burst of merges does not queue several redundant dispatches;
+# the newest commit is the one worth testing.
+concurrency:
+  group: test-dispatch
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    name: dispatch spiderw-test
+    runs-on: ubuntu-latest
+    steps:
+      # TEST_DISPATCH_TOKEN is a fine-grained PAT scoped to spiderw-test with
+      # Actions: write. It lives in this repo's secrets and is used here on a
+      # GitHub-hosted runner - it never touches the self-hosted host. Until it
+      # is set, this step is a no-op so main pushes are not failed.
+      - name: Trigger spiderw-test
+        env:
+          GH_TOKEN: ${{ secrets.TEST_DISPATCH_TOKEN }}
+          SPIDERW_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "TEST_DISPATCH_TOKEN not set; skipping dispatch."
+            exit 0
+          fi
+          gh workflow run hwsim.yml \
+            --repo chrispypip/spiderw-test \
+            --ref main \
+            --field ref="$SPIDERW_SHA" \
+            --field tier=all
+          echo "dispatched spiderw-test hwsim for $SPIDERW_SHA"
