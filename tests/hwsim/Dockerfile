@@ -16,8 +16,23 @@
 FROM golang:1.26-bookworm@sha256:1ecb7edf62a0408027bd5729dfd6b1b8766e578e8df93995b225dfd0944eb651 AS build
 WORKDIR /src
 COPY . .
-# Pure-Go (godbus), so a static binary runs on any base without glibc surprises.
-RUN CGO_ENABLED=0 go build -trimpath -o /out/spiderw ./cmd/spiderw
+# SPIDERW_VERSION unset (the default): build the CLI from the cloned source, so
+# any branch or commit can be tested. Pure-Go (godbus), so a static binary runs
+# on any base without glibc surprises.
+#
+# SPIDERW_VERSION set to a released tag (e.g. v0.14.0): download that published
+# binary instead and test the exact artifact users get, rather than a rebuild of
+# it. GoReleaser names archives spiderw_<version-without-v>_linux_<arch>.tar.gz.
+ARG SPIDERW_VERSION=
+RUN mkdir -p /out && \
+    if [ -n "$SPIDERW_VERSION" ]; then \
+      arch="$(dpkg --print-architecture)"; \
+      url="https://github.com/chrispypip/spiderw/releases/download/${SPIDERW_VERSION}/spiderw_${SPIDERW_VERSION#v}_linux_${arch}.tar.gz"; \
+      echo "downloading $url"; \
+      wget -qO- "$url" | tar -xz -C /out spiderw; \
+    else \
+      CGO_ENABLED=0 go build -trimpath -o /out/spiderw ./cmd/spiderw; \
+    fi
 
 # --- iwd from source --------------------------------------------------------
 # The tarball bundles ell in ./ell; with no --enable-external-ell (which would

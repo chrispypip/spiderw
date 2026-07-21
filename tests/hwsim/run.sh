@@ -35,8 +35,17 @@ else
     echo "      (reset with: sudo modprobe -r mac80211_hwsim)"
 fi
 
-echo "[run] building $IMAGE"
-docker build -f tests/hwsim/Dockerfile -t "$IMAGE" .
+# SPIDERW_VERSION (optional): a released tag like v0.14.0. When set, the image
+# downloads that published binary instead of building from source, so the tier
+# verifies the exact release artifact. Unset builds from the checked-out source.
+build_args=()
+if [ -n "${SPIDERW_VERSION:-}" ]; then
+    build_args+=(--build-arg "SPIDERW_VERSION=$SPIDERW_VERSION")
+    echo "[run] building $IMAGE (published spiderw $SPIDERW_VERSION)"
+else
+    echo "[run] building $IMAGE (spiderw from source)"
+fi
+docker build -f tests/hwsim/Dockerfile "${build_args[@]}" -t "$IMAGE" .
 
 # iwd's rfkill module needs /dev/rfkill. --network host shares the net namespace
 # but not device nodes, so pass it through. (mac80211_hwsim radios register with
