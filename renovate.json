@@ -63,6 +63,23 @@
       "description": "One PR for the Go toolchain across go.mod and the Dockerfile",
       "matchDatasources": ["golang-version"],
       "groupName": "go toolchain"
+    },
+    {
+      "description": "Auto-merge action and image updates once CI passes. These do not touch iwd runtime behaviour, so the mock gates are a complete signal (hwsim runs post-merge).",
+      "matchManagers": ["github-actions", "dockerfile"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge dev tooling (golangci-lint, goimports, Go toolchain) once CI passes. Drop 'go' here to review compiler bumps by hand.",
+      "matchDepNames": ["golangci/golangci-lint", "go", "golang.org/x/tools"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "Never auto-merge majors; review them by hand. Last so it overrides the automerge rules above.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
     }
   ]
 }
