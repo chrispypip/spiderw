@@ -13,6 +13,12 @@ Global flags may be placed anywhere in the command:
 - `--json` emits JSON for commands with structured output.
 - `--help` prints command help.
 
+Print the CLI's own version (distinct from `daemon version`, which reports iwd's):
+
+```bash
+spiderw version
+```
+
 Daemon examples:
 
 ```bash

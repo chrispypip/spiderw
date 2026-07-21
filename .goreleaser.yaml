@@ -1,0 +1,51 @@
+---
+# Release build for the spiderw CLI. Runs on a v* tag push (see
+# .github/workflows/release.yml), cross-compiles the CLI, and attaches the
+# archives and checksums to a GitHub Release.
+#
+# Only the CLI is released. spiderw is primarily a Go library; library consumers
+# use `go get`, and this just gives CLI users a prebuilt binary (and gives the
+# hwsim tier an artifact to verify).
+version: 2
+
+builds:
+  - id: spiderw
+    main: ./cmd/spiderw
+    binary: spiderw
+    env:
+      - CGO_ENABLED=0  # pure-Go (godbus), so static and portable
+    goos:
+      - linux  # iwd is Linux-only; no other OS makes sense
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      # Stamp the CLI's own version (resolveVersion in
+      # cmd/spiderw/cli/version.go). The folded scalar joins these lines with a
+      # single space back into one -ldflags string, keeping each line under 80.
+      - >-
+        -s -w -X
+        github.com/chrispypip/spiderw/cmd/spiderw/cli.version=v{{ .Version }}
+
+archives:
+  - id: spiderw
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  draft: false
+  # Tags like v0.14.0-rc1 are published as prereleases, so a release candidate
+  # can be built and hwsim-verified without being marked the latest release.
+  prerelease: auto
+
+changelog:
+  use: github
+  sort: asc

@@ -159,6 +159,7 @@ func rootCommand(app *App) *Command {
 			"bss":           bssCommand(app),
 			"network":       networkCommand(app),
 			"known-network": knownNetworkCommand(app),
+			"version":       versionCommand(app),
 		},
 	}
 }

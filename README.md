@@ -182,8 +182,17 @@ Key principles:
 
 ## User Quick Start
 
+As a library:
+
 ```bash
 go get github.com/chrispypip/spiderw
+```
+
+Or install the CLI - `go install` from source, or download a prebuilt Linux
+binary (amd64/arm64) from the [Releases](https://github.com/chrispypip/spiderw/releases):
+
+```bash
+go install github.com/chrispypip/spiderw/cmd/spiderw@latest
 ```
 
 Example snippet:
