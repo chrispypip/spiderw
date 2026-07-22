@@ -27,6 +27,9 @@ ARG SPIDERW_VERSION=
 RUN mkdir -p /out && \
     if [ -n "$SPIDERW_VERSION" ]; then \
       arch="$(dpkg --print-architecture)"; \
+      # dpkg reports 32-bit ARM as armhf/armel; GoReleaser names that archive
+      # "arm" (amd64 and arm64 already match).
+      case "$arch" in armhf|armel) arch=arm ;; esac; \
       url="https://github.com/chrispypip/spiderw/releases/download/${SPIDERW_VERSION}/spiderw_${SPIDERW_VERSION#v}_linux_${arch}.tar.gz"; \
       echo "downloading $url"; \
       wget -qO- "$url" | tar -xz -C /out spiderw; \
