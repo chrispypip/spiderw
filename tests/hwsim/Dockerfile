@@ -79,8 +79,10 @@ COPY tests/hwsim/smoke.sh /usr/local/bin/smoke.sh
 COPY tests/hwsim/connect.sh /usr/local/bin/connect.sh
 COPY tests/hwsim/roam.sh /usr/local/bin/roam.sh
 COPY tests/hwsim/signal.sh /usr/local/bin/signal.sh
+COPY tests/hwsim/known-network.sh /usr/local/bin/known-network.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/smoke.sh \
-      /usr/local/bin/connect.sh /usr/local/bin/roam.sh /usr/local/bin/signal.sh
+      /usr/local/bin/connect.sh /usr/local/bin/roam.sh /usr/local/bin/signal.sh \
+      /usr/local/bin/known-network.sh
 
 # The entrypoint brings up dbus + iwd, then execs the command. Default: the smoke.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

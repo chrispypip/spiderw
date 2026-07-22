@@ -34,6 +34,7 @@ tests/hwsim/run.sh                       # build + read-only smoke
 tests/hwsim/run.sh connect.sh            # build + AP/station/connect flow
 tests/hwsim/run.sh roam.sh               # build + roam flow; needs 3 radios
 tests/hwsim/run.sh signal.sh             # build + signal-level agent flow
+tests/hwsim/run.sh known-network.sh      # build + known-network lifecycle
 tests/hwsim/run.sh spiderw device list   # override the command
 RADIOS=2 tests/hwsim/run.sh               # choose radio count
 ```
@@ -69,6 +70,12 @@ if `mac80211_hwsim` is already loaded with fewer radios, reset it first
   monitor (`CQM_RSSI_LIST`), which mac80211/hwsim does not implement (it has only
   the single-threshold monitor the roam tier uses), so band tracking as the
   signal moves is testable only on real hardware, not here.
+- **`known-network.sh` (known-network lifecycle):** connecting to a PSK network
+  makes iwd *save* a profile; spiderw then drives its whole lifecycle - asserts
+  it appears in `known-network list`/`status` with the right properties, that it
+  *survives a disconnect*, that `autoconnect` round-trips and its change
+  subscription fires, and that `forget` removes it. The first exercise of the
+  `KnownNetwork` interface against a real daemon.
 
 ## Automating it
 
