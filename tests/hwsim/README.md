@@ -33,15 +33,17 @@ module enabled, or a GitHub-hosted Ubuntu runner, works.
 tests/hwsim/run.sh                       # build + read-only smoke
 tests/hwsim/run.sh connect.sh            # build + AP/station/connect flow
 tests/hwsim/run.sh roam.sh               # build + roam flow; needs 3 radios
+tests/hwsim/run.sh signal.sh             # build + signal-level agent flow
 tests/hwsim/run.sh spiderw device list   # override the command
 RADIOS=2 tests/hwsim/run.sh               # choose radio count
 ```
 
 `connect.sh` takes optional `SSID`, `PASSPHRASE`, `SCAN_TRIES`; `roam.sh` adds
-`WEAK_CDBM` (how far the connected AP is faded, in centi-dBm) and `ROAM_TIMEOUT`.
-`run.sh roam.sh` auto-selects 3 radios and starts the hwsim medium controller
-(`HWSIM_MEDIUM=1`); if `mac80211_hwsim` is already loaded with fewer radios,
-reset it first (`sudo modprobe -r mac80211_hwsim`).
+`WEAK_CDBM` (how far the connected AP is faded, in centi-dBm) and `ROAM_TIMEOUT`;
+`signal.sh` adds `THRESHOLDS` (the dBm bands to register). `run.sh roam.sh`
+auto-selects 3 radios and starts the hwsim medium controller (`HWSIM_MEDIUM=1`);
+if `mac80211_hwsim` is already loaded with fewer radios, reset it first
+(`sudo modprobe -r mac80211_hwsim`).
 
 ## Tiers
 
@@ -58,6 +60,16 @@ reset it first (`sudo modprobe -r mac80211_hwsim`).
   the roam *signature* through `station monitor access-point`: the associated BSS
   changes with no `access-point=none` between (a reconnect would show one; a true
   roam does not). This is the behaviour a single real radio could never test.
+- **`signal.sh` (signal-level agent):** spiderw *registers a
+  `SignalLevelAgent`*. One station connects to one AP, then `station
+  monitor-signal <dBm>...` registers the agent; the test asserts iwd delivers the
+  initial callback and spiderw decodes it into a valid band index and range
+  string - the first exercise of that whole interface against a real daemon.
+  Note: the *live* band index tracks RSSI only through iwd's multi-threshold CQM
+  monitor (`CQM_RSSI_LIST`), which mac80211/hwsim does not implement (it has only
+  the single-threshold monitor the roam tier uses), so band tracking as the
+  signal moves is testable only on real hardware, not here.
+
 ## Automating it
 
 This tier is deliberately **not** wired into this repo's CI. It needs a real iwd

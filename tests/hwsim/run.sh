@@ -12,7 +12,8 @@
 set -euo pipefail
 
 # The roam tier (roam.sh) needs three radios (two APs + a station) and the hwsim
-# medium controller. Detect it and set both, unless the caller overrode RADIOS.
+# medium controller for per-link RSSI control. Detect it and set both, unless the
+# caller overrode RADIOS. Other tiers run on the default two radios.
 default_radios=2
 env_args=()
 for arg in "$@"; do
