@@ -297,11 +297,12 @@ func runKnownNetworkAutoConnect(app *App, ctx context.Context, ref string, args 
 			return err
 		}
 
-		newVal, err := k.AutoConnect(ctx)
-		if err != nil {
-			return err
-		}
-		return app.printOutput(knownNetworkAutoConnectResult{KnownNetwork: ref, AutoConnect: newVal})
+		// iwd applies AutoConnect asynchronously: a read right after the Set can
+		// still return the OLD value (the property updates on a later event-loop
+		// turn, announced by PropertiesChanged). A successful Set is iwd accepting
+		// the value, so report what was requested rather than a re-read that races
+		// the apply and can echo the stale old value.
+		return app.printOutput(knownNetworkAutoConnectResult{KnownNetwork: ref, AutoConnect: auto})
 	})
 }
 

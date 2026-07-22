@@ -155,6 +155,22 @@ func TestKnownNetworkCmd_AutoConnect_Set(t *testing.T) {
 	require.Equal(t, "false", strings.TrimSpace(out))
 }
 
+// iwd applies AutoConnect asynchronously, so a read right after the Set can still
+// return the old value. The command must report what was requested (the Set
+// succeeded), not a stale re-read - the hwsim known-network tier caught the old
+// re-read echoing the pre-change value.
+func TestKnownNetworkCmd_AutoConnect_Set_ReportsRequested(t *testing.T) {
+	t.Parallel()
+
+	fake := fakeWithKnownNetwork()
+	kn := fake.knownNetworks["/net/connman/iwd/known_networks/1"].(*fakeKnownNetwork)
+	kn.staleReadAfterSet = true // a read-after-set still returns the old true
+
+	out, code := driveCLI(fake, nil, false, "known-network", "KnownNet", "autoconnect", "off")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "false", strings.TrimSpace(out))
+}
+
 func TestKnownNetworkCmd_AutoConnect_InvalidValue(t *testing.T) {
 	t.Parallel()
 

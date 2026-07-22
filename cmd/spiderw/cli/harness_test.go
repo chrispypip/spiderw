@@ -723,6 +723,9 @@ type fakeKnownNetwork struct {
 	props         *spiderw.KnownNetworkProperties
 	forgetErr     error
 	err           error
+	// staleReadAfterSet models iwd applying AutoConnect asynchronously: the Set
+	// succeeds but an immediate read still returns the old value.
+	staleReadAfterSet bool
 }
 
 func (f *fakeKnownNetwork) Path() string { return f.path }
@@ -766,7 +769,12 @@ func (f *fakeKnownNetwork) SetAutoConnect(ctx context.Context, autoConnect bool)
 	if f.err != nil {
 		return f.err
 	}
-	f.props.AutoConnect = autoConnect
+	// When staleReadAfterSet is set, the Set succeeds but the stored value does
+	// not change, so a read-after-set returns the old value - as iwd does while
+	// the async apply is still pending.
+	if !f.staleReadAfterSet {
+		f.props.AutoConnect = autoConnect
+	}
 	return nil
 }
 
