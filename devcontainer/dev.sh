@@ -25,9 +25,9 @@ fi
 
 docker_compose=()
 if docker compose version >/dev/null 2>&1; then
-    docker_compose=(docker compose --project-directory ./dev)
+    docker_compose=(docker compose --project-directory ./devcontainer)
 elif command -v docker-compose >/dev/null 2>&1; then
-    docker_compose=(docker-compose --project-directory ./dev)
+    docker_compose=(docker-compose --project-directory ./devcontainer)
 else
     echo "[dev.sh] ERROR: Docker Compose not found (need 'docker compose' v2 or 'docker-compose')." >&2
     exit 1
@@ -35,26 +35,26 @@ fi
 
 ensure_container() {
     if [[ "$REBUILD" == "1" ]]; then
-        "${docker_compose[@]}" --project-directory ./dev build "$SERVICE"
+        "${docker_compose[@]}" --project-directory ./devcontainer build "$SERVICE"
     fi
 
     # Is it running?
-    if "${docker_compose[@]}" --project-directory ./dev ps --services --filter "status=running" | grep -q \
+    if "${docker_compose[@]}" --project-directory ./devcontainer ps --services --filter "status=running" | grep -q \
             "$SERVICE"; then
         echo "[dev.sh] $SERVICE container already running"
         return
     fi
 
     # Does it exist but is stopped?
-    if "${docker_compose[@]}" --project-directory ./dev ps --services --filter "status=exited" | grep -q \
+    if "${docker_compose[@]}" --project-directory ./devcontainer ps --services --filter "status=exited" | grep -q \
             "$SERVICE"; then
         echo "[dev.sh] $SERVICE container exists but is stopped. Restarting it."
-        "${docker_compose[@]}" --project-directory ./dev start "$SERVICE"
+        "${docker_compose[@]}" --project-directory ./devcontainer start "$SERVICE"
         return
     fi
 
     # Create the container
-    "${docker_compose[@]}" --project-directory ./dev up -d --build "$SERVICE"
+    "${docker_compose[@]}" --project-directory ./devcontainer up -d --build "$SERVICE"
 }
 ensure_container
 
@@ -72,7 +72,7 @@ echo
 #   --rm: remove container after exit
 #   --service-ports: allows port exposure if tests or hostapd require it
 #   --use-aliases: ensures hostnames inside the network resolve
-exec "${docker_compose[@]}" --project-directory ./dev run --rm \
+exec "${docker_compose[@]}" --project-directory ./devcontainer run --rm \
     --service-ports \
     --use-aliases \
     "$SERVICE" "$@"

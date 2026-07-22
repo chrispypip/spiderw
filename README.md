@@ -288,7 +288,7 @@ in [TESTING.md](TESTING.md) and [BENCHMARKS.md](BENCHMARKS.md).
 
 ```text
 *.go                     -> The public spiderw library (package spiderw)
-dev/                     -> Development files
+devcontainer/            -> Development files
     Dockerfile.dev       -> Dev container runtime definition
     docker-compose.yml   -> Orchestration for development environment
     dev.sh               -> Entry point for dev shell

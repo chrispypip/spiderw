@@ -62,9 +62,9 @@ RESET := \033[0m
 # -----------------------------------------------------------------------------------
 define COMPOSE
 	if docker compose version >/dev/null 2>&1; then \
-		docker compose --project-directory ./dev $(1); \
+		docker compose --project-directory ./devcontainer $(1); \
 	else \
-		docker-compose --project-directory ./dev $(1); \
+		docker-compose --project-directory ./devcontainer $(1); \
 	fi
 endef
 
@@ -256,8 +256,8 @@ arm64: ## Build the CLI for linux/arm64 (e.g. Raspberry Pi) -> dist/spiderw-linu
 preflight: ## Validate container environment
 	@echo -e "$(BLUE)[ preflight ]$(RESET) Running host + container preflight..."
 	$(call require_host)
-	@./dev/scripts/preflight-host.sh
-	@$(RUN) ./dev/scripts/preflight-container.sh
+	@./devcontainer/scripts/preflight-host.sh
+	@$(RUN) ./devcontainer/scripts/preflight-container.sh
 
 
 # -----------------------------------------------------------------------------------

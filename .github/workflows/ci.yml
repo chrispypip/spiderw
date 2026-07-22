@@ -13,7 +13,7 @@ permissions:
 
 # The Go version is single-sourced from go.mod (jobs use go-version-file), so it
 # never drifts from the module's declared toolchain. golangci-lint is pinned
-# here and in dev/Dockerfile.dev; Renovate keeps the two in sync
+# here and in devcontainer/Dockerfile.dev; Renovate keeps the two in sync
 # (see renovate.json).
 env:
   GOLANGCI_LINT_VERSION: "v2.12.2"

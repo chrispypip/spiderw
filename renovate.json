@@ -11,7 +11,7 @@
       "customType": "regex",
       "description": "golangci-lint pinned in the dev Dockerfile and CI",
       "managerFilePatterns": [
-        "/^dev/Dockerfile\\.dev$/",
+        "/^devcontainer/Dockerfile\\.dev$/",
         "/^\\.github/workflows/ci\\.yml$/"
       ],
       "matchStrings": [
@@ -24,7 +24,7 @@
       "customType": "regex",
       "description": "Go version pinned in the dev Dockerfile (CI reads go.mod instead)",
       "managerFilePatterns": [
-        "/^dev/Dockerfile\\.dev$/"
+        "/^devcontainer/Dockerfile\\.dev$/"
       ],
       "matchStrings": [
         "ARG GO_VERSION=(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"
@@ -36,7 +36,7 @@
       "customType": "regex",
       "description": "goimports (golang.org/x/tools) pinned in the dev Dockerfile",
       "managerFilePatterns": [
-        "/^dev/Dockerfile\\.dev$/"
+        "/^devcontainer/Dockerfile\\.dev$/"
       ],
       "matchStrings": [
         "ARG GOIMPORTS_VERSION=(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"

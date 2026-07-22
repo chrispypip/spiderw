@@ -8,6 +8,6 @@
 .git
 .github
 docs
-dev
+devcontainer
 examples
 *.md
