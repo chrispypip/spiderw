@@ -22,6 +22,11 @@ for arg in "$@"; do
         default_radios=3
         env_args+=(-e HWSIM_MEDIUM=1 -e IWD_DEBUG=1)
         ;;
+    affinities.sh | */affinities.sh)
+        # Station.Affinities is an iwd [experimental] property, hidden unless iwd
+        # runs with -E; IWD_DEBUG surfaces the setter's accept/reject in the log.
+        env_args+=(-e IWD_EXPERIMENTAL=1 -e IWD_DEBUG=1)
+        ;;
     esac
 done
 

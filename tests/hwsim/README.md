@@ -36,6 +36,7 @@ tests/hwsim/run.sh roam.sh               # build + roam flow; needs 3 radios
 tests/hwsim/run.sh signal.sh             # build + signal-level agent flow
 tests/hwsim/run.sh known-network.sh      # build + known-network lifecycle
 tests/hwsim/run.sh hidden.sh             # build + connect-hidden method
+tests/hwsim/run.sh affinities.sh         # build + SetAffinities round-trip
 tests/hwsim/run.sh spiderw device list   # override the command
 RADIOS=2 tests/hwsim/run.sh               # choose radio count
 ```
@@ -86,6 +87,18 @@ if `mac80211_hwsim` is already loaded with fewer radios, reset it first
   succeeds and exercises the method. If a future iwd instead rejected the call as
   not-hidden, the test reports that as the feasibility wall (a true hidden BEACON
   would need hostapd's `ignore_broadcast_ssid`, which this image does not carry).
+- **`affinities.sh` (SetAffinities):** spiderw *writes* `Station.Affinities` - a
+  BSS the station should stay pinned to within its connected network. Affinities
+  is an iwd `[experimental]` property, so `run.sh` starts iwd with `-E`
+  (`IWD_EXPERIMENTAL=1`) for this tier only. It connects a station, sets an
+  affinity to the connected BSS by MAC, and asserts the *write lifecycle*: iwd
+  accepts the set, then drops it when the setting client exits. That drop is by
+  design - iwd ties an affinity to the D-Bus connection that set it
+  (`station_affinity_disconnected_cb`), so a dead controller leaves no stale
+  pin - which means the one-shot CLI cannot hold an affinity across invocations;
+  only a long-lived client (the library, held open) can. So the tier proves the
+  write reaches and is applied by iwd rather than a cross-invocation round-trip,
+  which is not observable by design.
 
 ## Automating it
 

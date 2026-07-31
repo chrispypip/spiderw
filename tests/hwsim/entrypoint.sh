@@ -63,6 +63,12 @@ iwd_args=()
 if [ "${IWD_DEBUG:-}" = "1" ]; then
     iwd_args+=(-d)
 fi
+# iwd hides API members marked [experimental] in its docs unless started with -E.
+# Station.Affinities is one such property, so the affinities tier turns this on;
+# it only ADDS members, so the stable tiers are unaffected.
+if [ "${IWD_EXPERIMENTAL:-}" = "1" ]; then
+    iwd_args+=(-E)
+fi
 /usr/libexec/iwd "${iwd_args[@]}" >"$IWD_LOG" 2>&1 &
 
 if ! wait_bus_name net.connman.iwd; then
