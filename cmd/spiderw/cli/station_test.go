@@ -334,6 +334,9 @@ func TestStationCmd_Affinities_SetByMAC(t *testing.T) {
 		"station", testStationPath, "affinities", "set", "aa:bb:cc:dd:ee:ff")
 	require.Equal(t, 0, code, out)
 	require.Equal(t, []string{"/net/connman/iwd/phy0/wlan0/aabbccddeeff"}, st.setAffinitiesTo)
+	// A successful set warns (on stderr) that iwd drops the affinity when the CLI
+	// exits, since the pin is scoped to the setting D-Bus connection.
+	require.Contains(t, out, "warning: iwd releases this affinity")
 }
 
 func TestStationCmd_Affinities_Clear(t *testing.T) {
@@ -346,6 +349,8 @@ func TestStationCmd_Affinities_Clear(t *testing.T) {
 	require.True(t, st.setAffinitiesCalled)
 	require.Empty(t, st.setAffinitiesTo, "clear sends an empty list")
 	require.Contains(t, out, "no affinities set")
+	// Clearing is not setting a pin, so it must not carry the persistence warning.
+	require.NotContains(t, out, "warning: iwd releases this affinity")
 }
 
 func TestStationCmd_Affinities_ClearRejectsArgs(t *testing.T) {
@@ -382,6 +387,7 @@ func TestStationCmd_Affinities_Set(t *testing.T) {
 		"/net/connman/iwd/phy0/wlan0/aaa",
 		"/net/connman/iwd/phy0/wlan0/bbb",
 	}, st.setAffinitiesTo)
+	require.Contains(t, out, "warning: iwd releases this affinity")
 }
 
 func TestStationCmd_Affinities_Set_Missing(t *testing.T) {

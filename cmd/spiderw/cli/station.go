@@ -461,6 +461,14 @@ func runStationAffinitiesSet(app *App, ctx context.Context, stationRef string, a
 		if err := s.SetAffinities(ctx, paths); err != nil {
 			return err
 		}
+		// iwd ties a station affinity to the D-Bus connection that set it and
+		// drops it the moment that connection closes. This CLI exits right after
+		// printing, so the affinity is released immediately - it does not persist.
+		// Only a long-lived client (the library, holding the connection open) can
+		// hold one. Warn on stderr so stdout/--json stay clean for scripts.
+		fmt.Fprintln(app.stderr(), "warning: iwd releases this affinity when the "+
+			"setting process exits, so the CLI cannot hold it persistently; only a "+
+			"long-lived client can")
 		return app.printOutput(stationAffinitiesResult(refs))
 	})
 }
