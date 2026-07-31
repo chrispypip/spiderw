@@ -35,6 +35,7 @@ tests/hwsim/run.sh connect.sh            # build + AP/station/connect flow
 tests/hwsim/run.sh roam.sh               # build + roam flow; needs 3 radios
 tests/hwsim/run.sh signal.sh             # build + signal-level agent flow
 tests/hwsim/run.sh known-network.sh      # build + known-network lifecycle
+tests/hwsim/run.sh hidden.sh             # build + connect-hidden method
 tests/hwsim/run.sh spiderw device list   # override the command
 RADIOS=2 tests/hwsim/run.sh               # choose radio count
 ```
@@ -76,6 +77,15 @@ if `mac80211_hwsim` is already loaded with fewer radios, reset it first
   *survives a disconnect*, that `autoconnect` round-trips and its change
   subscription fires, and that `forget` removes it. The first exercise of the
   `KnownNetwork` interface against a real daemon.
+- **`hidden.sh` (connect-hidden):** spiderw *drives `ConnectHiddenNetwork`*, a
+  distinct path from `Network.Connect` in which iwd runs a *directed* probe scan
+  for a named SSID rather than picking from broadcast scan results. iwd's AP mode
+  cannot actually suppress the SSID in beacons, so the test stands up a normal
+  (visible) AP and, without a broad station scan first, calls
+  `station connect-hidden` - a real AP answers the directed probe, so the connect
+  succeeds and exercises the method. If a future iwd instead rejected the call as
+  not-hidden, the test reports that as the feasibility wall (a true hidden BEACON
+  would need hostapd's `ignore_broadcast_ssid`, which this image does not carry).
 
 ## Automating it
 
