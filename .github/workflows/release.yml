@@ -10,13 +10,18 @@ on:
   push:
     tags: ["v*"]
 
+# Least privilege: default every job to read-only, and grant write only to the
+# job that needs it (below), so a job added later inherits read-only, not write.
 permissions:
-  contents: write  # create the release and upload assets
+  contents: read
 
 jobs:
   release:
     name: goreleaser
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # create the release and upload assets
+
     steps:
       # yamllint disable-line rule:line-length
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1

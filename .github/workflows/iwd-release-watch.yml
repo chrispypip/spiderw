@@ -19,14 +19,17 @@ on:
     - cron: "0 9 * * 1"  # Mondays 09:00 UTC
   workflow_dispatch:
 
+# Least privilege: read-only by default; the one job that opens issues declares
+# issues: write itself, so a job added later inherits read-only, not write.
 permissions:
   contents: read
-  issues: write
 
 jobs:
   check:
     name: check for new iwd release
     runs-on: ubuntu-latest
+    permissions:
+      issues: write  # open the tracking issue
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}  # gh needs this without a checkout
