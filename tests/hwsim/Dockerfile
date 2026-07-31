@@ -74,18 +74,14 @@ RUN apt-get update \
 
 COPY --from=iwd /iwd-root/ /
 COPY --from=build /out/spiderw /usr/local/bin/spiderw
+# entrypoint.sh is the container's init (dbus + iwd); the tier scripts under
+# tiers/ are the test bodies it execs. Copying the whole tiers/ directory means a
+# new tier is picked up just by dropping a file in it - no Dockerfile edit. run.sh
+# is the HOST-side driver (it runs docker build/run) and deliberately stays out of
+# the image.
 COPY tests/hwsim/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY tests/hwsim/smoke.sh /usr/local/bin/smoke.sh
-COPY tests/hwsim/connect.sh /usr/local/bin/connect.sh
-COPY tests/hwsim/roam.sh /usr/local/bin/roam.sh
-COPY tests/hwsim/signal.sh /usr/local/bin/signal.sh
-COPY tests/hwsim/known-network.sh /usr/local/bin/known-network.sh
-COPY tests/hwsim/hidden.sh /usr/local/bin/hidden.sh
-COPY tests/hwsim/affinities.sh /usr/local/bin/affinities.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/smoke.sh \
-      /usr/local/bin/connect.sh /usr/local/bin/roam.sh /usr/local/bin/signal.sh \
-      /usr/local/bin/known-network.sh /usr/local/bin/hidden.sh \
-      /usr/local/bin/affinities.sh
+COPY tests/hwsim/tiers/ /usr/local/bin/
+RUN chmod +x /usr/local/bin/*.sh
 
 # The entrypoint brings up dbus + iwd, then execs the command. Default: the smoke.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

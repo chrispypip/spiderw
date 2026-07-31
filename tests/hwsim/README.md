@@ -50,6 +50,13 @@ if `mac80211_hwsim` is already loaded with fewer radios, reset it first
 
 ## Tiers
 
+Each tier is one script under `tiers/`; the image copies that whole directory,
+so adding a tier is just dropping a new `tiers/<name>.sh` in (no Dockerfile
+change) and running `tests/hwsim/run.sh <name>.sh`. `run.sh` and `entrypoint.sh`
+sit one level up: `run.sh` is the host-side driver (build + `docker run`), and
+`entrypoint.sh` is the container init that brings up dbus + iwd before exec'ing
+the tier.
+
 - **`smoke.sh` (read-only):** spiderw *reads* real iwd - `daemon info`,
   `adapter/device list` and `status`. Read-only, safe. The first mock-vs-reality
   check.
