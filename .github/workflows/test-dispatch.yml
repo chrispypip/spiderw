@@ -42,12 +42,42 @@ jobs:
   dispatch:
     name: dispatch spiderw-test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read  # read this repo's CI run status for the gate below
     steps:
+      # Gate on CI: this workflow and CI both start from the same push, so CI is
+      # usually still running. Poll its run for this commit and dispatch only if
+      # it passed, so a red CI - a fast-forward merge that broke a test, say -
+      # does not spend the serialized self-hosted runner.
+      - name: Require CI to have passed on this commit
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          api="repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs"
+          q='.workflow_runs[0] | "\(.status) \(.conclusion)"'
+          for _ in $(seq 1 40); do
+            r=$(gh api "$api?head_sha=$SHA" --jq "$q" 2>/dev/null) || r=
+            case "$r" in
+              "completed success")
+                echo "CI passed."; echo "ok=true" >>"$GITHUB_OUTPUT"; exit 0 ;;
+              completed*)
+                echo "CI not passed ($r); skipping dispatch."
+                echo "ok=false" >>"$GITHUB_OUTPUT"; exit 0 ;;
+            esac
+            sleep 15
+          done
+          echo "CI did not finish in time; skipping dispatch."
+          echo "ok=false" >>"$GITHUB_OUTPUT"
+
       # TEST_DISPATCH_TOKEN is a fine-grained PAT scoped to spiderw-test with
       # Actions: write. It lives in this repo's secrets and is used here on a
       # GitHub-hosted runner - it never touches the self-hosted host. Until it
       # is set, this step is a no-op so main pushes are not failed.
       - name: Trigger spiderw-test
+        if: steps.ci.outputs.ok == 'true'
         env:
           GH_TOKEN: ${{ secrets.TEST_DISPATCH_TOKEN }}
           SPIDERW_SHA: ${{ github.sha }}
