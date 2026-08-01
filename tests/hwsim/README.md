@@ -38,6 +38,7 @@ tests/hwsim/run.sh known-network.sh      # build + known-network lifecycle
 tests/hwsim/run.sh hidden.sh             # build + connect-hidden method
 tests/hwsim/run.sh affinities.sh         # build + SetAffinities round-trip
 tests/hwsim/run.sh ordered-networks.sh   # build + ranked scan; needs 3 radios
+tests/hwsim/run.sh wsc.sh                # build + WSC (WPS) enrollee interface
 tests/hwsim/run.sh spiderw device list   # override the command
 RADIOS=2 tests/hwsim/run.sh               # choose radio count
 ```
@@ -115,6 +116,16 @@ the tier.
   only a long-lived client (the library, held open) can. So the tier proves the
   write reaches and is applied by iwd rather than a cross-invocation round-trip,
   which is not observable by design.
+- **`wsc.sh` (WSC / WPS enrollee):** spiderw *drives the station's
+  `SimpleConfiguration` interface* - `GeneratePin`, `PushButton`, `Cancel`. A
+  completed enrollment needs an AP acting as a WPS registrar, which iwd AP mode
+  is not (its `AccessPoint` interface has no WSC method) and this image has no
+  hostapd, so a join cannot complete on hwsim. Short of that, the tier asserts
+  the enrollee interface works: `GeneratePin` returns a valid 8-digit WPS PIN
+  (correct check digit - a real PIN, not eight random digits), `PushButton`
+  initiates a session that `Cancel` then aborts on iwd's side (the blocking call
+  returns), and a no-op `Cancel` is rejected. The first exercise of that
+  interface against a real daemon.
 
 ## Automating it
 
