@@ -15,6 +15,13 @@
 
 FROM golang:1.26-bookworm@sha256:1ecb7edf62a0408027bd5729dfd6b1b8766e578e8df93995b225dfd0944eb651 AS build
 WORKDIR /src
+# Download modules in their OWN layer, keyed only on go.mod/go.sum. Editing
+# anything else - a tier script, source, docs - leaves this layer cached, so the
+# module download does not re-run; only the recompile below re-runs, and it reuses
+# these already-downloaded modules (no network). Without this split, the `COPY . .`
+# below would be invalidated by any file change and drag the download along.
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
 # SPIDERW_VERSION unset (the default): build the CLI from the cloned source, so
 # any branch or commit can be tested. Pure-Go (godbus), so a static binary runs
