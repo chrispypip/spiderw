@@ -33,6 +33,7 @@ module enabled, or a GitHub-hosted Ubuntu runner, works.
 tests/hwsim/run.sh                       # build + read-only smoke
 tests/hwsim/run.sh connect.sh            # build + AP/station/connect flow
 tests/hwsim/run.sh start-profile.sh      # build + AP from a stored profile
+tests/hwsim/run.sh wrong-passphrase.sh   # build + failed-connect error path
 tests/hwsim/run.sh roam.sh               # build + roam flow; needs 3 radios
 tests/hwsim/run.sh signal.sh             # build + signal-level agent flow
 tests/hwsim/run.sh known-network.sh      # build + known-network lifecycle
@@ -74,6 +75,14 @@ the tier.
   profile into iwd's AP dir (`/var/lib/iwd/ap`), starts the AP from it, asserts
   it is up broadcasting the profile's SSID, and proves the profile works by
   connecting a station with its passphrase.
+- **`wrong-passphrase.sh` (failed-connect error path):** every other connect uses
+  the right passphrase and asserts success; this asserts a FAILURE, where the mock
+  is most likely to be more forgiving than iwd. With a wrong (but valid-length)
+  passphrase the AP's 4-way handshake rejects the station (iwd is both AP and
+  station, so it is really enforced). The test asserts spiderw fails the connect
+  with a non-empty error rather than a phantom success, leaves the station
+  disconnected, and then RECOVERS - a follow-up connect with the correct
+  passphrase succeeds, proving the failed attempt did not wedge iwd.
 - **`roam.sh` (roam):** spiderw *observes a roam*. Two APs share one SSID; the
   station connects to one, then iwd's `hwsim` medium tool (`net.connman.hwsim`,
   `Rule.SignalStrength`) fades that AP so iwd roams to the other. The test asserts
