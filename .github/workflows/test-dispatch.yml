@@ -25,6 +25,9 @@ on:
       - "go.mod"
       - "go.sum"
       - "tests/hwsim/**"
+      # Shapes the hwsim Docker build context, so a change can alter/break the
+      # build even when nothing above changed.
+      - ".dockerignore"
 
 permissions:
   contents: read
