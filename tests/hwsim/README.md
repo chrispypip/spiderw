@@ -35,6 +35,8 @@ tests/hwsim/run.sh connect.sh            # build + AP/station/connect flow
 tests/hwsim/run.sh start-profile.sh      # build + AP from a stored profile
 tests/hwsim/run.sh wrong-passphrase.sh   # build + failed-connect error path
 tests/hwsim/run.sh resolved-refs.sh      # build + path->SSID/MAC/name resolver
+tests/hwsim/run.sh power-toggle.sh       # build + device/adapter power toggle
+tests/hwsim/run.sh ap-scan.sh            # build + AP-side scan for neighbors
 tests/hwsim/run.sh roam.sh               # build + roam flow; needs 3 radios
 tests/hwsim/run.sh signal.sh             # build + signal-level agent flow
 tests/hwsim/run.sh known-network.sh      # build + known-network lifecycle
@@ -154,6 +156,18 @@ the tier.
   initiates a session that `Cancel` then aborts on iwd's side (the blocking call
   returns), and a no-op `Cancel` is rejected. The first exercise of that
   interface against a real daemon.
+- **`power-toggle.sh` (Powered write path):** the last write path not covered
+  elsewhere - `SetPowered`, on both the device and the adapter. It powers a
+  device off (asserting the Device object persists with `Powered=false`, since
+  off is not removal) and back on (asserting it is usable again - a scan works),
+  then round-trips the adapter's `Powered` (a distinct `Adapter.SetPowered`) and
+  checks the device returns and scans afterwards.
+- **`ap-scan.sh` (AP-side scan):** the station scan paths are covered elsewhere;
+  this drives the distinct AP-side scan (`AccessPoint.Scan` +
+  `GetOrderedNetworks`, which iwd exports on a device in AP mode so an AP can
+  survey its neighbours). A scanner in AP mode scans for a second, started AP,
+  and asserts that AP's SSID comes back through `access-point <ap> networks`,
+  resolved to its name with a signal and a security type.
 
 ## Automating it
 
