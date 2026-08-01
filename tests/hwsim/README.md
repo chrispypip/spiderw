@@ -37,16 +37,17 @@ tests/hwsim/run.sh signal.sh             # build + signal-level agent flow
 tests/hwsim/run.sh known-network.sh      # build + known-network lifecycle
 tests/hwsim/run.sh hidden.sh             # build + connect-hidden method
 tests/hwsim/run.sh affinities.sh         # build + SetAffinities round-trip
+tests/hwsim/run.sh ordered-networks.sh   # build + ranked scan; needs 3 radios
 tests/hwsim/run.sh spiderw device list   # override the command
 RADIOS=2 tests/hwsim/run.sh               # choose radio count
 ```
 
 `connect.sh` takes optional `SSID`, `PASSPHRASE`, `SCAN_TRIES`; `roam.sh` adds
 `WEAK_CDBM` (how far the connected AP is faded, in centi-dBm) and `ROAM_TIMEOUT`;
-`signal.sh` adds `THRESHOLDS` (the dBm bands to register). `run.sh roam.sh`
-auto-selects 3 radios and starts the hwsim medium controller (`HWSIM_MEDIUM=1`);
-if `mac80211_hwsim` is already loaded with fewer radios, reset it first
-(`sudo modprobe -r mac80211_hwsim`).
+`signal.sh` adds `THRESHOLDS` (the dBm bands to register). `run.sh roam.sh` and
+`run.sh ordered-networks.sh` auto-select 3 radios and start the hwsim medium
+controller (`HWSIM_MEDIUM=1`); if `mac80211_hwsim` is already loaded with fewer
+radios, reset it first (`sudo modprobe -r mac80211_hwsim`).
 
 ## Tiers
 
@@ -70,6 +71,14 @@ the tier.
   the roam *signature* through `station monitor access-point`: the associated BSS
   changes with no `access-point=none` between (a reconnect would show one; a true
   roam does not). This is the behaviour a single real radio could never test.
+- **`ordered-networks.sh` (ranked scan):** spiderw *reads iwd's ordered
+  networks*. `station networks` calls `GetOrderedNetworks`, which iwd returns
+  ranked best-signal-first; spiderw resolves each object path to its SSID and
+  converts the signal to dBm. Two APs on distinct SSIDs, with the medium
+  controller fading one, let the test assert the ranking: the strong SSID is
+  listed before the weak one, both resolved (not raw paths), with the strong
+  signal numerically greater. Unlike `connect.sh`'s `network list` (unordered,
+  daemon-wide), this is the ordered per-station method and its SSID resolver.
 - **`signal.sh` (signal-level agent):** spiderw *registers a
   `SignalLevelAgent`*. One station connects to one AP, then `station
   monitor-signal <dBm>...` registers the agent; the test asserts iwd delivers the

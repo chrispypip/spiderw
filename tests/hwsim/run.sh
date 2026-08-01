@@ -11,14 +11,17 @@
 # the shared network namespace (--network host) and manages them with NET_ADMIN.
 set -euo pipefail
 
-# The roam tier (roam.sh) needs three radios (two APs + a station) and the hwsim
-# medium controller for per-link RSSI control. Detect it and set both, unless the
-# caller overrode RADIOS. Other tiers run on the default two radios.
+# The roam and ordered-networks tiers need three radios (two APs + a station) and
+# the hwsim medium controller for per-link RSSI control. Detect them and set both,
+# unless the caller overrode RADIOS. Other tiers run on the default two radios.
 default_radios=2
 env_args=()
 for arg in "$@"; do
     case "$arg" in
-    roam.sh | */roam.sh)
+    roam.sh | */roam.sh | ordered-networks.sh | */ordered-networks.sh)
+        # Both need three radios (two APs + a station) and the hwsim medium
+        # controller for per-link RSSI: roam fades the connected AP, ordered
+        # fades the weaker AP so the two SSIDs rank differently.
         default_radios=3
         env_args+=(-e HWSIM_MEDIUM=1 -e IWD_DEBUG=1)
         ;;
