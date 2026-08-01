@@ -34,6 +34,7 @@ tests/hwsim/run.sh                       # build + read-only smoke
 tests/hwsim/run.sh connect.sh            # build + AP/station/connect flow
 tests/hwsim/run.sh start-profile.sh      # build + AP from a stored profile
 tests/hwsim/run.sh wrong-passphrase.sh   # build + failed-connect error path
+tests/hwsim/run.sh resolved-refs.sh      # build + path->SSID/MAC/name resolver
 tests/hwsim/run.sh roam.sh               # build + roam flow; needs 3 radios
 tests/hwsim/run.sh signal.sh             # build + signal-level agent flow
 tests/hwsim/run.sh known-network.sh      # build + known-network lifecycle
@@ -83,6 +84,16 @@ the tier.
   with a non-empty error rather than a phantom success, leaves the station
   disconnected, and then RECOVERS - a follow-up connect with the correct
   passphrase succeeds, proving the failed attempt did not wedge iwd.
+- **`resolved-refs.sh` (friendly-ref resolver):** spiderw's status bundles turn
+  iwd's cross-object paths into the names they stand for - a connected network
+  into its SSID, an access point into its MAC, a device into its adapter name -
+  from one `GetManagedObjects` tree. That resolver is otherwise unit-tested only
+  against the mock, whose object tree merely *imitates* iwd's layout. This
+  tier connects a station and asserts every such ref in `station`/`network`/
+  `device status` is resolved - and, against ground truth (the SSID, the AP's
+  BSSID, the station name), resolved to the *right* value - so a real-iwd layout
+  that differed from the mock's (leaving raw `/net/connman/iwd/...` paths) is
+  caught here.
 - **`roam.sh` (roam):** spiderw *observes a roam*. Two APs share one SSID; the
   station connects to one, then iwd's `hwsim` medium tool (`net.connman.hwsim`,
   `Rule.SignalStrength`) fades that AP so iwd roams to the other. The test asserts
