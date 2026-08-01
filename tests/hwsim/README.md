@@ -32,6 +32,7 @@ module enabled, or a GitHub-hosted Ubuntu runner, works.
 ```bash
 tests/hwsim/run.sh                       # build + read-only smoke
 tests/hwsim/run.sh connect.sh            # build + AP/station/connect flow
+tests/hwsim/run.sh start-profile.sh      # build + AP from a stored profile
 tests/hwsim/run.sh roam.sh               # build + roam flow; needs 3 radios
 tests/hwsim/run.sh signal.sh             # build + signal-level agent flow
 tests/hwsim/run.sh known-network.sh      # build + known-network lifecycle
@@ -66,6 +67,13 @@ the tier.
   through the CLI - mode switch, AP start, scan, connect, disconnect - and asserts
   the station reaches (and leaves) the connected state. The first exercise of the
   *write* paths against the real daemon.
+- **`start-profile.sh` (AP from a stored profile):** where `connect.sh` uses the
+  inline `access-point start <ssid> <psk>`, this drives the distinct
+  `StartProfile` path - iwd reads a stored `.ap` profile file (which can carry
+  security config beyond the inline PSK form). The tier writes a minimal PSK
+  profile into iwd's AP dir (`/var/lib/iwd/ap`), starts the AP from it, asserts
+  it is up broadcasting the profile's SSID, and proves the profile works by
+  connecting a station with its passphrase.
 - **`roam.sh` (roam):** spiderw *observes a roam*. Two APs share one SSID; the
   station connects to one, then iwd's `hwsim` medium tool (`net.connman.hwsim`,
   `Rule.SignalStrength`) fades that AP so iwd roams to the other. The test asserts
