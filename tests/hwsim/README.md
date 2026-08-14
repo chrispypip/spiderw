@@ -7,62 +7,90 @@ diverge.
 
 ## Requirements
 
-A host with a hwsim-enabled kernel (`CONFIG_MAC80211_HWSIM`) and Docker. This is
-**not** most workstations - a stock desktop kernel usually lacks the option, and a
-container cannot load a module the host kernel does not have. A cloud VM with the
-module enabled, or a GitHub-hosted Ubuntu runner, works.
+A host with a hwsim-enabled kernel (`CONFIG_MAC80211_HWSIM`). This is **not**
+most workstations - a stock desktop kernel usually lacks the option. A cloud VM
+with the module enabled works; the test harness runs on a dedicated, disposable
+VM (see `spiderw-test`).
+
+The tiers run **natively** on that VM - no Docker (`mac80211_hwsim` would not
+work under Docker on these VMs). The VM image is baked once with what `run.sh`
+needs on `PATH`: a **pinned iwd** (3.12, built from source `--enable-hwsim` so
+the `hwsim` medium tool is present) and Go (to build spiderw from source). The
+runner user has passwordless sudo, because `run.sh` re-execs under it - iwd, the
+`/var/lib/iwd` wipe, and `modprobe` all need root. NetworkManager must not
+manage the `wlan*` interfaces, and no packaged iwd service should be running
+(`run.sh` stops one defensively).
+
+> The **same tier scripts** also run in a container against the Pi's real radio
+> (`tests/hardware/`, which reuses `Dockerfile` + `entrypoint.sh`). That path
+> keeps Docker; only the VM/hwsim path is native. The tier scripts are identical
+> across both.
 
 ## What it does
 
-- The virtual radios are created on the **host** (`modprobe mac80211_hwsim`).
-- The container runs its **own** system D-Bus and iwd (see `entrypoint.sh`), so
-  iwd owns `net.connman.iwd` on the container's bus, isolated from the host. It
-  borrows the host's radios through the shared network namespace
-  (`--network host`) and manages them with `NET_ADMIN`.
-- iwd is built from source at a **pinned version** (3.12), not installed from
-  apt: Ubuntu ships iwd 2.14, and the point of this tier is to meet the same
-  daemon the hardware runs. The iwd tarball bundles the exact ell it was released
-  with, so bumping `IWD_VERSION` in the Dockerfile is all it takes to track a new
-  target.
-- spiderw talks to that iwd over the system bus (its default; the mock is the
-  odd one out on the session bus).
+- Each `run.sh` call is one tier and its own clean slate - the isolation
+  `docker run --rm` used to give. `lib.sh` reloads `mac80211_hwsim` (fresh phys
+  in default station mode), wipes `/var/lib/iwd` (no leftover known-network or
+  stored-AP profile), starts a **fresh** iwd (and, for roam/ordered, a fresh
+  `hwsim` medium controller so no fade rule leaks), then tears it all down on
+  exit. iwd's log lands at `/tmp/iwd.log`, where the tiers already look.
+- iwd is **pinned** (3.12), not the distro package: Ubuntu ships 2.14, and the
+  point of this tier is to meet the same daemon the hardware runs. The VM image
+  builds it from the kernel.org tarball (which bundles the exact ell), the same
+  version the `Dockerfile` pins for the Pi path.
+- spiderw talks to that iwd over the **system** bus (its default; the mock is
+  the odd one out on the session bus).
 
 ## Run it (from the repo root, on the VM)
 
 ```bash
-tests/hwsim/run.sh                       # build + read-only smoke
-tests/hwsim/run.sh connect.sh            # build + AP/station/connect flow
-tests/hwsim/run.sh start-profile.sh      # build + AP from a stored profile
-tests/hwsim/run.sh wrong-passphrase.sh   # build + failed-connect error path
-tests/hwsim/run.sh resolved-refs.sh      # build + path->SSID/MAC/name resolver
-tests/hwsim/run.sh power-toggle.sh       # build + device/adapter power toggle
-tests/hwsim/run.sh ap-scan.sh            # build + AP-side scan for neighbors
-tests/hwsim/run.sh roam.sh               # build + roam flow; needs 3 radios
-tests/hwsim/run.sh signal.sh             # build + signal-level agent flow
-tests/hwsim/run.sh known-network.sh      # build + known-network lifecycle
-tests/hwsim/run.sh hidden.sh             # build + connect-hidden method
-tests/hwsim/run.sh affinities.sh         # build + SetAffinities round-trip
-tests/hwsim/run.sh ordered-networks.sh   # build + ranked scan; needs 3 radios
-tests/hwsim/run.sh wsc.sh                # build + WSC (WPS) enrollee interface
+tests/hwsim/run.sh                       # read-only smoke
+tests/hwsim/run.sh connect.sh            # AP/station/connect flow
+tests/hwsim/run.sh start-profile.sh      # AP from a stored profile
+tests/hwsim/run.sh wrong-passphrase.sh   # failed-connect error path
+tests/hwsim/run.sh resolved-refs.sh      # path->SSID/MAC/name resolver
+tests/hwsim/run.sh power-toggle.sh       # device/adapter power toggle
+tests/hwsim/run.sh ap-scan.sh            # AP-side scan for neighbors
+tests/hwsim/run.sh roam.sh               # roam flow; auto-selects 3 radios
+tests/hwsim/run.sh signal.sh             # signal-level agent flow
+tests/hwsim/run.sh known-network.sh      # known-network lifecycle
+tests/hwsim/run.sh hidden.sh             # connect-hidden method
+tests/hwsim/run.sh affinities.sh         # SetAffinities round-trip
+tests/hwsim/run.sh ordered-networks.sh   # ranked scan; auto-selects 3 radios
+tests/hwsim/run.sh wsc.sh                # WSC (WPS) enrollee interface
 tests/hwsim/run.sh spiderw device list   # override the command
-RADIOS=2 tests/hwsim/run.sh               # choose radio count
+RADIOS=2 tests/hwsim/run.sh              # override the radio count
+SPIDERW_VERSION=v0.14.0 tests/hwsim/run.sh   # test a published binary
 ```
 
-`connect.sh` takes optional `SSID`, `PASSPHRASE`, `SCAN_TRIES`; `roam.sh` adds
-`WEAK_CDBM` (how far the connected AP is faded, in centi-dBm) and `ROAM_TIMEOUT`;
-`signal.sh` adds `THRESHOLDS` (the dBm bands to register). `run.sh roam.sh` and
-`run.sh ordered-networks.sh` auto-select 3 radios and start the hwsim medium
-controller (`HWSIM_MEDIUM=1`); if `mac80211_hwsim` is already loaded with fewer
-radios, reset it first (`sudo modprobe -r mac80211_hwsim`).
+`run.sh` re-execs under sudo. It uses a `spiderw` already on `PATH` (the CI
+installs one up front); otherwise it downloads the `SPIDERW_VERSION` release, or
+builds from the checked-out source. `connect.sh` takes optional `SSID`,
+`PASSPHRASE`, `SCAN_TRIES`; `roam.sh` adds `WEAK_CDBM` (how far the connected AP
+is faded, in centi-dBm) and `ROAM_TIMEOUT`; `signal.sh` adds `THRESHOLDS` (the
+dBm bands to register). `run.sh roam.sh` and `run.sh ordered-networks.sh`
+auto-select 3 radios and start the hwsim medium controller (`HWSIM_MEDIUM=1`);
+`run.sh` reloads the module every call, so a stale radio count fixes itself.
+
+> **Destructive to the host's iwd state.** `run.sh` wipes `/var/lib/iwd` and
+> reloads `mac80211_hwsim` - it is built for the disposable VM, not a workstation
+> whose saved networks you care about.
 
 ## Tiers
 
-Each tier is one script under `tiers/`; the image copies that whole directory,
-so adding a tier is just dropping a new `tiers/<name>.sh` in (no Dockerfile
-change) and running `tests/hwsim/run.sh <name>.sh`. `run.sh` and `entrypoint.sh`
-sit one level up: `run.sh` is the host-side driver (build + `docker run`), and
-`entrypoint.sh` is the container init that brings up dbus + iwd before exec'ing
-the tier.
+Each tier is one script under `tiers/`; adding a tier is just dropping a new
+`tiers/<name>.sh` in and running `tests/hwsim/run.sh <name>.sh`. The tier
+scripts assume iwd is already up and drive spiderw against it - they do not care
+whether that iwd came from the native harness or the container, which is why the
+same scripts serve both paths. One level up:
+
+- `run.sh` - the native host-side driver (VM): pick the radio count + flags,
+  bring up a fresh iwd via `lib.sh`, run the tier, tear down.
+- `lib.sh` - the native bring-up/teardown (reload radios, wipe state, start/stop
+  iwd and the hwsim medium).
+- `Dockerfile` + `entrypoint.sh` - the **container** path, used against the Pi's
+  real radio (`tests/hardware/`). `entrypoint.sh` is the container init that
+  brings up dbus + iwd before exec'ing the tier.
 
 - **`smoke.sh` (read-only):** spiderw *reads* real iwd - `daemon info`,
   `adapter/device list` and `status`. Read-only, safe. The first mock-vs-reality
@@ -179,12 +207,12 @@ on the runner.
 
 So run it one of two ways:
 
-- **Manually**, on a hwsim-enabled machine, as a pre-release check: `git pull`
-  and run the three tiers above.
+- **Manually**, on a hwsim-enabled disposable machine, as a pre-release check:
+  `git pull` and run the tiers above.
 - **From a separate private repo** that registers the self-hosted runner, clones
   this (public) repo, and runs the tiers. A private repo has no anonymous forks,
-  which removes the exposure entirely; it is also the right home for a
-  real-hardware runner later. Point that runner at a **dedicated, disposable** VM
-  (nothing sensitive on it, no reused keys or broad credentials), since the
-  workload is privileged: Docker plus a `NET_ADMIN` / `--network host` container
-  can reach host root.
+  which removes the exposure entirely; it is also the home for the real-hardware
+  Pi runner. Point that runner at a **dedicated, disposable** VM (nothing
+  sensitive on it, no reused keys or broad credentials), since the workload is
+  privileged: the runner has passwordless sudo and iwd runs as root with
+  `NET_ADMIN` over the radios, so it can reach host root regardless.
