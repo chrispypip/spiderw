@@ -35,7 +35,7 @@ echo "[connect] AP=$AP  STA=$STA  SSID=$SSID"
 # an SSID reference ambiguous. So resolve the network belonging to OUR station
 # and address it by path.
 STA_PATH=$(spiderw device list | awk -F'\t' -v d="$STA" '$1 == d {print $2}')
-[ -n "$STA_PATH" ] || fail "could not resolve the device path for $STA"
+[ "$STA_PATH" != "" ] || fail "could not resolve the device path for $STA"
 
 net_path() {
     spiderw network list \
@@ -59,17 +59,17 @@ step "device $STA mode station"
 spiderw device "$STA" mode station || fail "could not set $STA to station mode"
 
 NET=""
-for try in $(seq 1 "$SCAN_TRIES"); do
-    step "station $STA scan (try $try/$SCAN_TRIES)"
-    spiderw station "$STA" scan || true
+for ((i = 0; i < SCAN_TRIES; i++)); do
+    step "station $STA scan (try $i/$SCAN_TRIES)"
+    spiderw station "$STA" scan
     # Only count a hit under OUR station: another station seeing the SSID says
     # nothing about whether this one can connect to it.
     NET=$(net_path)
-    [ -n "$NET" ] && break
+    [ "$NET" != "" ] && break
     echo "[connect] $SSID not visible to $STA yet"
     sleep 1
 done
-[ -n "$NET" ] || fail "station $STA never saw SSID $SSID after $SCAN_TRIES scans"
+[ "$NET" != "" ] || fail "station $STA never saw SSID $SSID after $SCAN_TRIES scans"
 echo "[connect] network object under $STA: $NET"
 
 # --- connect ----------------------------------------------------------------

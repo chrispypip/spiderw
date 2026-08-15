@@ -62,7 +62,7 @@ find_hwsim_tool() {
 # ~10s at 0.2s intervals). Returns 0 once present, 1 on timeout.
 wait_bus_name() {
     local name="$1" tries="${2:-50}" _
-    for _ in $(seq 1 "$tries"); do
+    for ((i = 0; i < tries; i++)); do
         if dbus-send --system --print-reply --dest=org.freedesktop.DBus \
              /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null \
              | grep -q "$name"; then
@@ -83,7 +83,7 @@ hwsim_reload() {
     modprobe -r "$HWSIM_MODULE" 2>/dev/null || true
     modprobe "$HWSIM_MODULE" "radios=$radios" \
         || fail "modprobe $HWSIM_MODULE radios=$radios failed"
-    for _ in $(seq 1 25); do
+    for ((i = 0; i < 25; i++)); do
         [ "$(iw dev 2>/dev/null | grep -c Interface)" -ge "$radios" ] && return 0
         sleep 0.2
     done
@@ -135,16 +135,63 @@ iwd_start() {
         fail "iwd did not come up on the system bus"
     fi
     log "net.connman.iwd is up (pid $IWD_PID, $iwd_bin ${args[*]})"
+    if ! kill -0 "$IWD_PID" 2>/dev/null; then
+        log "iwd disappeared immediately after D-Bus registration"
+        cat "$IWD_LOG" >&2
+        fail "iwd exited after startup"
+    fi
 }
 
 # Teardown, safe to call more than once (run.sh traps it on EXIT). Stops the
 # processes this library started and unloads the module, so a REUSED VM is left
 # as clean as a fresh one - a fresh VM discards all of it anyway.
 harness_down() {
-    [ -n "$IWD_PID" ] && kill "$IWD_PID" 2>/dev/null || true
-    [ -n "$HWSIM_PID" ] && kill "$HWSIM_PID" 2>/dev/null || true
+    [ "$IWD_PID" != "" ] && kill "$IWD_PID" 2>/dev/null || true
+    [ "$HWSIM_PID" != "" ] && kill "$HWSIM_PID" 2>/dev/null || true
+    if [ "$IWD_PID" != "" ]; then
+        kill "$IWD_PID" 2>/dev/null || true
+        wait "$IWD_PID" 2>/dev/null || true
+    fi
+    if [ "$HWSIM_PID" != "" ]; then
+        kill "$HWSIM_PID" 2>/dev/null || true
+        wait "$HWSIM_PID" 2>/dev/null || true
+    fi
     pkill -x iwd 2>/dev/null || true
     pkill -x hwsim 2>/dev/null || true
     IWD_PID=""; HWSIM_PID=""
     modprobe -r "$HWSIM_MODULE" 2>/dev/null || true
+}
+
+cleanup() {
+    rc=$?
+
+    if [ "$rc" -ne 0 ]; then
+        echo
+        echo "===== iwd log ====="
+        if [ -f "$IWD_LOG" ]; then
+            cat "$IWD_LOG"
+        else
+            echo "(no $IWD_LOG)"
+        fi
+
+        echo
+        echo "===== hwsim log ====="
+        if [ -f "$HWSIM_LOG" ]; then
+            cat "$HWSIM_LOG"
+        else
+            echo "(no $HWSIM_LOG)"
+        fi
+
+        echo
+        echo "===== processes ====="
+        ps -ef | grep -E '[i]wd|[h]wsim' || true
+
+        echo
+        echo "===== D-Bus owners ====="
+        busctl --system list --no-pager \
+            | grep -E 'net\.connman\.(iwd|hwsim)' || true
+    fi
+
+    harness_down
+    exit "$rc"
 }

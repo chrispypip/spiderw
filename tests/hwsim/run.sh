@@ -67,7 +67,7 @@ ensure_spiderw() {
     local bindir="${TMPDIR:-/tmp}/spiderw-hwsim-bin"
     mkdir -p "$bindir"
 
-    if [ -n "${SPIDERW_VERSION:-}" ]; then
+    if [ "${SPIDERW_VERSION:-}" != "" ]; then
         local arch url
         arch="$(dpkg --print-architecture 2>/dev/null || uname -m)"
         case "$arch" in
@@ -94,7 +94,7 @@ ensure_spiderw() {
 
 [ -e /dev/rfkill ] || log "WARNING: /dev/rfkill missing; iwd needs it and may not start"
 
-trap harness_down EXIT
+trap cleanup EXIT
 ensure_spiderw
 hwsim_reload "$RADIOS"
 iwd_start
