@@ -70,11 +70,14 @@ if [ $# -ge 1 ] && [ -n "$HW_TIERS_LOCAL" ]; then
     fi
 fi
 
-# Forward the tier's env into the container (only the vars that are set), so
-# e.g. the connect tier gets its SSID/PASSPHRASE. `-e VAR` passes the current
-# value through without echoing the secret into the command line.
+# Forward the tiers' env into the container (only the vars that are set), so a
+# tier gets its SSID/PASSPHRASE and tunables. `-e VAR` passes the current value
+# through (spaces and all, e.g. THRESHOLDS) without echoing a secret onto the
+# command line.
 env_args=()
-for var in SSID PASSPHRASE SECURITY SCAN_TRIES; do
+for var in SSID PASSPHRASE SECURITY SCAN_TRIES \
+           BAD_PASSPHRASE SETTLE_TRIES MIN_NETWORKS THRESHOLDS REG_TIMEOUT \
+           DEVICE_TRIES; do
     [ -n "${!var:-}" ] && env_args+=(-e "$var")
 done
 
