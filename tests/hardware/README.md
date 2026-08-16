@@ -42,6 +42,18 @@ iwd behaves differently here, which is exactly the divergence worth testing.
   its change subscription fires, and that `forget` removes it. Same external-AP
   env as `connect`. (Unlike the hwsim tier it can't stop the AP, so it drops
   `autoconnect` before forgetting to avoid an auto-reconnect race.)
+- **`signal` (hardware-only, `tiers/signal.sh`):** registers a
+  `SignalLevelAgent` (`station monitor-signal <dBm>...`) on the connected link
+  and asserts iwd delivers the initial callback and spiderw decodes it into a
+  valid band index + range string. Same external-AP env plus `THRESHOLDS` and
+  `REG_TIMEOUT`. *Live* band tracking as the signal moves needs iwd's
+  multi-threshold CQM (`CQM_RSSI_LIST`), which fullmac brcmfmac is not expected
+  to deliver, so this asserts the register/callback/decode path, not live
+  tracking - that would need a softmac (mt76/iwlwifi) station later.
+
+The `connect`, `known-network`, and `signal` tiers share `tiers/common.sh`
+(`resolve_sta`, which waits for iwd to enumerate the real radio, and
+`sta_path`), sourced via `. "$(dirname "${BASH_SOURCE[0]}")/common.sh"`.
 
 Shared hwsim tiers live in `../hwsim/tiers/` and are baked onto `PATH` in the
 image; hardware-only tiers live in `tiers/` here and are baked into a separate
