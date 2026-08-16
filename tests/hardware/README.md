@@ -50,10 +50,29 @@ iwd behaves differently here, which is exactly the divergence worth testing.
   multi-threshold CQM (`CQM_RSSI_LIST`), which fullmac brcmfmac is not expected
   to deliver, so this asserts the register/callback/decode path, not live
   tracking - that would need a softmac (mt76/iwlwifi) station later.
+- **`wrong-passphrase` (hardware-only, `tiers/wrong-passphrase.sh`):** asserts
+  the FAILURE path against the real AP's 4-way handshake - a wrong (valid-length)
+  passphrase must fail with a non-empty error and no phantom connect, leave the
+  station disconnected, then RECOVER with the correct passphrase. `SSID` +
+  `PASSPHRASE` (the correct one) required; `BAD_PASSPHRASE` optional.
+- **`power-toggle` (hardware-only, `tiers/power-toggle.sh`):** `SetPowered`
+  off/on on the device *and* adapter, asserting the property round-trips and the
+  radio is usable again (a scan works) - real rfkill + brcmfmac firmware
+  down/up. No AP or credentials needed.
+- **`ordered-networks` (hardware-only, `tiers/ordered-networks.sh`):** uses the
+  genuine ambient RF - `station networks` (GetOrderedNetworks) over the real APs
+  in range, asserting the list is monotonically descending by signal, signals
+  decode to dBm, and SSIDs resolve. `MIN_NETWORKS` (default 2); optional `SSID`
+  must appear if set. No connect/credentials needed.
+- **`resolved-refs` (hardware-only, `tiers/resolved-refs.sh`):** connects, then
+  asserts every cross-object ref in the status bundles resolves to a friendly
+  identifier (SSID, connected BSSID/MAC, station name, adapter name) and is
+  mutually consistent (the connected BSSID appears in the network's advertised
+  BSSes). Same external-AP env as `connect`.
 
-The `connect`, `known-network`, and `signal` tiers share `tiers/common.sh`
-(`resolve_sta`, which waits for iwd to enumerate the real radio, and
-`sta_path`), sourced via `. "$(dirname "${BASH_SOURCE[0]}")/common.sh"`.
+All hardware tiers share `tiers/common.sh` (`resolve_sta`, which waits for iwd
+to enumerate the real radio, and `sta_path`), sourced via
+`. "$(dirname "${BASH_SOURCE[0]}")/common.sh"`.
 
 Shared hwsim tiers live in `../hwsim/tiers/` and are baked onto `PATH` in the
 image; hardware-only tiers live in `tiers/` here and are baked into a separate
