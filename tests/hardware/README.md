@@ -35,6 +35,13 @@ iwd behaves differently here, which is exactly the divergence worth testing.
   connected state. The write paths, on real brcmfmac. No AP is created (one
   radio), so it needs the target AP supplied by env: `SSID`, `PASSPHRASE` (for a
   PSK network), optional `SECURITY=psk|open` and `SCAN_TRIES`.
+- **`known-network` (hardware-only, `tiers/known-network.sh`):** connecting to a
+  PSK network makes iwd *save* a profile; this drives its whole lifecycle on
+  real hardware - asserts it appears in `known-network list`/`status` with the
+  right properties, *survives a disconnect*, that `autoconnect` round-trips and
+  its change subscription fires, and that `forget` removes it. Same external-AP
+  env as `connect`. (Unlike the hwsim tier it can't stop the AP, so it drops
+  `autoconnect` before forgetting to avoid an auto-reconnect race.)
 
 Shared hwsim tiers live in `../hwsim/tiers/` and are baked onto `PATH` in the
 image; hardware-only tiers live in `tiers/` here and are baked into a separate

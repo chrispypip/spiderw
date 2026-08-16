@@ -19,6 +19,9 @@
 #   SCAN_TRIES  scans to wait for the AP to appear (default 15)
 set -uo pipefail
 
+# shellcheck source=tests/hardware/tiers/common.sh
+. "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+
 SSID="${SSID:-}"
 PASSPHRASE="${PASSPHRASE:-}"
 SECURITY="${SECURITY:-psk}"
@@ -32,13 +35,10 @@ if [ "$SECURITY" = "psk" ] && [ "$PASSPHRASE" = "" ]; then
     fail "SECURITY=psk needs PASSPHRASE (or set SECURITY=open)"
 fi
 
-# --- the single real station device -----------------------------------------
-# The Pi has one radio; take the first named device as the station. `device
-# list` prints "name<TAB>path" per device, so keep the first tab-field and drop
-# any bare-path lines.
-mapfile -t DEVICES < <(spiderw device list | cut -f1 | grep -v '^/' | awk 'NF')
-[ "${#DEVICES[@]}" -ge 1 ] || fail "no named wireless device, saw: ${DEVICES[*]:-none}"
-STA="${DEVICES[0]}"
+# --- the single real station device (waits for iwd to enumerate it) ---------
+# The Pi has one radio; take the first named device as the station.
+STA=$(resolve_sta) \
+    || fail "iwd never presented a wireless device (rfkill soft-block? wlan0 taken by NetworkManager? radio not up?)"
 echo "[hw-connect] STA=$STA  SSID=$SSID  SECURITY=$SECURITY"
 
 step "device $STA mode station"
@@ -46,7 +46,7 @@ spiderw device "$STA" mode station || fail "could not set $STA to station mode"
 
 # Resolve the network under OUR station and address it by path, so the ref is
 # unambiguous (matches how the hwsim connect tier scopes its network).
-STA_PATH=$(spiderw device list | awk -F'\t' -v d="$STA" '$1 == d {print $2}')
+STA_PATH=$(sta_path "$STA")
 [ "$STA_PATH" != "" ] || fail "could not resolve the device path for $STA"
 
 net_path() {
