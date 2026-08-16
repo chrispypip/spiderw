@@ -76,6 +76,13 @@ iwd behaves differently here, which is exactly the divergence worth testing.
   iwd with `-E` for this tier. On fullmac brcmfmac iwd may *reject* the pin; that
   rejection is reported as a feasibility wall (a finding), not a pass. Same
   external-AP env as `connect`.
+- **`hidden` (hardware-only, `tiers/hidden.sh`):** drives `ConnectHiddenNetwork`
+  (a directed probe) against a truly **hidden** AP - it first confirms the SSID
+  is *absent* from a broadcast scan, then connect-hidden connects. Unlike the
+  hwsim tier (iwd AP mode can't hide the SSID), the real AP genuinely suppresses
+  the beacon. **Requires the AP configured hidden** (hostapd
+  `ignore_broadcast_ssid=1`); if the SSID is visible, iwd's rejection is reported
+  as a feasibility wall. Same external-AP env as `connect`, plus `CONNECT_TRIES`.
 
 All hardware tiers share `tiers/common.sh` (`resolve_sta`, which waits for iwd
 to enumerate the real radio, and `sta_path`), sourced via
