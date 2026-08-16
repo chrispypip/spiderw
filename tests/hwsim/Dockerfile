@@ -88,7 +88,12 @@ COPY --from=build /out/spiderw /usr/local/bin/spiderw
 # the image.
 COPY tests/hwsim/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY tests/hwsim/tiers/ /usr/local/bin/
-RUN chmod +x /usr/local/bin/*.sh
+# Hardware-only tiers (a single station against an EXTERNAL AP - the Pi has one
+# radio) live in a SEPARATE image dir so their names never collide with the
+# hwsim tiers on PATH. The hardware driver (tests/hardware/run.sh) invokes them
+# by full path; the hwsim path never touches them.
+COPY tests/hardware/tiers/ /usr/local/lib/spiderw-hardware/
+RUN chmod +x /usr/local/bin/*.sh /usr/local/lib/spiderw-hardware/*.sh
 
 # The entrypoint brings up dbus + iwd, then execs the command. Default: the smoke.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

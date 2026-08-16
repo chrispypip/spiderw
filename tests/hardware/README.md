@@ -24,12 +24,37 @@ iwd behaves differently here, which is exactly the divergence worth testing.
 - The **control plane must be Ethernet**: a test reconfigures `wlan0`, which
   would drop a Wi-Fi-connected runner.
 
+## Tiers
+
+- **`smoke.sh` (shared, read-only):** reused from the hwsim tier - it only
+  *reads* iwd, so it is radio-agnostic. The first mock-vs-reality check on the
+  real driver.
+- **`connect` (hardware-only, `tiers/connect.sh`):** drives the single real
+  station through mode-station -> scan -> `Network.Connect` (with a passphrase)
+  -> disconnect against an **external** AP, asserting it reaches and leaves the
+  connected state. The write paths, on real brcmfmac. No AP is created (one
+  radio), so it needs the target AP supplied by env: `SSID`, `PASSPHRASE` (for a
+  PSK network), optional `SECURITY=psk|open` and `SCAN_TRIES`.
+
+Shared hwsim tiers live in `../hwsim/tiers/` and are baked onto `PATH` in the
+image; hardware-only tiers live in `tiers/` here and are baked into a separate
+image dir, so a hardware tier can share a name with an hwsim one without
+colliding. `run.sh` resolves a bare tier name to the right one.
+
 ## Running it (on the Pi runner)
 
 ```bash
 tests/hardware/run.sh              # build + read-only smoke
-tests/hardware/run.sh smoke.sh     # a specific tier from the image
+tests/hardware/run.sh smoke.sh     # the shared read-only smoke, explicitly
+SSID=lab-ap PASSPHRASE=secret \
+  tests/hardware/run.sh connect    # station connect against your lab AP
 ```
+
+The `connect` tier connects `wlan0` to a **real external AP**, so run it on a
+runner whose control plane is **Ethernet** (per the constraint above) and point
+it at your lab router. Wiring it into `hardware.yml` with the SSID/passphrase
+from repo secrets is the CI step (deferred with the rest of the hardware
+runner's GitHub Actions setup); run it by hand against the lab AP until then.
 
 Host setup (Docker, `wlan0` freed from NetworkManager, the WiFi regdomain, the
 pre-loaded AF_ALG crypto modules, and the `seccomp=unconfined` the run needs) is

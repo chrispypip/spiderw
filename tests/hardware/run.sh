@@ -3,8 +3,17 @@
 # self-hosted runner (see spiderw-test's provision-pi-runner.sh + hardware.yml).
 #
 #   tests/hardware/run.sh                    # build + read-only smoke
-#   tests/hardware/run.sh smoke.sh           # a specific tier (in the image)
+#   tests/hardware/run.sh smoke.sh           # a shared hwsim tier (radio-agnostic)
+#   tests/hardware/run.sh connect            # a hardware-only tier (tiers/*.sh)
 #   tests/hardware/run.sh spiderw device list   # override the command
+#
+#   # the connect tier needs the external AP's details (no AP is created):
+#   SSID=lab-ap PASSPHRASE=secret tests/hardware/run.sh connect
+#
+# Hardware-only tiers live in tests/hardware/tiers/ and are baked into the image
+# at /usr/local/lib/spiderw-hardware/ (a separate dir so their names cannot
+# collide with the hwsim tiers on PATH). A bare tier name here resolves to that
+# path; smoke.sh (shared, on PATH) and raw commands pass through unchanged.
 #
 # It reuses the hwsim container image (tests/hwsim/Dockerfile: spiderw + a pinned
 # iwd), but drives it against the Pi's REAL brcmfmac radio, NOT virtual
@@ -46,7 +55,30 @@ else
     echo "[run] WARNING: /dev/rfkill missing on host; iwd needs it and will not start"
 fi
 
+# Resolve the command. A bare hardware-tier name (with or without .sh) that
+# exists under tests/hardware/tiers/ maps to its in-image path; anything else -
+# a shared hwsim tier like smoke.sh (found on PATH), or a raw command - passes
+# through untouched.
+HW_TIERS_LOCAL="$(cd "$(dirname "${BASH_SOURCE[0]}")/tiers" 2>/dev/null && pwd)"
+HW_TIERS_IMAGE="/usr/local/lib/spiderw-hardware"
+cmd=("$@")
+if [ $# -ge 1 ] && [ -n "$HW_TIERS_LOCAL" ]; then
+    name="${1%.sh}"
+    if [ -f "$HW_TIERS_LOCAL/$name.sh" ]; then
+        shift
+        cmd=("$HW_TIERS_IMAGE/$name.sh" "$@")
+    fi
+fi
+
+# Forward the tier's env into the container (only the vars that are set), so
+# e.g. the connect tier gets its SSID/PASSPHRASE. `-e VAR` passes the current
+# value through without echoing the secret into the command line.
+env_args=()
+for var in SSID PASSPHRASE SECURITY SCAN_TRIES; do
+    [ -n "${!var:-}" ] && env_args+=(-e "$var")
+done
+
 echo "[run] running against the real wlan0 (--network host, seccomp=unconfined)"
 docker run --rm --network host --cap-add NET_ADMIN \
     --security-opt seccomp=unconfined \
-    "${device_args[@]}" "$IMAGE" "$@"
+    "${device_args[@]}" "${env_args[@]}" "$IMAGE" "${cmd[@]}"
