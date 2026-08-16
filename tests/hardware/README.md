@@ -69,6 +69,13 @@ iwd behaves differently here, which is exactly the divergence worth testing.
   identifier (SSID, connected BSSID/MAC, station name, adapter name) and is
   mutually consistent (the connected BSSID appears in the network's advertised
   BSSes). Same external-AP env as `connect`.
+- **`affinities` (hardware-only, `tiers/affinities.sh`):** connects, then sets
+  `Station.Affinities` to the connected BSS and asserts the write lifecycle - iwd
+  accepts the set and drops it when the one-shot setting client exits
+  (client-scoped by design). Affinities is `[experimental]`, so `run.sh` starts
+  iwd with `-E` for this tier. On fullmac brcmfmac iwd may *reject* the pin; that
+  rejection is reported as a feasibility wall (a finding), not a pass. Same
+  external-AP env as `connect`.
 
 All hardware tiers share `tiers/common.sh` (`resolve_sta`, which waits for iwd
 to enumerate the real radio, and `sta_path`), sourced via

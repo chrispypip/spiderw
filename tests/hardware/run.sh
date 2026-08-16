@@ -61,6 +61,7 @@ fi
 # through untouched.
 HW_TIERS_LOCAL="$(cd "$(dirname "${BASH_SOURCE[0]}")/tiers" 2>/dev/null && pwd)"
 HW_TIERS_IMAGE="/usr/local/lib/spiderw-hardware"
+tier_name="${1:-}"                    # the tier name before any shift below
 cmd=("$@")
 if [ $# -ge 1 ] && [ -n "$HW_TIERS_LOCAL" ]; then
     name="${1%.sh}"
@@ -80,6 +81,15 @@ for var in SSID PASSPHRASE SECURITY SCAN_TRIES \
            DEVICE_TRIES; do
     [ -n "${!var:-}" ] && env_args+=(-e "$var")
 done
+
+# Station.Affinities is an iwd [experimental] property, hidden unless iwd starts
+# with -E; the entrypoint turns that on for IWD_EXPERIMENTAL=1. IWD_DEBUG=1 (-d)
+# surfaces the affinity accept/drop in /tmp/iwd.log the tier reads.
+case "$tier_name" in
+    affinities | affinities.sh)
+        env_args+=(-e IWD_EXPERIMENTAL=1 -e IWD_DEBUG=1)
+        ;;
+esac
 
 echo "[run] running against the real wlan0 (--network host, seccomp=unconfined)"
 docker run --rm --network host --cap-add NET_ADMIN \
