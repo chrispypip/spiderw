@@ -82,12 +82,16 @@ for var in SSID PASSPHRASE SECURITY SCAN_TRIES \
     [ -n "${!var:-}" ] && env_args+=(-e "$var")
 done
 
-# Station.Affinities is an iwd [experimental] property, hidden unless iwd starts
-# with -E; the entrypoint turns that on for IWD_EXPERIMENTAL=1. IWD_DEBUG=1 (-d)
-# surfaces the affinity accept/drop in /tmp/iwd.log the tier reads.
+# Per-tier iwd flags. Station.Affinities is [experimental], hidden unless iwd
+# starts with -E; the entrypoint turns that on for IWD_EXPERIMENTAL=1. IWD_DEBUG=1
+# (-d) surfaces the detail those tiers read from /tmp/iwd.log (the affinity
+# accept/drop; the SAE handshake lines the wpa3 tier asserts on).
 case "$tier_name" in
     affinities | affinities.sh)
         env_args+=(-e IWD_EXPERIMENTAL=1 -e IWD_DEBUG=1)
+        ;;
+    wpa3 | wpa3.sh)
+        env_args+=(-e IWD_DEBUG=1)
         ;;
 esac
 

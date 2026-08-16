@@ -76,6 +76,13 @@ iwd behaves differently here, which is exactly the divergence worth testing.
   iwd with `-E` for this tier. On fullmac brcmfmac iwd may *reject* the pin; that
   rejection is reported as a feasibility wall (a finding), not a pass. Same
   external-AP env as `connect`.
+- **`wpa3` (hardware-only, `tiers/wpa3.sh`):** connects to a **WPA3-only** (SAE)
+  AP and asserts iwd genuinely negotiated **SAE** (from the iwd log) - the plain
+  `connect` tier can't tell WPA3-SAE from WPA2-PSK because iwd reports
+  `Type: psk` for both. `run.sh` starts iwd with `-d` for this tier so the SAE
+  lines are captured. Point it at a **WPA3-only** SSID (a WPA2/WPA3-*transition*
+  AP is what fails SAE on brcmfmac; 6GHz is out - the Pi radio has no 6GHz band).
+  Same env as `connect` (`PASSPHRASE` = the SAE password).
 - **`hidden` (hardware-only, `tiers/hidden.sh`):** drives `ConnectHiddenNetwork`
   (a directed probe) against a truly **hidden** AP - it first confirms the SSID
   is *absent* from a broadcast scan, then connect-hidden connects. Unlike the
