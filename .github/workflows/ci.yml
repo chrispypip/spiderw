@@ -16,7 +16,7 @@ permissions:
 # here and in devcontainer/Dockerfile.dev; Renovate keeps the two in sync
 # (see renovate.json).
 env:
-  GOLANGCI_LINT_VERSION: "v2.12.2"
+  GOLANGCI_LINT_VERSION: "v2.13.0"
 
 concurrency:
   group: ci-${{ github.ref }}
