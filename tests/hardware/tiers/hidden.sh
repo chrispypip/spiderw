@@ -66,17 +66,26 @@ in_broadcast() {
 
 # --- confirm the AP is actually HIDDEN (SSID absent from a broadcast scan) ---
 step "broadcast scan: confirm $SSID is hidden (should be ABSENT)"
+# iwd auto-scans, so an explicit Scan often collides ("operation already in
+# progress") - harmless, a scan IS running. Suppress it and wait for a populated
+# result; break as soon as the list has entries. A hidden AP never broadcasts
+# its SSID, so one good scan is enough to confirm absence.
 for ((i = 0; i < SCAN_TRIES; i++)); do
-    spiderw station "$STA" scan
-    sleep 1
+    spiderw station "$STA" scan >/dev/null 2>&1 || true
+    sleep 2
+    [ -n "$(spiderw station "$STA" networks 2>/dev/null | awk 'NF{print; exit}')" ] && break
 done
 echo "-- broadcast networks --"; spiderw station "$STA" networks | sed 's/^/  /'
+nbcast=$(spiderw station "$STA" networks 2>/dev/null | awk 'NF' | wc -l)
 if in_broadcast; then
     echo "[hw-hidden] WARNING: '$SSID' IS in the broadcast scan - the AP is not"
     echo "            configured hidden (hostapd ignore_broadcast_ssid); iwd may"
     echo "            then reject connect-hidden as not-hidden."
+elif [ "$nbcast" -ge 1 ]; then
+    echo "[hw-hidden] confirmed hidden: '$SSID' absent from a broadcast of $nbcast networks"
 else
-    echo "[hw-hidden] confirmed hidden: '$SSID' absent from the broadcast scan"
+    echo "[hw-hidden] NOTE: broadcast scan returned no networks; cannot confirm"
+    echo "            hidden here - connect-hidden below is the real assertion."
 fi
 
 # --- connect-hidden (iwd's directed probe) ----------------------------------
