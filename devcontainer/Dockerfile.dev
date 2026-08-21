@@ -84,7 +84,7 @@ ENV PATH=/usr/local/go/bin:${GOPATH}/bin:${PATH}
 # Pin golangci-lint to a v2 release so it matches the v2 .golangci.yml schema
 # and the version used in CI. Note the `/v2` module path: golangci-lint v2 is a
 # distinct module, and the legacy path's @latest still resolves to v1.
-ARG GOLANGCI_LINT_VERSION=v2.13.0
+ARG GOLANGCI_LINT_VERSION=v2.13.1
 # goimports is pinned to a golang.org/x/tools release (Renovate-managed).
 ARG GOIMPORTS_VERSION=v0.49.0
 RUN go install golang.org/x/tools/cmd/goimports@${GOIMPORTS_VERSION} && \
