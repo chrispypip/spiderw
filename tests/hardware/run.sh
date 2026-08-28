@@ -81,7 +81,8 @@ fi
 env_args=()
 for var in SSID PASSPHRASE SECURITY SCAN_TRIES \
            BAD_PASSPHRASE SETTLE_TRIES MIN_NETWORKS THRESHOLDS REG_TIMEOUT \
-           DEVICE_TRIES TRACK_WINDOW MIN_DISTINCT_BANDS; do
+           DEVICE_TRIES TRACK_WINDOW MIN_DISTINCT_BANDS \
+           CONNECT_TRIES CONNECT_WAIT; do
     [ -n "${!var:-}" ] && env_args+=(-e "$var")
 done
 

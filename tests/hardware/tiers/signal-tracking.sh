@@ -40,6 +40,11 @@ SSID="${SSID:-}"
 PASSPHRASE="${PASSPHRASE:-}"
 SECURITY="${SECURITY:-psk}"
 SCAN_TRIES="${SCAN_TRIES:-15}"
+# Initial association must land in a high-power window of the breathing AP, so
+# retry the connect across (at least) one fade cycle: CONNECT_TRIES x CONNECT_WAIT
+# should exceed the AP's sweep period (~72s with the default fade).
+CONNECT_TRIES="${CONNECT_TRIES:-12}"
+CONNECT_WAIT="${CONNECT_WAIT:-6}"
 THRESHOLDS="${THRESHOLDS:--80 -84 -88}"
 TRACK_WINDOW="${TRACK_WINDOW:-90}"
 MIN_DISTINCT_BANDS="${MIN_DISTINCT_BANDS:-2}"
@@ -104,13 +109,32 @@ for ((i = 0; i < SCAN_TRIES; i++)); do
 done
 [ "$NET" != "" ] || fail "station $STA never saw SSID $SSID after $SCAN_TRIES scans"
 
-step "network $SSID connect"
-if [ "$SECURITY" = "open" ]; then
-    spiderw network "$NET" connect || fail "connect (open) failed"
-else
-    spiderw network "$NET" connect --passphrase="$PASSPHRASE" || fail "connect failed"
-fi
-[ "$(spiderw network "$NET" connected)" = "true" ] || fail "not connected after connect"
+# The AP is BREATHING (its TX power sweeps up and down), so a single connect can
+# land during a low-power dip where association / the 4-way handshake times out
+# ("Operation failed") - even though a connection, once up, rides the fade fine.
+# So retry across at least one fade cycle: some attempts land in a high-power
+# window and succeed. Re-resolve NET each pass in case the scan data churned.
+step "network $SSID connect (breathing AP; retry across a fade cycle)"
+connected=false
+for ((i = 0; i < CONNECT_TRIES; i++)); do
+    NET=$(net_path)
+    if [ "$NET" = "" ]; then
+        spiderw station "$STA" scan >/dev/null 2>&1 || true
+        sleep "$CONNECT_WAIT"; continue
+    fi
+    if [ "$SECURITY" = "open" ]; then
+        spiderw network "$NET" connect >/dev/null 2>&1 || true
+    else
+        spiderw network "$NET" connect --passphrase="$PASSPHRASE" >/dev/null 2>&1 || true
+    fi
+    if [ "$(spiderw network "$NET" connected 2>/dev/null)" = "true" ]; then
+        connected=true; break
+    fi
+    echo "  connect try $((i + 1))/$CONNECT_TRIES failed (AP may be in a fade dip); retrying"
+    sleep "$CONNECT_WAIT"
+done
+[ "$connected" = true ] \
+    || fail "connect to $SSID failed after $CONNECT_TRIES tries - AP breathing too low (raise FADE_LOW_MBM on the AP), out of range, or wrong passphrase?"
 echo "[hw-signal-track] connected to $SSID"
 
 # --- watch the agent for LIVE band movement --------------------------------
