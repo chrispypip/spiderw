@@ -117,5 +117,5 @@ runner's GitHub Actions setup); run it by hand against the lab AP until then.
 
 Host setup (Docker, `wlan0` freed from NetworkManager, the WiFi regdomain, the
 pre-loaded AF_ALG crypto modules, and the `seccomp=unconfined` the run needs) is
-handled by spiderw-test's `provision-pi-runner.sh` and driven by its
+handled by spiderw-test's `provision-dut-runner.sh` and driven by its
 `hardware.yml`. See that repo for provisioning and the runner.

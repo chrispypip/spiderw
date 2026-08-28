@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Host-side driver for the REAL-HARDWARE test tier. Runs on the Raspberry Pi
-# self-hosted runner (see spiderw-test's provision-pi-runner.sh + hardware.yml).
+# self-hosted runner (see spiderw-test's provision-dut-runner.sh + hardware.yml).
 #
 #   tests/hardware/run.sh                    # build + read-only smoke
 #   tests/hardware/run.sh smoke.sh           # a shared hwsim tier (radio-agnostic)
@@ -23,7 +23,7 @@
 # shares the host kernel, the real driver/firmware/radio are all exercised; only
 # iwd is containerized (ephemeral, version-pinned).
 #
-# Host prerequisites (provision-pi-runner.sh sets these up, hardware.yml checks
+# Host prerequisites (provision-dut-runner.sh sets these up, hardware.yml checks
 # them): Docker; wlan0 released by NetworkManager; the WiFi regdomain set so
 # rfkill is unblocked; and the AF_ALG crypto modules pre-loaded on the host (a
 # container cannot auto-load kernel modules). Docker's default seccomp profile
