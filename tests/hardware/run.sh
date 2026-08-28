@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Host-side driver for the REAL-HARDWARE test tier. Runs on the Raspberry Pi
-# self-hosted runner (see spiderw-test's provision-dut-runner.sh + hardware.yml).
+# Host-side driver for the REAL-HARDWARE test tier. Runs on a self-hosted runner
+# whose host has a real Wi-Fi radio - the DUT (device under test). It is normally
+# invoked by an out-of-tree CI harness, but is self-contained: given the host
+# prerequisites below, you can run it directly on any suitably configured host.
 #
 #   tests/hardware/run.sh                    # build + read-only smoke
 #   tests/hardware/run.sh smoke.sh           # a shared hwsim tier (radio-agnostic)
@@ -16,20 +18,21 @@
 # path; smoke.sh (shared, on PATH) and raw commands pass through unchanged.
 #
 # It reuses the hwsim container image (tests/hwsim/Dockerfile: spiderw + a pinned
-# iwd), but drives it against the Pi's REAL brcmfmac radio, NOT virtual
-# mac80211_hwsim ones. So there is deliberately NO `modprobe` here: the
+# iwd), but drives it against the host's REAL radio (brcmfmac, iwlwifi, ...), NOT
+# virtual mac80211_hwsim ones. So there is deliberately NO `modprobe` here: the
 # container's iwd manages the host's real wlan0 through the shared network
 # namespace (`--network host` + NET_ADMIN + /dev/rfkill). Because the container
 # shares the host kernel, the real driver/firmware/radio are all exercised; only
 # iwd is containerized (ephemeral, version-pinned).
 #
-# Host prerequisites (provision-dut-runner.sh sets these up, hardware.yml checks
-# them): Docker; wlan0 released by NetworkManager; the WiFi regdomain set so
-# rfkill is unblocked; and the AF_ALG crypto modules pre-loaded on the host (a
-# container cannot auto-load kernel modules). Docker's default seccomp profile
-# blocks AF_ALG socket creation on the Pi, so `--security-opt seccomp=unconfined`
-# is required; that is a safe relaxation here since the container already runs
-# with NET_ADMIN + --network host + --device (it can reach host root regardless).
+# Host prerequisites (whatever provisions the runner must ensure these; the tier
+# assumes them): Docker; a radio at wlan0 released by NetworkManager; the WiFi
+# regdomain set so rfkill is unblocked (where the driver honors it); and the
+# AF_ALG crypto modules pre-loaded on the host (a container cannot auto-load
+# kernel modules). Docker's default seccomp profile blocks AF_ALG socket creation
+# on these arm64 hosts, so `--security-opt seccomp=unconfined` is required; that
+# is a safe relaxation here since the container already runs with NET_ADMIN +
+# --network host + --device (it can reach host root regardless).
 set -euo pipefail
 
 IMAGE="${IMAGE:-spiderw-hardware}"

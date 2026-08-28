@@ -110,12 +110,14 @@ SSID=lab-ap PASSPHRASE=secret \
 ```
 
 The `connect` tier connects `wlan0` to a **real external AP**, so run it on a
-runner whose control plane is **Ethernet** (per the constraint above) and point
-it at your lab router. Wiring it into `hardware.yml` with the SSID/passphrase
-from repo secrets is the CI step (deferred with the rest of the hardware
-runner's GitHub Actions setup); run it by hand against the lab AP until then.
+runner whose control plane is **Ethernet** (per the constraint above), and point
+it at your lab router with `SSID`/`PASSPHRASE` in the environment (as shown
+above). You can run it by hand, or drive it from CI.
 
-Host setup (Docker, `wlan0` freed from NetworkManager, the WiFi regdomain, the
-pre-loaded AF_ALG crypto modules, and the `seccomp=unconfined` the run needs) is
-handled by spiderw-test's `provision-dut-runner.sh` and driven by its
-`hardware.yml`. See that repo for provisioning and the runner.
+Host setup (Docker, a radio at `wlan0` freed from NetworkManager, the WiFi
+regdomain, the pre-loaded AF_ALG crypto modules, and the `seccomp=unconfined`
+the run needs) is the job of whatever provisions the runner. This tier depends
+only on those prerequisites, not on any particular provisioning - so it is
+self-contained here. (Our own lab runs it from a separate private runner repo
+that provisions the hosts and schedules the jobs, but that is orchestration, not
+a dependency of this tier.)

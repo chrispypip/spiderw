@@ -9,8 +9,9 @@ diverge.
 
 A host with a hwsim-enabled kernel (`CONFIG_MAC80211_HWSIM`). This is **not**
 most workstations - a stock desktop kernel usually lacks the option. A cloud VM
-with the module enabled works; the test harness runs on a dedicated, disposable
-VM (see `spiderw-test`).
+with the module enabled works; our own harness runs on a dedicated, disposable
+VM, provisioned out-of-tree in a separate private runner repo. Everything this
+tier needs is described here, so it does not depend on that repo.
 
 The tiers run **natively** on that VM - no Docker (`mac80211_hwsim` would not
 work under Docker on these VMs). The VM image is baked once with what `run.sh`
