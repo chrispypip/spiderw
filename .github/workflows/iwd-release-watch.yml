@@ -74,7 +74,7 @@ jobs:
 
           ## Checklist
           - [ ] Build spiderw against iwd ${LATEST}
-          - [ ] Run the integration suite on the Pi against real iwd ${LATEST}
+          - [ ] Run the integration suite on real hardware against iwd ${LATEST}
           - [ ] Confirm/update the documented support floor (README "iwd 3.12")
           - [ ] Note any API or behavior changes
 

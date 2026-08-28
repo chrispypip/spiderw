@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exercise Station.SetAffinities on the Pi's REAL brcmfmac station connected to
+# Exercise Station.SetAffinities on the DUT's REAL station radio connected to
 # an EXTERNAL AP, against a real iwd 3.12.
 #
 # FEASIBILITY NOTE. Affinities is an iwd [experimental] read-write property, so

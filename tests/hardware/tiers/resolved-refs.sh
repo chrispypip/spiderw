@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Prove spiderw resolves iwd object PATHS to friendly identifiers on the Pi's
-# REAL brcmfmac station against an EXTERNAL AP, against a real iwd 3.12.
+# Prove spiderw resolves iwd object PATHS to friendly identifiers on the DUT's
+# REAL station radio against an EXTERNAL AP, against a real iwd 3.12.
 #
 # spiderw's status bundles turn iwd's cross-object paths into the names they
 # stand for - a connected network shows its SSID, an access point its MAC, a

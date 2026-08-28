@@ -97,7 +97,7 @@ The following areas are currently implemented and tested end to end:
   (`StationDiagnostic`) before the larger operating-mode and P2P areas.
 - Promote the 802.1x credential-agent callbacks from experimental to tested with
   a mock fixture that drives the username/password and private-key paths.
-- Formalize real-hardware validation (Raspberry Pi against real iwd) as a release
+- Formalize real-hardware validation (real hardware against real iwd) as a release
   step, since mock and CI coverage cannot exercise driver-gated behavior such as
   `SetAffinities`.
 - Keep the README, `examples/`, godoc, and release notes current as each slice

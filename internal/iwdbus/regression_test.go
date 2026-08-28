@@ -116,8 +116,8 @@ func itoa(i int) string {
 	return string(b[n:])
 }
 
-// The tests below guard bugs found on real hardware (a Raspberry Pi running iwd
-// 3.12) that every mock-backed test missed. Each one shipped green because the mock
+// The tests below guard bugs found on real hardware (running iwd 3.12) that
+// every mock-backed test missed. Each one shipped green because the mock
 // was more forgiving than the daemon; each is recorded here so the specific wire
 // behavior can never silently regress. They intentionally duplicate unit coverage -
 // the point is provenance, not novelty.

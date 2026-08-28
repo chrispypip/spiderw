@@ -11,8 +11,8 @@
 #
 # Each call reloads the virtual radios and starts a FRESH iwd, so one call is a
 # clean slate for one tier - the same isolation `docker run --rm` gave the
-# container path (still used on the Pi, tests/hardware/run.sh). lib.sh does the
-# bring-up/teardown; the tier scripts under tiers/ are unchanged between paths.
+# container path (used for the hardware tier, tests/hardware/run.sh). lib.sh does
+# the bring-up/teardown; the tier scripts under tiers/ are unchanged between paths.
 #
 # Needs root (iwd, the state wipe, and modprobe all do); it re-execs under sudo.
 set -euo pipefail

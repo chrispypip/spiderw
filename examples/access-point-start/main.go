@@ -3,8 +3,9 @@
 // For an access point whose SSID, security mode, and credentials come from a
 // stored iwd provisioning profile, see the access-point-start-profile example.
 //
-// Note: on some FullMAC drivers - notably the Raspberry Pi's built-in brcmfmac
-// chip - the kernel rejects the inline Start with a generic "failed starting"
+// Note: on some FullMAC drivers - notably brcmfmac (e.g. the Raspberry Pi's
+// built-in chip) - the kernel rejects the inline Start with a generic "failed
+// starting"
 // error even on an idle radio; access-point-start-profile is the reliable path
 // there. See examples/README.md for details.
 //

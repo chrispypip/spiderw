@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Connect the Pi's REAL brcmfmac station to an EXTERNAL access point through the
+# Connect the DUT's REAL station radio to an EXTERNAL access point through the
 # spiderw CLI, against a real iwd 3.12.
 #
-# The hwsim connect tier self-hosts an AP on a second radio; the Pi has ONE radio
-# and cannot, so this drives the STATION half against a pre-existing external AP
-# (the lab router). It exercises the write paths that matter most on the real
-# driver/firmware: mode station, scan, Network.Connect with a passphrase, and
-# disconnect. brcmfmac is fullmac (firmware-driven), where iwd behaves
-# differently from hwsim's softmac - exactly the divergence worth testing.
+# The hwsim connect tier self-hosts an AP on a second radio; a real DUT has ONE
+# radio and cannot, so this drives the STATION half against a pre-existing
+# external AP (the lab router). It exercises the write paths that matter most on
+# the real driver/firmware: mode station, scan, Network.Connect with a
+# passphrase, and disconnect. A fullmac DUT (e.g. brcmfmac) is firmware-driven,
+# where iwd behaves differently from hwsim's softmac - exactly the divergence
+# worth testing.
 #
 # The chain is one assertion: if the station reaches (and leaves) the connected
 # state against a real AP, every write path in between worked on real hardware.
@@ -36,7 +37,7 @@ if [ "$SECURITY" = "psk" ] && [ "$PASSPHRASE" = "" ]; then
 fi
 
 # --- the single real station device (waits for iwd to enumerate it) ---------
-# The Pi has one radio; take the first named device as the station.
+# The DUT has one radio; take the first named device as the station.
 STA=$(resolve_sta) \
     || fail "iwd never presented a wireless device (rfkill soft-block? wlan0 taken by NetworkManager? radio not up?)"
 echo "[hw-connect] STA=$STA  SSID=$SSID  SECURITY=$SECURITY"

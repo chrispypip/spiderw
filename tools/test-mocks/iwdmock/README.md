@@ -43,7 +43,7 @@ API, which is the iwd version spiderw is developed and tested against.
 
 If you need behavior closer to real hardware, use:
 
-* A Raspberry Pi running real iwd
+* A real device running iwd (e.g. a Raspberry Pi or other SBC)
 * mac80211_hwsim (kernel module)
 * or a dedicated "test lab" device
 

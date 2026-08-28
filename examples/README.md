@@ -77,7 +77,7 @@ running, exercise the start paths by stopping it first - for example
 `access-point-start-profile -session -profile MockProfile` (the mock's one seeded
 profile).
 
-### Running an access point on real iwd (e.g. a Raspberry Pi)
+### Running an access point on real iwd
 
 `StartProfile(ssid)` tells iwd to bring up an access point from a provisioning
 file it reads off disk, named `<ssid>.ap` in the AP profile directory (the daemon
@@ -89,19 +89,20 @@ test on real hardware, write a minimal WPA2-PSK profile and start it:
 # 1. Put the wireless device into AP mode (spiderw or iwctl):
 spiderw device wlan0 mode ap          # or: iwctl device wlan0 set-property Mode ap
 
-# 2. Write the profile. The file name IS the SSID, so PiTestAP.ap => SSID "PiTestAP".
+# 2. Write the profile. The file name IS the SSID, so TestAP.ap => SSID "TestAP".
 #    (Confirm your state directory with `spiderw daemon`; /var/lib/iwd is the default.)
 sudo mkdir -p /var/lib/iwd/ap
-printf '[Security]\nPassphrase=%s\n' 'change-this-passphrase' | sudo tee /var/lib/iwd/ap/PiTestAP.ap >/dev/null
-sudo chmod 600 /var/lib/iwd/ap/PiTestAP.ap   # iwd rejects world-readable secret files
+printf '[Security]\nPassphrase=%s\n' 'change-this-passphrase' | sudo tee /var/lib/iwd/ap/TestAP.ap >/dev/null
+sudo chmod 600 /var/lib/iwd/ap/TestAP.ap   # iwd rejects world-readable secret files
 
 # 3. Start it from the profile (this hosts a network - it CHANGES state):
-go run ./examples/access-point-start-profile -profile PiTestAP
-#    ...or the CLI:  spiderw access-point wlan0 start-profile PiTestAP
+go run ./examples/access-point-start-profile -profile TestAP
+#    ...or the CLI:  spiderw access-point wlan0 start-profile TestAP
 ```
 
-**Raspberry Pi / brcmfmac caveat - prefer `StartProfile`.** On the Pi's built-in
-Wi-Fi (the `brcmfmac` FullMAC driver), iwd's inline `Start(ssid, psk)` - the
+**FullMAC (brcmfmac) caveat - prefer `StartProfile`.** On a FullMAC driver like
+`brcmfmac` (e.g. the Raspberry Pi's built-in Wi-Fi), iwd's inline `Start(ssid,
+psk)` - the
 `access-point-start` example - often fails even on an idle radio with a generic
 `net.connman.iwd.Failed` ("failed starting iwd AccessPoint"). The iwd log shows
 the kernel refusing the AP with `START_AP failed: -52`, alongside

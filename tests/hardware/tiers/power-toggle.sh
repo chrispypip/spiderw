@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Toggle Powered on the Pi's REAL brcmfmac device and its adapter, against a real
+# Toggle Powered on the DUT's REAL radio device and its adapter, against a real
 # iwd 3.12. No AP or credentials needed - it only cycles the local radio.
 #
 # SetPowered on both the Device and the Adapter object. Powering a device off
 # turns its radio off (the Device object persists with Powered=false, its
 # Station/AP interfaces drop); powering it back on must leave it usable. On real
-# hardware this exercises actual rfkill + brcmfmac firmware down/up, which the
+# hardware this exercises actual rfkill + the driver's firmware down/up, which the
 # virtual radio cannot. The Adapter's Powered is a distinct write path
 # (Adapter.SetPowered vs Device.SetPowered); powering the adapter off may also
 # drop its device from the tree, so that half asserts the property round-trips

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exercise station connect-hidden on the Pi's REAL brcmfmac station against a
+# Exercise station connect-hidden on the DUT's REAL station radio against a
 # truly HIDDEN external AP, against a real iwd 3.12.
 #
 # ConnectHiddenNetwork is a distinct path from Network.Connect (the connect

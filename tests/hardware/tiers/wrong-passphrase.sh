@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Prove spiderw surfaces a FAILED connect correctly on the Pi's REAL brcmfmac
-# station against an EXTERNAL AP, against a real iwd 3.12.
+# Prove spiderw surfaces a FAILED connect correctly on the DUT's REAL station
+# radio against an EXTERNAL AP, against a real iwd 3.12.
 #
 # Every other connect asserts success; this asserts the FAILURE path, where the
 # pure-Go mock is most likely to be more forgiving than iwd - and where a REAL

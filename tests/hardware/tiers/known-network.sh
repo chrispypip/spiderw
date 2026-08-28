@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Drive the KnownNetwork lifecycle on the Pi's REAL brcmfmac station against an
+# Drive the KnownNetwork lifecycle on the DUT's REAL station radio against an
 # EXTERNAL AP, through the spiderw CLI, against a real iwd 3.12.
 #
 # Connecting to a PSK network makes iwd SAVE a known-network profile - its own
 # object with autoconnect / type / last-connected, which OUTLIVES a disconnect
 # and is removed only by Forget. The hwsim known-network tier proves this with a
-# self-hosted AP on a second radio; the Pi has one radio, so this drives it
+# self-hosted AP on a second radio; a real DUT has one radio, so this drives it
 # against a pre-existing external AP (the lab router). Nothing else exercises the
 # KnownNetwork interface on real hardware.
 #

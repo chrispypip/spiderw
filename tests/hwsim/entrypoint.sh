@@ -74,7 +74,7 @@ fi
 # softmac driver like iwlwifi gets its netdev torn down and rebuilt by iwd, and
 # when THIS container's iwd exits the phy is left with NO interface - so the next
 # run's preflight finds no wlan0 (a fullmac driver like brcmfmac keeps its
-# interface, which is why the Pi never hit this). IWD_USE_DEFAULT_INTERFACE=1
+# interface, which is why a fullmac DUT never hit this). IWD_USE_DEFAULT_INTERFACE=1
 # writes the setting that makes iwd use the existing interface as-is (also iwd's
 # own recommendation for fullmac). iwd reads /etc/iwd/main.conf (built with
 # --sysconfdir=/etc). hwsim, which recreates virtual interfaces freely, never

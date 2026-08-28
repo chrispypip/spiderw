@@ -5,7 +5,8 @@
 # entrypoint.sh), where `docker run --rm` gave each tier a clean slate for free:
 # a fresh system D-Bus, a fresh pinned iwd, an empty /var/lib/iwd, and every
 # radio back in its default mode. That container path is still used AGAINST REAL
-# HARDWARE on the Pi (tests/hardware/run.sh). But mac80211_hwsim would not work
+# HARDWARE by the hardware tier (tests/hardware/run.sh). But mac80211_hwsim would
+# not work
 # under Docker on the test VMs, so on the VM we run the tiers directly and this
 # library reproduces that per-run cleanliness itself.
 #

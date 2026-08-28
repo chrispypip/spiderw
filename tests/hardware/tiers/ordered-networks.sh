@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Prove spiderw reads iwd's ORDERED networks correctly on the Pi's REAL brcmfmac
-# station, against a real iwd 3.12 - using the genuine ambient RF around the Pi.
+# Prove spiderw reads iwd's ORDERED networks correctly on the DUT's REAL station
+# radio, against a real iwd 3.12 - using the genuine ambient RF around the DUT.
 #
 # `station networks` calls GetOrderedNetworks: iwd returns the last scan's
 # networks in iwd's RANK order, and spiderw resolves each object path to its SSID

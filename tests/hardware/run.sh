@@ -89,7 +89,7 @@ done
 # recreate its interface (the entrypoint turns this into iwd's UseDefaultInterface
 # setting). Without it a softmac DUT like iwlwifi is left with no netdev once this
 # container's iwd exits, failing the NEXT run's preflight; it is a no-op on a
-# fullmac DUT like the Pi's brcmfmac, which keeps its interface regardless.
+# fullmac DUT (e.g. brcmfmac), which keeps its interface regardless.
 env_args+=(-e IWD_USE_DEFAULT_INTERFACE=1)
 
 # Per-tier iwd flags. Station.Affinities is [experimental], hidden unless iwd

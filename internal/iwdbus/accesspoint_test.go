@@ -283,7 +283,7 @@ func testAccessPoint_GetProperties_Minimal(t *testing.T) {
 	t.Parallel()
 	// A stopped AP reports only Started; iwd omits Scanning and the other
 	// optionals, so Scanning must collapse to false rather than erroring. This is
-	// the hardware-observed shape (a Raspberry Pi reported exactly this and the
+	// the hardware-observed shape (real hardware reported exactly this and the
 	// original strict parser failed on the absent Scanning).
 	a := &AccessPoint{call: &fakeCaller{
 		getAllFn: func(ctx context.Context, iface string) (map[string]dbus.Variant, error) {

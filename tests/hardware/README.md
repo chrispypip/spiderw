@@ -1,7 +1,7 @@
 # real-hardware test tier
 
-Runs spiderw against a **real iwd** on the Raspberry Pi's **real brcmfmac
-radio** - the genuine driver + firmware + hardware, not the virtual
+Runs spiderw against a **real iwd** on a DUT's **real radio** (brcmfmac,
+iwlwifi, ...) - the genuine driver + firmware + hardware, not the virtual
 `mac80211_hwsim` radios of the [hwsim tier](../hwsim/README.md). Every bug this
 project has shipped came from hardware, so this is the highest-value tier.
 
@@ -9,18 +9,20 @@ project has shipped came from hardware, so this is the highest-value tier.
 
 It reuses the hwsim **container image** (`../hwsim/Dockerfile`: spiderw + pinned
 iwd) but a different **driver**: `run.sh` here runs that container against the
-Pi's real `wlan0` via `--network host` (no `modprobe`), so the container's iwd
+DUT's real `wlan0` via `--network host` (no `modprobe`), so the container's iwd
 manages the physical radio. The container shares the host kernel, so the real
 driver/firmware/radio are exercised; only iwd is containerized (ephemeral,
 version-pinned).
 
-`brcmfmac` is **fullmac** (firmware-driven roaming) versus hwsim's softmac - so
-iwd behaves differently here, which is exactly the divergence worth testing.
+A **fullmac** DUT (e.g. `brcmfmac`, firmware-driven roaming) makes iwd behave
+differently from hwsim's softmac - exactly the divergence worth testing. A
+**softmac** DUT (e.g. `iwlwifi`) is closer to hwsim, but a real driver still
+exercises paths the virtual radio cannot.
 
 ## Constraints
 
-- **One radio**, so tiers are **station-only against EXTERNAL APs** (the Pi
-  can't self-host an AP like the hwsim connect tier does).
+- **One radio**, so tiers are **station-only against EXTERNAL APs** (a
+  single-radio DUT can't self-host an AP like the hwsim connect tier does).
 - The **control plane must be Ethernet**: a test reconfigures `wlan0`, which
   would drop a Wi-Fi-connected runner.
 
@@ -32,7 +34,7 @@ iwd behaves differently here, which is exactly the divergence worth testing.
 - **`connect` (hardware-only, `tiers/connect.sh`):** drives the single real
   station through mode-station -> scan -> `Network.Connect` (with a passphrase)
   -> disconnect against an **external** AP, asserting it reaches and leaves the
-  connected state. The write paths, on real brcmfmac. No AP is created (one
+  connected state. The write paths, on the real driver. No AP is created (one
   radio), so it needs the target AP supplied by env: `SSID`, `PASSPHRASE` (for a
   PSK network), optional `SECURITY=psk|open` and `SCAN_TRIES`.
 - **`known-network` (hardware-only, `tiers/known-network.sh`):** connecting to a
@@ -57,7 +59,7 @@ iwd behaves differently here, which is exactly the divergence worth testing.
   `PASSPHRASE` (the correct one) required; `BAD_PASSPHRASE` optional.
 - **`power-toggle` (hardware-only, `tiers/power-toggle.sh`):** `SetPowered`
   off/on on the device *and* adapter, asserting the property round-trips and the
-  radio is usable again (a scan works) - real rfkill + brcmfmac firmware
+  radio is usable again (a scan works) - real rfkill + driver firmware
   down/up. No AP or credentials needed.
 - **`ordered-networks` (hardware-only, `tiers/ordered-networks.sh`):** uses the
   genuine ambient RF - `station networks` (GetOrderedNetworks) over the real APs
@@ -81,7 +83,7 @@ iwd behaves differently here, which is exactly the divergence worth testing.
   `connect` tier can't tell WPA3-SAE from WPA2-PSK because iwd reports
   `Type: psk` for both. `run.sh` starts iwd with `-d` for this tier so the SAE
   lines are captured. Point it at a **WPA3-only** SSID (a WPA2/WPA3-*transition*
-  AP is what fails SAE on brcmfmac; 6GHz is out - the Pi radio has no 6GHz band).
+  AP is what fails SAE on brcmfmac; 6GHz is out - brcmfmac has no 6GHz band).
   Same env as `connect` (`PASSPHRASE` = the SAE password).
 - **`hidden` (hardware-only, `tiers/hidden.sh`):** drives `ConnectHiddenNetwork`
   (a directed probe) against a truly **hidden** AP - it first confirms the SSID
@@ -100,7 +102,7 @@ image; hardware-only tiers live in `tiers/` here and are baked into a separate
 image dir, so a hardware tier can share a name with an hwsim one without
 colliding. `run.sh` resolves a bare tier name to the right one.
 
-## Running it (on the Pi runner)
+## Running it (on the DUT runner)
 
 ```bash
 tests/hardware/run.sh              # build + read-only smoke

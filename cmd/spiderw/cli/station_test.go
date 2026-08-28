@@ -974,8 +974,9 @@ func TestStreamStationProperty_DisconnectClearsLine(t *testing.T) {
 }
 
 // TestStationCmd_Affinities_SetError covers the failure path for `affinities set`.
-// iwd rejects SetAffinities on hardware that does not support it (a Raspberry Pi's
-// brcmfmac does), so this is a path users hit routinely - and it had no test.
+// iwd rejects SetAffinities on hardware that does not support it (a fullmac
+// driver like brcmfmac does), so this is a path users hit routinely - and it had
+// no test.
 func TestStationCmd_Affinities_SetError(t *testing.T) {
 	t.Parallel()
 

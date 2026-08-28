@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Connect the Pi's REAL brcmfmac station to a WPA3-Personal (SAE) external AP and
+# Connect the DUT's REAL station radio to a WPA3-Personal (SAE) external AP and
 # assert iwd genuinely used SAE, against a real iwd 3.12.
 #
 # WHY A SEPARATE TIER. The connect tier already connects with a passphrase and
@@ -11,7 +11,7 @@
 # FINDING CONTEXT (real hw): brcmfmac + iwd WPA3-SAE WORKS against a WPA3-only
 # AP. An earlier WPA2/WPA3-TRANSITION (mixed) AP failed the SAE handshake
 # (reason 15) - so use a WPA3-ONLY SSID here, not a transition one. 6GHz is out
-# (the Pi radio has no 6GHz band); use a 2.4/5GHz WPA3 SSID.
+# (the brcmfmac radio has no 6GHz band); use a 2.4/5GHz WPA3 SSID.
 #
 # Env: SSID / PASSPHRASE / SCAN_TRIES   (as in connect.sh; PASSPHRASE required).
 set -uo pipefail

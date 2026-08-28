@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Prove spiderw's SignalLevelAgent registers and delivers on the Pi's REAL
-# brcmfmac station, connected to an EXTERNAL AP, against a real iwd 3.12.
+# Prove spiderw's SignalLevelAgent registers and delivers on the DUT's REAL
+# station radio, connected to an EXTERNAL AP, against a real iwd 3.12.
 #
 # `station monitor-signal <dBm>...` registers a net.connman.iwd.SignalLevelAgent
 # with RSSI thresholds; iwd calls it back with a band index (0 = strongest) and
