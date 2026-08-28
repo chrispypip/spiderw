@@ -69,6 +69,21 @@ fi
 if [ "${IWD_EXPERIMENTAL:-}" = "1" ]; then
     iwd_args+=(-E)
 fi
+# On a real single-radio DUT (the hardware tier), iwd must NOT remove and
+# recreate the interface. With iwd's default (UseDefaultInterface=false) a
+# softmac driver like iwlwifi gets its netdev torn down and rebuilt by iwd, and
+# when THIS container's iwd exits the phy is left with NO interface - so the next
+# run's preflight finds no wlan0 (a fullmac driver like brcmfmac keeps its
+# interface, which is why the Pi never hit this). IWD_USE_DEFAULT_INTERFACE=1
+# writes the setting that makes iwd use the existing interface as-is (also iwd's
+# own recommendation for fullmac). iwd reads /etc/iwd/main.conf (built with
+# --sysconfdir=/etc). hwsim, which recreates virtual interfaces freely, never
+# sets this, so its behaviour is unchanged.
+if [ "${IWD_USE_DEFAULT_INTERFACE:-}" = "1" ]; then
+    mkdir -p /etc/iwd
+    printf '[General]\nUseDefaultInterface=true\n' > /etc/iwd/main.conf
+    log "iwd main.conf: UseDefaultInterface=true (keep the DUT's netdev)"
+fi
 /usr/libexec/iwd "${iwd_args[@]}" >"$IWD_LOG" 2>&1 &
 
 if ! wait_bus_name net.connman.iwd; then

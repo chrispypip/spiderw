@@ -82,6 +82,13 @@ for var in SSID PASSPHRASE SECURITY SCAN_TRIES \
     [ -n "${!var:-}" ] && env_args+=(-e "$var")
 done
 
+# The hardware tier drives ONE real physical radio, so iwd must never remove and
+# recreate its interface (the entrypoint turns this into iwd's UseDefaultInterface
+# setting). Without it a softmac DUT like iwlwifi is left with no netdev once this
+# container's iwd exits, failing the NEXT run's preflight; it is a no-op on a
+# fullmac DUT like the Pi's brcmfmac, which keeps its interface regardless.
+env_args+=(-e IWD_USE_DEFAULT_INTERFACE=1)
+
 # Per-tier iwd flags. Station.Affinities is [experimental], hidden unless iwd
 # starts with -E; the entrypoint turns that on for IWD_EXPERIMENTAL=1. IWD_DEBUG=1
 # (-d) surfaces the detail those tiers read from /tmp/iwd.log (the affinity
