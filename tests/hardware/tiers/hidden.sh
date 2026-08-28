@@ -28,7 +28,7 @@ SSID="${SSID:-}"
 PASSPHRASE="${PASSPHRASE:-}"
 SECURITY="${SECURITY:-psk}"
 SCAN_TRIES="${SCAN_TRIES:-5}"
-CONNECT_TRIES="${CONNECT_TRIES:-4}"
+CONNECT_TRIES="${CONNECT_TRIES:-6}"
 SETTLE_TRIES="${SETTLE_TRIES:-10}"
 
 dump_iwd_log() {
@@ -104,10 +104,16 @@ for ((i = 0; i < CONNECT_TRIES; i++)); do
             && { echo "$out"; connected=true; break; }
     fi
     echo "$out"
-    # A rejection because the network is visible is the feasibility wall, not a
-    # flake - stop and say so plainly.
+    # Distinguish a genuine feasibility wall from a retryable miss. iwd returns
+    # NotHidden / AlreadyProvisioned when a network with this SSID is already
+    # VISIBLE or KNOWN (the AP is not actually hidden) - fatal. But a directed
+    # probe that finds nothing returns "Object not found" (NotFound), which is
+    # transient - it raced iwd's autoconnect scan or missed a beacon - and must
+    # RETRY. Match ONLY the CamelCase iwd error names and the contiguous phrases,
+    # so "...not found ... hidden network" no longer trips this (the old greedy
+    # `*not*hidden*` did, mis-killing the retryable case = the intermittent FAIL).
     case "$out" in
-    *NotHidden* | *not*hidden* | *already*visible* | *AlreadyProvisioned* | *already*provisioned*)
+    *NotHidden* | *"not hidden"* | *AlreadyProvisioned* | *"already provisioned"*)
         fail "iwd rejected connect-hidden as not-hidden/visible: the AP is not actually hidden (set hostapd ignore_broadcast_ssid=1)" ;;
     esac
     sleep 2
