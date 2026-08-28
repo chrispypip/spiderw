@@ -45,27 +45,12 @@ spiderw device "$STA" mode station || fail "$STA -> station mode"
 
 STA_PATH=$(sta_path "$STA")
 [ "$STA_PATH" != "" ] || fail "could not resolve the device path for $STA"
-net_path() {
-    spiderw network list \
-      | awk -F'\t' -v ssid="$SSID" -v pfx="$STA_PATH/" \
-            '$1 == ssid && index($2, pfx) == 1 { print $2; exit }'
-}
-
-# --- scan + connect ---------------------------------------------------------
-NET=""
-for ((i = 0; i < SCAN_TRIES; i++)); do
-    step "station $STA scan (try $i/$SCAN_TRIES)"
-    spiderw station "$STA" scan
-    NET=$(net_path)
-    [ "$NET" != "" ] && break
-    sleep 2
-done
-[ "$NET" != "" ] || fail "station $STA never saw SSID $SSID after $SCAN_TRIES scans"
-
-step "network $SSID connect (WPA3-SAE)"
-spiderw network "$NET" connect --passphrase="$PASSPHRASE" \
-    || fail "connect failed (SAE handshake? transition-mode AP? wrong password?)"
-[ "$(spiderw network "$NET" connected)" = "true" ] || fail "not connected after connect"
+# --- scan + connect (WPA3-SAE), retried via the shared helper ---------------
+# connect_sta uses the passphrase (SECURITY defaults to psk; iwd picks SAE from
+# the AP's AKM). A failure here is the SAE handshake, a transition-mode AP, a
+# wrong password, or the AP being out of range.
+NET=$(connect_sta "$STA" "$STA_PATH") \
+    || fail "connect failed (SAE handshake? transition-mode AP? wrong password? out of range?)"
 echo "[hw-wpa3] connected to $SSID"
 
 # --- assert iwd actually negotiated SAE (not PSK) ---------------------------

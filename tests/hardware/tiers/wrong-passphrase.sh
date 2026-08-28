@@ -91,17 +91,13 @@ done
     || fail "station is connected=$state after a failed connect (want false)"
 echo "[hw-wrongpsk] station left disconnected after the failed connect"
 
-# --- 4. RECOVER: the correct passphrase must now connect --------------------
+# --- 4. RECOVER: the correct passphrase must now connect (retried) ----------
+# The wrong attempt above is deliberately single-shot (retrying a wrong password
+# is pointless); the recovery uses connect_sta so a transient RF miss on the
+# CORRECT passphrase does not read as "failed to recover".
 step "network $SSID connect with the CORRECT passphrase (must succeed)"
-spiderw network "$NET" connect --passphrase="$PASSPHRASE" \
+NET=$(connect_sta "$STA" "$STA_PATH") \
     || fail "connect with the correct passphrase failed after the wrong-passphrase attempt"
-state=""
-for ((i = 0; i < SETTLE_TRIES; i++)); do
-    state=$(connected_now)
-    [ "$state" = "true" ] && break
-    sleep 1
-done
-[ "$state" = "true" ] || fail "not connected=$state with the correct passphrase (want true)"
 echo "[hw-wrongpsk] recovered: correct passphrase connected after the wrong one failed"
 
 spiderw station "$STA" disconnect >/dev/null 2>&1 || true

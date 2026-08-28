@@ -50,38 +50,13 @@ spiderw device "$STA" mode station || fail "could not set $STA to station mode"
 STA_PATH=$(sta_path "$STA")
 [ "$STA_PATH" != "" ] || fail "could not resolve the device path for $STA"
 
-net_path() {
-    spiderw network list \
-      | awk -F'\t' -v ssid="$SSID" -v pfx="$STA_PATH/" \
-            '$1 == ssid && index($2, pfx) == 1 { print $2; exit }'
-}
-
-# --- scan until the external AP is visible ----------------------------------
-NET=""
-for ((i = 0; i < SCAN_TRIES; i++)); do
-    step "station $STA scan (try $i/$SCAN_TRIES)"
-    spiderw station "$STA" scan
-    NET=$(net_path)
-    [ "$NET" != "" ] && break
-    echo "[hw-connect] $SSID not visible to $STA yet"
-    sleep 2
-done
-[ "$NET" != "" ] \
-    || fail "station $STA never saw SSID $SSID after $SCAN_TRIES scans (AP off, out of range, or wrong regdomain?)"
-echo "[hw-connect] network object under $STA: $NET"
-
-# --- connect ----------------------------------------------------------------
-step "network $SSID connect"
-if [ "$SECURITY" = "open" ]; then
-    spiderw network "$NET" connect || fail "connect (open) failed"
-else
-    spiderw network "$NET" connect --passphrase="$PASSPHRASE" \
-        || fail "connect failed (wrong passphrase, or AP rejected the station?)"
-fi
-
-# The one assertion that matters: iwd reports the network connected.
-connected=$(spiderw network "$NET" connected)
-[ "$connected" = "true" ] || fail "network $SSID connected=$connected (want true)"
+# --- scan + connect (retried) via the shared helper -------------------------
+# The chain that matters: scan sees the AP, connect drives mode station -> scan
+# -> Network.Connect, and the station reaches the connected state. connect_sta
+# does all three (and retries a transient RF connect); a real failure here is
+# the AP off / out of range / a wrong passphrase / the station being rejected.
+NET=$(connect_sta "$STA" "$STA_PATH") \
+    || fail "could not connect to $SSID (AP off, out of range, wrong passphrase, or rejected?)"
 echo "[hw-connect] connected to $SSID on real hardware"
 spiderw station "$STA" status || true
 

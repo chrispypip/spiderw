@@ -92,49 +92,14 @@ spiderw device "$STA" mode station || fail "$STA -> station mode"
 
 STA_PATH=$(sta_path "$STA")
 [ "$STA_PATH" != "" ] || fail "could not resolve the device path for $STA"
-net_path() {
-    spiderw network list \
-      | awk -F'\t' -v ssid="$SSID" -v pfx="$STA_PATH/" \
-            '$1 == ssid && index($2, pfx) == 1 { print $2; exit }'
-}
-
 # --- connect (the agent monitors the CONNECTED link) ------------------------
-NET=""
-for ((i = 0; i < SCAN_TRIES; i++)); do
-    step "station $STA scan (try $i/$SCAN_TRIES)"
-    spiderw station "$STA" scan
-    NET=$(net_path)
-    [ "$NET" != "" ] && break
-    sleep 2
-done
-[ "$NET" != "" ] || fail "station $STA never saw SSID $SSID after $SCAN_TRIES scans"
-
-# The AP is BREATHING (its TX power sweeps up and down), so a single connect can
-# land during a low-power dip where association / the 4-way handshake times out
-# ("Operation failed") - even though a connection, once up, rides the fade fine.
-# So retry across at least one fade cycle: some attempts land in a high-power
-# window and succeed. Re-resolve NET each pass in case the scan data churned.
-step "network $SSID connect (breathing AP; retry across a fade cycle)"
-connected=false
-for ((i = 0; i < CONNECT_TRIES; i++)); do
-    NET=$(net_path)
-    if [ "$NET" = "" ]; then
-        spiderw station "$STA" scan >/dev/null 2>&1 || true
-        sleep "$CONNECT_WAIT"; continue
-    fi
-    if [ "$SECURITY" = "open" ]; then
-        spiderw network "$NET" connect >/dev/null 2>&1 || true
-    else
-        spiderw network "$NET" connect --passphrase="$PASSPHRASE" >/dev/null 2>&1 || true
-    fi
-    if [ "$(spiderw network "$NET" connected 2>/dev/null)" = "true" ]; then
-        connected=true; break
-    fi
-    echo "  connect try $((i + 1))/$CONNECT_TRIES failed (AP may be in a fade dip); retrying"
-    sleep "$CONNECT_WAIT"
-done
-[ "$connected" = true ] \
-    || fail "connect to $SSID failed after $CONNECT_TRIES tries - AP breathing too low (raise FADE_LOW_MBM on the AP), out of range, or wrong passphrase?"
+# The AP is BREATHING (its TX power sweeps), so a single connect can land in a
+# low-power dip where the 4-way handshake times out - even though a connection,
+# once up, rides the fade fine. connect_sta retries across a fade cycle (this
+# tier raises CONNECT_TRIES/CONNECT_WAIT to span the sweep period), so an attempt
+# lands in a high-power window.
+NET=$(connect_sta "$STA" "$STA_PATH") \
+    || fail "connect to $SSID failed - AP breathing too low (raise FADE_LOW_MBM on the AP), out of range, or wrong passphrase?"
 echo "[hw-signal-track] connected to $SSID"
 
 # --- watch the agent for LIVE band movement --------------------------------

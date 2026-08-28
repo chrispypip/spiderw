@@ -76,30 +76,10 @@ spiderw device "$STA" mode station || fail "$STA -> station mode"
 
 STA_PATH=$(sta_path "$STA")
 [ "$STA_PATH" != "" ] || fail "could not resolve the device path for $STA"
-net_path() {
-    spiderw network list \
-      | awk -F'\t' -v ssid="$SSID" -v pfx="$STA_PATH/" \
-            '$1 == ssid && index($2, pfx) == 1 { print $2; exit }'
-}
-
-# --- connect (the agent monitors the CONNECTED link) ------------------------
-NET=""
-for ((i = 0; i < SCAN_TRIES; i++)); do
-    step "station $STA scan (try $i/$SCAN_TRIES)"
-    spiderw station "$STA" scan
-    NET=$(net_path)
-    [ "$NET" != "" ] && break
-    sleep 2
-done
-[ "$NET" != "" ] || fail "station $STA never saw SSID $SSID after $SCAN_TRIES scans"
-
-step "network $SSID connect"
-if [ "$SECURITY" = "open" ]; then
-    spiderw network "$NET" connect || fail "connect (open) failed"
-else
-    spiderw network "$NET" connect --passphrase="$PASSPHRASE" || fail "connect failed"
-fi
-[ "$(spiderw network "$NET" connected)" = "true" ] || fail "not connected after connect"
+# --- connect (the agent monitors the CONNECTED link); scan + connect + retry -
+# --- via the shared helper --------------------------------------------------
+NET=$(connect_sta "$STA" "$STA_PATH") \
+    || fail "could not connect to $SSID (scan/connect retries exhausted)"
 echo "[hw-signal] connected to $SSID"
 
 # --- register the signal-level agent and capture the initial callback -------
