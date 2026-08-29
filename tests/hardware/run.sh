@@ -82,7 +82,7 @@ env_args=()
 for var in SSID PASSPHRASE SECURITY SCAN_TRIES \
            BAD_PASSPHRASE SETTLE_TRIES MIN_NETWORKS THRESHOLDS REG_TIMEOUT \
            DEVICE_TRIES TRACK_WINDOW MIN_DISTINCT_BANDS \
-           CONNECT_TRIES CONNECT_WAIT ROAM_TIMEOUT; do
+           CONNECT_TRIES CONNECT_WAIT ROAM_TIMEOUT WPS_TIMEOUT WPS_TRIES; do
     [ -n "${!var:-}" ] && env_args+=(-e "$var")
 done
 
@@ -112,6 +112,11 @@ case "$tier_name" in
     access-point | access-point.sh)
         # -d so iwd.log carries the AP start/driver lines the tier's dump reads
         # (fullmac Start failures show up there).
+        env_args+=(-e IWD_DEBUG=1)
+        ;;
+    wps | wps.sh)
+        # -d so iwd.log carries the WSC / enrollment / credential lines the
+        # tier's failure dump reads.
         env_args+=(-e IWD_DEBUG=1)
         ;;
 esac
