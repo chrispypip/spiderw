@@ -82,7 +82,7 @@ env_args=()
 for var in SSID PASSPHRASE SECURITY SCAN_TRIES \
            BAD_PASSPHRASE SETTLE_TRIES MIN_NETWORKS THRESHOLDS REG_TIMEOUT \
            DEVICE_TRIES TRACK_WINDOW MIN_DISTINCT_BANDS \
-           CONNECT_TRIES CONNECT_WAIT; do
+           CONNECT_TRIES CONNECT_WAIT ROAM_TIMEOUT; do
     [ -n "${!var:-}" ] && env_args+=(-e "$var")
 done
 
@@ -102,6 +102,11 @@ case "$tier_name" in
         env_args+=(-e IWD_EXPERIMENTAL=1 -e IWD_DEBUG=1)
         ;;
     wpa3 | wpa3.sh)
+        env_args+=(-e IWD_DEBUG=1)
+        ;;
+    roam | roam.sh)
+        # -d so iwd.log carries the roam / BTM-transition decisions the tier's
+        # failure dump reads.
         env_args+=(-e IWD_DEBUG=1)
         ;;
 esac
