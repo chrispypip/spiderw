@@ -47,6 +47,16 @@ poll_in_list() {   # NAME present(true|false)
     done
     return 1
 }
+# scan_usable STA - the "radio is usable again" check after a power-on. Powered=
+# true precedes the driver/firmware being ready to scan, so a lone scan can fail
+# ("failed scheduling scan"); retry until it schedules or SETTLE_TRIES is spent.
+scan_usable() {
+    for ((k = 0; k < SETTLE_TRIES; k++)); do
+        spiderw station "$1" scan >/dev/null 2>&1 && return 0
+        sleep 1
+    done
+    return 1
+}
 
 # --- the single real device (waits for iwd to enumerate it) -----------------
 STA=$(resolve_sta) \
@@ -69,7 +79,8 @@ spiderw device "$STA" powered on >/dev/null || fail "set powered on failed"
 poll 'dev_powered' true || fail "device still powered=$(dev_powered) after on"
 # Prove it is usable again: a scan needs a live radio.
 spiderw device "$STA" mode station || fail "mode station after power-on failed"
-spiderw station "$STA" scan || fail "scan after power-on failed (radio not usable again)"
+scan_usable "$STA" \
+    || fail "scan after power-on still failed after ${SETTLE_TRIES}s (radio not usable again)"
 echo "[hw-power] device powered back on and usable (scan worked)"
 
 # --- 2. adapter Powered off -> on (distinct write path) ---------------------
@@ -92,7 +103,8 @@ poll 'adapter_powered' true || fail "adapter still powered=$(adapter_powered) af
 # off is iwd's business - this waits for the device either way.)
 poll_in_list "$STA" true || fail "device $STA did not return after the adapter power cycle"
 spiderw device "$STA" mode station || fail "mode station after adapter power-on failed"
-spiderw station "$STA" scan || fail "scan after adapter power-on failed"
+scan_usable "$STA" \
+    || fail "scan after adapter power-on still failed after ${SETTLE_TRIES}s"
 echo "[hw-power] adapter powered back on; device returned and is usable"
 
 echo
