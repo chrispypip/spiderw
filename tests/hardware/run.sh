@@ -82,7 +82,8 @@ env_args=()
 for var in SSID PASSPHRASE SECURITY SCAN_TRIES \
            BAD_PASSPHRASE SETTLE_TRIES MIN_NETWORKS THRESHOLDS REG_TIMEOUT \
            DEVICE_TRIES TRACK_WINDOW MIN_DISTINCT_BANDS \
-           CONNECT_TRIES CONNECT_WAIT ROAM_TIMEOUT WPS_TIMEOUT WPS_TRIES; do
+           CONNECT_TRIES CONNECT_WAIT ROAM_TIMEOUT WPS_TIMEOUT WPS_TRIES \
+           MIN_6E_MHZ; do
     [ -n "${!var:-}" ] && env_args+=(-e "$var")
 done
 
@@ -101,7 +102,7 @@ case "$tier_name" in
     affinities | affinities.sh)
         env_args+=(-e IWD_EXPERIMENTAL=1 -e IWD_DEBUG=1)
         ;;
-    wpa3 | wpa3.sh)
+    wpa3 | wpa3.sh | 6e | 6e.sh)
         env_args+=(-e IWD_DEBUG=1)
         ;;
     roam | roam.sh)
