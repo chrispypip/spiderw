@@ -7,9 +7,12 @@
 # HOW THE ROAM IS DRIVEN (externally, not here). Two APs on the AP host share the
 # SSID on different channels; an orchestrator there (spiderw-test's roam rig)
 # SEEDS the station onto AP1 (AP2 starts down), then, when it sees the station
-# associate, brings AP2 up and sends an 802.11v BSS Transition Management request
-# steering the station to AP2. So this tier is purely OBSERVATIONAL: it connects
-# and watches, it does NOT drive the APs (no SSH / coordination from the DUT).
+# associate, brings AP2 up and triggers a roam to it - EITHER an 802.11v BSS
+# Transition Management steer (works on any DUT) OR by fading AP1's TX power so a
+# SOFTMAC station self-roams on low signal. This tier is agnostic to which: it is
+# purely OBSERVATIONAL - it connects and watches, and does NOT drive the APs (no
+# SSH / coordination from the DUT). (Signal-triggered self-roam is softmac-only:
+# run it on the iwlwifi DUT, not brcmfmac, which does not self-roam.)
 #
 # THE ASSERTION - the roam SIGNATURE, via `spiderw station monitor access-point`:
 # the associated BSS changes to a DIFFERENT BSS of the ESS with NO
@@ -127,4 +130,4 @@ echo "[hw-roam] clean roam $cur -> $now, no disassociation"
 spiderw station "$STA" disconnect >/dev/null 2>&1 || true
 
 echo
-echo "[hw-roam] PASS (BTM-steered clean roam observed on real hardware)"
+echo "[hw-roam] PASS (clean roam observed on real hardware)"
