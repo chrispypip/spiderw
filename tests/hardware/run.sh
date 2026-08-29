@@ -109,6 +109,11 @@ case "$tier_name" in
         # failure dump reads.
         env_args+=(-e IWD_DEBUG=1)
         ;;
+    access-point | access-point.sh)
+        # -d so iwd.log carries the AP start/driver lines the tier's dump reads
+        # (fullmac Start failures show up there).
+        env_args+=(-e IWD_DEBUG=1)
+        ;;
 esac
 
 echo "[run] running against the real wlan0 (--network host, seccomp=unconfined)"
