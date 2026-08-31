@@ -20,6 +20,7 @@ set -uo pipefail
 SETTLE_TRIES="${SETTLE_TRIES:-15}"
 
 dump_state() {
+    [ -n "${LAST_SCAN_ERR:-}" ] && { echo "--- last scan error ---"; printf '  %s\n' "$LAST_SCAN_ERR"; }
     echo "--- device list ---"; spiderw device list 2>&1 | sed 's/^/  /' || true
     [ -n "${STA:-}" ] && { echo "--- device status ---"; spiderw device "$STA" status 2>&1 | sed 's/^/  /' || true; }
 }
@@ -50,9 +51,17 @@ poll_in_list() {   # NAME present(true|false)
 # scan_usable STA - the "radio is usable again" check after a power-on. Powered=
 # true precedes the driver/firmware being ready to scan, so a lone scan can fail
 # ("failed scheduling scan"); retry until it schedules or SETTLE_TRIES is spent.
+# A scan already in progress means iwd is scanning (its own post-power-on
+# autoscan) - the radio IS usable, so that counts as success. The last real error
+# is kept in LAST_SCAN_ERR so a failure dump can show WHY it never scheduled.
+LAST_SCAN_ERR=""
 scan_usable() {
+    local sta="$1" out=""
     for ((k = 0; k < SETTLE_TRIES; k++)); do
-        spiderw station "$1" scan >/dev/null 2>&1 && return 0
+        out=$(spiderw station "$sta" scan 2>&1) && return 0
+        # An in-progress scan (iwd already scanning) means the radio is usable.
+        printf '%s' "$out" | grep -qiE 'in progress|already' && return 0
+        LAST_SCAN_ERR="$out"
         sleep 1
     done
     return 1
