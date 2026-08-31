@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# WARNING - SOFTMAC ONLY. This tier power-cycles the radio via iwd (Device and
+# Adapter Powered off->on). On brcmfmac (fullmac) that WEDGES the firmware: escan
+# returns -52, the netdev won't hold IFF_UP, and only a driver reload / reboot
+# recovers it - a manual run on a brcmfmac DUT will BRICK the radio until reboot.
+# CI gates this tier to the iwlwifi leg; run it by hand on softmac (iwlwifi) only.
+#
 # Toggle Powered on the DUT's REAL radio device and its adapter, against a real
 # iwd 3.12. No AP or credentials needed - it only cycles the local radio.
 #
