@@ -63,6 +63,9 @@ STA_PATH=$(sta_path "$STA")
 [ "$STA_PATH" != "" ] || fail "could not resolve the device path for $STA"
 
 # --- connect (only AP1 is up during seeding, so we land on it) ---------------
+# NET follows the common.sh connect idiom but is not read back in this
+# tier (it asserts the connection by other means).
+# shellcheck disable=SC2034
 NET=$(connect_sta "$STA" "$STA_PATH") \
     || fail "could not connect to $SSID (is AP1 up on the AP host?)"
 echo "[hw-roam] connected to $SSID"

@@ -133,7 +133,7 @@ i_weak=$(grep -nxF "$SSID_WEAK" <<<"$names" | head -n1 | cut -d: -f1)
 
 # And the signal spiderw decoded must agree with the ranking: strong > weak.
 awk -v a="$strong_dbm" -v b="$weak_dbm" -v g="$MIN_GAP_DBM" 'BEGIN{exit !(a - b >= g)}' \
-    || fail "signal gap too small: $SSID_STRONG=$strong_dbm dBm vs $SSID_WEAK=$weak_dbm dBm (< $g)"
+    || fail "signal gap too small: $SSID_STRONG=$strong_dbm dBm vs $SSID_WEAK=$weak_dbm dBm (< $MIN_GAP_DBM)"
 
 echo
 echo "[ordered] PASS: $SSID_STRONG ($strong_dbm dBm) ranked above" \

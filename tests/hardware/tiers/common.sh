@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared helpers for the real-hardware tiers (station-only, against an EXTERNAL
 # AP). Sourced by each tier via `. "$(dirname "${BASH_SOURCE[0]}")/common.sh"`;
 # in the image both live in /usr/local/lib/spiderw-hardware/. Not a tier itself.

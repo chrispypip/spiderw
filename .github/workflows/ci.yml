@@ -88,6 +88,21 @@ jobs:
         run: ./scripts/ascii-check.sh
 
   # ---------------------------------------------------------------------------
+  # Shell scripts (the hwsim/hardware tier drivers, the dev + devcontainer
+  # helpers, and scripts/) linted with shellcheck - preinstalled on the runner.
+  # --severity=warning matches spiderw-test's lint gate; intentional cases carry
+  # inline `# shellcheck disable=` / `shell=` directives.
+  # ---------------------------------------------------------------------------
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: shellcheck
+        run: git ls-files '*.sh' | xargs -r shellcheck --severity=warning
+
+  # ---------------------------------------------------------------------------
   # Native test suites that do NOT require D-Bus. One matrix leg per build tag
   # so each suite reports independently. (The `race` tag is intentionally not
   # here: internal/connect/race_test.go drives the iwd mock over a session bus,

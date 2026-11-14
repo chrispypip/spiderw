@@ -49,6 +49,9 @@ STA_PATH=$(sta_path "$STA")
 # connect_sta uses the passphrase (SECURITY defaults to psk; iwd picks SAE from
 # the AP's AKM). A failure here is the SAE handshake, a transition-mode AP, a
 # wrong password, or the AP being out of range.
+# NET follows the common.sh connect idiom but is not read back in this
+# tier (it asserts the connection by other means).
+# shellcheck disable=SC2034
 NET=$(connect_sta "$STA" "$STA_PATH") \
     || fail "connect failed (SAE handshake? transition-mode AP? wrong password? out of range?)"
 echo "[hw-wpa3] connected to $SSID"

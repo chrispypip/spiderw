@@ -58,6 +58,9 @@ STA_PATH=$(sta_path "$STA")
 [ "$STA_PATH" != "" ] || fail "could not resolve the device path for $STA"
 # --- connect (affinities need a connected station); scan + connect + retry ---
 # --- via the shared helper --------------------------------------------------
+# NET follows the common.sh connect idiom but is not read back in this
+# tier (it asserts the connection by other means).
+# shellcheck disable=SC2034
 NET=$(connect_sta "$STA" "$STA_PATH") \
     || fail "could not connect to $SSID (scan/connect retries exhausted)"
 echo "[hw-affinities] connected to $SSID"

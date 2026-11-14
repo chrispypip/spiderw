@@ -98,6 +98,9 @@ STA_PATH=$(sta_path "$STA")
 # once up, rides the fade fine. connect_sta retries across a fade cycle (this
 # tier raises CONNECT_TRIES/CONNECT_WAIT to span the sweep period), so an attempt
 # lands in a high-power window.
+# NET follows the common.sh connect idiom but is not read back in this
+# tier (it asserts the connection by other means).
+# shellcheck disable=SC2034
 NET=$(connect_sta "$STA" "$STA_PATH") \
     || fail "connect to $SSID failed - AP breathing too low (raise FADE_LOW_MBM on the AP), out of range, or wrong passphrase?"
 echo "[hw-signal-track] connected to $SSID"

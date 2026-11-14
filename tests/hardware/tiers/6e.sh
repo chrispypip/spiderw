@@ -42,6 +42,9 @@ STA_PATH=$(sta_path "$STA")
 [ "$STA_PATH" != "" ] || fail "could not resolve the device path for $STA"
 
 # --- connect (WPA3-SAE), retried via the shared helper ----------------------
+# NET follows the common.sh connect idiom but is not read back in this
+# tier (it asserts the connection by other means).
+# shellcheck disable=SC2034
 NET=$(connect_sta "$STA" "$STA_PATH") \
     || fail "connect to $SSID failed - 6E needs the AX210's 6 GHz radio (brcmfmac has none), WPA3-SAE, and the router's 6G beacon up"
 echo "[hw-6e] connected to $SSID"
