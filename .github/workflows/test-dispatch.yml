@@ -25,8 +25,11 @@ on:
       - "go.mod"
       - "go.sum"
       - "tests/hwsim/**"
-      # Shapes the hwsim Docker build context, so a change can alter/break the
-      # build even when nothing above changed.
+      # The shared container build (Dockerfile + entrypoint) the hardware tier
+      # builds from; also carries the tier scripts into the image.
+      - "tests/container/**"
+      # Shapes the Docker build context, so a change can alter/break the build
+      # even when nothing above changed.
       - ".dockerignore"
 
 permissions:

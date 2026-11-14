@@ -17,7 +17,7 @@
 # collide with the hwsim tiers on PATH). A bare tier name here resolves to that
 # path; smoke.sh (shared, on PATH) and raw commands pass through unchanged.
 #
-# It reuses the hwsim container image (tests/hwsim/Dockerfile: spiderw + a pinned
+# It reuses the shared image (tests/container/Dockerfile: spiderw + a pinned
 # iwd), but drives it against the host's REAL radio (brcmfmac, iwlwifi, ...), NOT
 # virtual mac80211_hwsim ones. So there is deliberately NO `modprobe` here: the
 # container's iwd manages the host's real wlan0 through the shared network
@@ -47,7 +47,7 @@ if [ -n "${SPIDERW_VERSION:-}" ]; then
 else
     echo "[run] building $IMAGE (spiderw from source)"
 fi
-docker build -f tests/hwsim/Dockerfile "${build_args[@]}" -t "$IMAGE" .
+docker build -f tests/container/Dockerfile "${build_args[@]}" -t "$IMAGE" .
 
 # iwd's rfkill support needs /dev/rfkill; --network host shares the net namespace
 # (where the real wlan0 lives) but not device nodes, so pass it through.

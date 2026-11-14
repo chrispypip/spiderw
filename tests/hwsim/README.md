@@ -23,7 +23,7 @@ manage the `wlan*` interfaces, and no packaged iwd service should be running
 (`run.sh` stops one defensively).
 
 > The **same tier scripts** also run in a container against a DUT's real radio
-> (`tests/hardware/`, which reuses `Dockerfile` + `entrypoint.sh`). That path
+> (`tests/hardware/`, which reuses the shared `tests/container/` build). That path
 > keeps Docker; only the VM/hwsim path is native. The tier scripts are identical
 > across both.
 
@@ -38,7 +38,7 @@ manage the `wlan*` interfaces, and no packaged iwd service should be running
 - iwd is **pinned** (3.12), not the distro package: Ubuntu ships 2.14, and the
   point of this tier is to meet the same daemon the hardware runs. The VM image
   builds it from the kernel.org tarball (which bundles the exact ell), the same
-  version the `Dockerfile` pins for the hardware path.
+  version the `tests/container/Dockerfile` pins for the hardware path.
 - spiderw talks to that iwd over the **system** bus (its default; the mock is
   the odd one out on the session bus).
 
@@ -89,9 +89,11 @@ same scripts serve both paths. One level up:
   bring up a fresh iwd via `lib.sh`, run the tier, tear down.
 - `lib.sh` - the native bring-up/teardown (reload radios, wipe state, start/stop
   iwd and the hwsim medium).
-- `Dockerfile` + `entrypoint.sh` - the **container** path, used against a DUT's
-  real radio (`tests/hardware/`). `entrypoint.sh` is the container init that
-  brings up dbus + iwd before exec'ing the tier.
+- `../container/Dockerfile` + `../container/entrypoint.sh` - the **container**
+  path, shared with the hardware tier (`tests/hardware/`) and run against a DUT's
+  real radio. `entrypoint.sh` is the container init that brings up dbus + iwd
+  before exec'ing the tier. These live in `tests/container/`, not here, because
+  both the hwsim and hardware drivers build from them.
 
 - **`smoke.sh` (read-only):** spiderw *reads* real iwd - `daemon info`,
   `adapter/device list` and `status`. Read-only, safe. The first mock-vs-reality

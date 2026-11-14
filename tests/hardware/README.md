@@ -7,8 +7,8 @@ project has shipped came from hardware, so this is the highest-value tier.
 
 ## How it relates to the hwsim tier
 
-It reuses the hwsim **container image** (`../hwsim/Dockerfile`: spiderw + pinned
-iwd) but a different **driver**: `run.sh` here runs that container against the
+It reuses the shared **container image** (`../container/Dockerfile`: spiderw +
+pinned iwd) but a different **driver**: `run.sh` runs that container against the
 DUT's real `wlan0` via `--network host` (no `modprobe`), so the container's iwd
 manages the physical radio. The container shares the host kernel, so the real
 driver/firmware/radio are exercised; only iwd is containerized (ephemeral,

@@ -1,11 +1,15 @@
-# Real-iwd smoke image for the hwsim test tier.
+# Real-iwd container image: a pinned iwd + the spiderw CLI + the tier scripts.
+# Shared build (tests/container/), used today by the HARDWARE tier
+# (tests/hardware/run.sh) to drive a DUT's real radio; it also served the hwsim
+# tier in its original `docker run --rm` form, before that tier went native
+# (tests/hwsim/ now brings iwd up directly - see its lib.sh).
 #
 # Multi-stage: build the spiderw CLI with the pinned Go toolchain, build a PINNED
 # iwd from source, then drop both into an Ubuntu 24.04 runtime. The container runs
 # its OWN system D-Bus and iwd (see entrypoint.sh); it only borrows the host's
-# virtual radios, via `docker run --network host`. So iwd owns net.connman.iwd on
-# the container's bus, isolated from the host, while managing the mac80211_hwsim
-# phys the host created.
+# radios, via `docker run --network host`. So iwd owns net.connman.iwd on the
+# container's bus, isolated from the host, while managing the phys the host
+# exposes (a real wlan* for hardware; mac80211_hwsim virtual phys historically).
 #
 # We build iwd from the kernel.org release tarball rather than apt, because Ubuntu
 # 24.04 ships iwd 2.14 while the target is 3.12. Pinning the version is the whole
@@ -86,7 +90,7 @@ COPY --from=build /out/spiderw /usr/local/bin/spiderw
 # new tier is picked up just by dropping a file in it - no Dockerfile edit. run.sh
 # is the HOST-side driver (it runs docker build/run) and deliberately stays out of
 # the image.
-COPY tests/hwsim/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY tests/container/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY tests/hwsim/tiers/ /usr/local/bin/
 # Hardware-only tiers (a single station against an EXTERNAL AP - the Pi has one
 # radio) live in a SEPARATE image dir so their names never collide with the
