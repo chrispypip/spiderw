@@ -45,6 +45,11 @@ jobs:
   dispatch:
     name: dispatch spiderw-test
     runs-on: ubuntu-latest
+    # TEST_DISPATCH_TOKEN (fine-grained PAT, Actions:write on spiderw-test) is
+    # scoped to this environment so the cross-repo token is readable only from
+    # an allowed ref (main) and its use is logged. No required reviewer: this
+    # fires automatically on every main push to test the merge.
+    environment: test-dispatch
     permissions:
       contents: read
       actions: read  # read this repo's CI run status for the gate below
