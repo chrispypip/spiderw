@@ -6,13 +6,13 @@
 #
 # HOW THE ROAM IS DRIVEN (externally, not here). Two APs on the AP host share the
 # SSID on different channels; an orchestrator there (spiderw-test's roam rig)
-# SEEDS the station onto AP1 (AP2 starts down), then, when it sees the station
-# associate, brings AP2 up and triggers a roam to it - EITHER an 802.11v BSS
-# Transition Management steer (works on any DUT) OR by fading AP1's TX power so a
-# SOFTMAC station self-roams on low signal. This tier is agnostic to which: it is
-# purely OBSERVATIONAL - it connects and watches, and does NOT drive the APs (no
-# SSH / coordination from the DUT). (Signal-triggered self-roam is softmac-only:
-# run it on the iwlwifi DUT, not brcmfmac, which does not self-roam.)
+# keeps BOTH APs up, sees which one the station associates to, and triggers a
+# roam to the OTHER - EITHER an 802.11v BSS Transition Management steer (works on
+# any DUT) OR by fading the current AP's TX power so a SOFTMAC station self-roams.
+# This tier is agnostic to which: it is purely OBSERVATIONAL - it connects and
+# watches, and does NOT drive the APs (no SSH / coordination from the DUT).
+# (Signal-triggered self-roam is softmac-only: run it on the iwlwifi DUT, not
+# brcmfmac, which does not self-roam.)
 #
 # THE ASSERTION - the roam SIGNATURE, via `spiderw station monitor access-point`:
 # the associated BSS changes to a DIFFERENT BSS of the ESS with NO
@@ -62,12 +62,12 @@ spiderw device "$STA" mode station || fail "$STA -> station mode"
 STA_PATH=$(sta_path "$STA")
 [ "$STA_PATH" != "" ] || fail "could not resolve the device path for $STA"
 
-# --- connect (only AP1 is up during seeding, so we land on it) ---------------
-# NET follows the common.sh connect idiom but is not read back in this
-# tier (it asserts the connection by other means).
+# --- connect (the orchestrator steers us once it sees us associate) ----------
+# NET follows the common.sh connect idiom but is not read back in this tier
+# (the connection is asserted by watching the monitor below).
 # shellcheck disable=SC2034
 NET=$(connect_sta "$STA" "$STA_PATH") \
-    || fail "could not connect to $SSID (is AP1 up on the AP host?)"
+    || fail "could not connect to $SSID (is the roam rig up on the AP host?)"
 echo "[hw-roam] connected to $SSID"
 
 # brcmfmac resets power-save to ON after each (re)connect, which can delay BTM
@@ -75,38 +75,45 @@ echo "[hw-roam] connected to $SSID"
 # (No-op where iw is absent or the driver ignores it.)
 iw dev "$STA" set power_save off 2>/dev/null || true
 
-cur_bss() {
-    spiderw station "$STA" status 2>/dev/null \
-        | awk '/ConnectedAccessPoint:/ {print $2}'
-}
-cur=""
-for _ in $(seq 1 5); do   # association can lag the connect call by a beat
-    cur=$(cur_bss)
-    [ "$cur" != "" ] && break
-    sleep 1
-done
-[ "$cur" != "" ] || fail "no ConnectedAccessPoint after connect"
-echo "[hw-roam] seeded on BSS $cur; waiting up to ${ROAM_TIMEOUT}s for the AP" \
-     "host to steer a roam"
-
 # --- watch the association across the roam -----------------------------------
+# Start the monitor RIGHT AFTER connecting (not after a status-poll delay) and
+# decide pass/fail from THIS stream - the authoritative source. The old code
+# detected the roam by polling `station status` once a second, which races the
+# steer: a fast or bouncing transition slips between samples, and a steer that
+# lands before the first poll leaves the baseline reading the post-roam AP. The
+# monitor captures every change in order, so neither race can hide the roam.
 : >"$MON"
 spiderw station "$STA" monitor access-point >"$MON" 2>&1 &
 mon_pid=$!
-sleep 1   # let the monitor print the seed line for the current AP
 
-# The orchestrator fires the BTM steer when it sees us associate; wait for the
-# associated BSS to change to a DIFFERENT one of the ESS.
-now="$cur"
+# Parse the capture (lines in order): the SEED is the first associated BSS; a
+# clean ROAM is a later, DIFFERENT associated BSS with NO `access-point=none` (a
+# disassociation) between them - a `none` there is a reconnect, not a roam.
+# Prints one of: "ROAM seed new" | "RECONNECT seed new" | "NOROAM seed" | "NONE".
+roam_verdict() {
+    awk '
+        /access-point=/ {
+            ap = $0; sub(/.*access-point=/, "", ap); sub(/[ \t].*/, "", ap)
+            if (ap == "none" || ap == "") { if (seed != "") saw_none = 1; next }
+            if (seed == "") { seed = ap; next }
+            if (ap != seed) { new = ap; exit }
+        }
+        END {
+            if (new != "")       print (saw_none ? "RECONNECT " : "ROAM ") seed " " new
+            else if (seed != "") print "NOROAM " seed
+            else                 print "NONE"
+        }' "$1"
+}
+
+echo "[hw-roam] watching up to ${ROAM_TIMEOUT}s for the AP host to steer a roam"
+verdict="NONE"
 for _ in $(seq 1 "$ROAM_TIMEOUT"); do
-    now=$(cur_bss)
-    [ "$now" != "" ] && [ "$now" != "$cur" ] && break
+    verdict=$(roam_verdict "$MON")
+    case "$verdict" in ROAM*|RECONNECT*) break ;; esac
     sleep 1
 done
 
-# The status poll and the monitor's subscription race on the same property
-# change; give the monitor a moment to write the roam line before killing it.
-sleep 1
+sleep 1   # let the monitor flush its final line
 kill "$mon_pid" 2>/dev/null
 wait "$mon_pid" 2>/dev/null
 
@@ -114,22 +121,22 @@ echo
 echo "== monitor access-point capture =="
 sed 's/^/  /' "$MON"
 
-if ! { [ "$now" != "" ] && [ "$now" != "$cur" ]; }; then
-    echo "[hw-roam] no roam within ${ROAM_TIMEOUT}s (still on $cur)." >&2
-    echo "  Is the AP host's roam orchestrator running (AP2 up + a BTM steer)," \
-         "and is the steer reaching this station?" >&2
-    fail "station did not roam"
-fi
+# shellcheck disable=SC2086
+set -- $verdict
+case "$1" in
+    ROAM)
+        echo "[hw-roam] clean roam $2 -> $3, no disassociation" ;;
+    RECONNECT)
+        fail "saw access-point=none between $2 and $3: a reconnect, not a roam" ;;
+    NOROAM)
+        echo "[hw-roam] no roam within ${ROAM_TIMEOUT}s (still on $2)." >&2
+        echo "  Is the AP host's roam orchestrator running and steering this" \
+             "station?" >&2
+        fail "station did not roam" ;;
+    *)
+        fail "never associated to $SSID (no access-point in the monitor stream)" ;;
+esac
 
-# --- the roam signature -----------------------------------------------------
-# The new AP appears in the stream, and no disassociation (access-point=none)
-# happened between the association and the roam.
-grep -q "access-point=$now" "$MON" \
-    || fail "monitor never reported the new AP $now"
-grep -q "access-point=none" "$MON" \
-    && fail "saw a disassociation (access-point=none): that is a reconnect, not a roam"
-
-echo "[hw-roam] clean roam $cur -> $now, no disassociation"
 spiderw station "$STA" disconnect >/dev/null 2>&1 || true
 
 echo
