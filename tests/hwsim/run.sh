@@ -22,11 +22,13 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 TIERS_DIR="$HERE/tiers"
 
 # Re-exec under sudo if not already root. --preserve-env carries the knobs a
-# caller (or the CI step) may have set; iwd, the /var/lib/iwd wipe, and modprobe
-# all require root.
+# caller (or the CI step) may have set: the tier flags, plus the proxy and Go
+# toolchain vars a from-source build needs - sudo otherwise drops them, so a cold
+# manual build could not reach a proxied network to fetch a Go toolchain. iwd, the
+# /var/lib/iwd wipe, and modprobe all require root.
 if [ "$(id -u)" -ne 0 ]; then
     echo "[run] re-executing under sudo (iwd + modprobe need root)"
-    exec sudo --preserve-env=RADIOS,SPIDERW_VERSION,IWD_DEBUG,IWD_EXPERIMENTAL,HWSIM_MEDIUM \
+    exec sudo --preserve-env=RADIOS,SPIDERW_VERSION,IWD_DEBUG,IWD_EXPERIMENTAL,HWSIM_MEDIUM,http_proxy,https_proxy,no_proxy,HTTP_PROXY,HTTPS_PROXY,NO_PROXY,GOPROXY,GOTOOLCHAIN,GOFLAGS \
         bash "${BASH_SOURCE[0]}" "$@"
 fi
 
