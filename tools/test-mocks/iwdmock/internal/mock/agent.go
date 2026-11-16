@@ -12,6 +12,21 @@ import (
 // secured, not-yet-known network to connect. Integration tests use this literal.
 const securedNetworkPassphrase = "mock-secret-passphrase"
 
+// The 802.1x (EAP) networks' expected credentials, one set per method the mock
+// drives. The mock agent must supply these for the matching network to connect;
+// integration tests use these literals.
+const (
+	// username+password (RequestUserNameAndPassword) - PeapNet.
+	enterpriseNetworkUser     = "mock-eap-user"
+	enterpriseNetworkPassword = "mock-eap-password"
+	// password-only (RequestUserPassword) - TtlsNet. The mock supplies this
+	// identity (as iwd would from the network config) and expects the password.
+	enterprisePasswordIdentity = "mock-eap-identity"
+	enterprisePasswordOnly     = "mock-ttls-password"
+	// private-key passphrase (RequestPrivateKeyPassphrase) - TlsNet (EAP-TLS).
+	enterpriseKeyPassphrase = "mock-tls-key-pass"
+)
+
 // agentRegistry tracks the single credentials agent registered via
 // AgentManager, and calls back into it (over D-Bus) when the mock needs a
 // passphrase. It mirrors iwd's one-agent-per-connection model.
@@ -72,6 +87,72 @@ func (r *agentRegistry) requestPassphrase(network dbus.ObjectPath) (passphrase s
 	}
 
 	call := conn.Object(sender, path).Call(iwdbus.IwdAgentIface+".RequestPassphrase", 0, network)
+	if call.Err != nil {
+		return "", true, call.Err
+	}
+	if err := call.Store(&passphrase); err != nil {
+		return "", true, err
+	}
+	return passphrase, true, nil
+}
+
+// requestUserNameAndPassword calls the registered agent's
+// RequestUserNameAndPassword for an 802.1x network. ok is false when no agent is
+// registered (the caller should reply NoAgent).
+func (r *agentRegistry) requestUserNameAndPassword(network dbus.ObjectPath) (user, password string, ok bool, err error) {
+	r.mu.Lock()
+	conn, sender, path, set := r.conn, r.sender, r.path, r.set
+	r.mu.Unlock()
+
+	if !set || conn == nil {
+		return "", "", false, nil
+	}
+
+	call := conn.Object(sender, path).Call(iwdbus.IwdAgentIface+".RequestUserNameAndPassword", 0, network)
+	if call.Err != nil {
+		return "", "", true, call.Err
+	}
+	if err := call.Store(&user, &password); err != nil {
+		return "", "", true, err
+	}
+	return user, password, true, nil
+}
+
+// requestUserPassword calls the registered agent's RequestUserPassword for an
+// 802.1x network whose identity the network already carries (passed as user).
+// ok is false when no agent is registered.
+func (r *agentRegistry) requestUserPassword(network dbus.ObjectPath, user string) (password string, ok bool, err error) {
+	r.mu.Lock()
+	conn, sender, path, set := r.conn, r.sender, r.path, r.set
+	r.mu.Unlock()
+
+	if !set || conn == nil {
+		return "", false, nil
+	}
+
+	call := conn.Object(sender, path).Call(iwdbus.IwdAgentIface+".RequestUserPassword", 0, network, user)
+	if call.Err != nil {
+		return "", true, call.Err
+	}
+	if err := call.Store(&password); err != nil {
+		return "", true, err
+	}
+	return password, true, nil
+}
+
+// requestPrivateKeyPassphrase calls the registered agent's
+// RequestPrivateKeyPassphrase for an 802.1x (EAP-TLS) network whose client
+// private key is encrypted. ok is false when no agent is registered.
+func (r *agentRegistry) requestPrivateKeyPassphrase(network dbus.ObjectPath) (passphrase string, ok bool, err error) {
+	r.mu.Lock()
+	conn, sender, path, set := r.conn, r.sender, r.path, r.set
+	r.mu.Unlock()
+
+	if !set || conn == nil {
+		return "", false, nil
+	}
+
+	call := conn.Object(sender, path).Call(iwdbus.IwdAgentIface+".RequestPrivateKeyPassphrase", 0, network)
 	if call.Err != nil {
 		return "", true, call.Err
 	}

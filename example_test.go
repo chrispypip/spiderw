@@ -402,6 +402,58 @@ func ExampleClient_RegisterAgent() {
 	fmt.Println("connected")
 }
 
+// ExampleClient_RegisterAgent_enterprise wires the 802.1x (EAP) credential
+// callbacks. iwd invokes whichever one the network's EAP method needs:
+// UserNameAndPassword when the network config carries no identity, UserPassword
+// when the identity is already configured, or PrivateKeyPassphrase for EAP-TLS
+// with an encrypted client key. Wiring all three covers any enterprise network;
+// the EAP method and any CA/client certificates live in iwd's provisioning file,
+// not here.
+func ExampleClient_RegisterAgent_enterprise() {
+	ctx := context.Background()
+
+	client, err := spiderw.NewClient(ctx, spiderw.SystemBus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	agent, err := client.RegisterAgent(ctx, spiderw.AgentConfig{
+		UserNameAndPassword: func(ctx context.Context, networkPath string) (user, password string, err error) {
+			return lookupEapIdentity(networkPath), lookupEapPassword(networkPath), nil
+		},
+		UserPassword: func(ctx context.Context, networkPath, user string) (string, error) {
+			// iwd supplies the configured identity in user; return its password.
+			return lookupEapPassword(networkPath), nil
+		},
+		PrivateKeyPassphrase: func(ctx context.Context, networkPath string) (string, error) {
+			return lookupPrivateKeyPassphrase(networkPath), nil
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = agent.Unregister(ctx) }()
+
+	refs, err := client.Daemon().Networks(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(refs) == 0 {
+		log.Fatal("no networks found")
+	}
+
+	network, err := client.Network(ctx, refs[0].Path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := network.Connect(ctx); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("connected")
+}
+
 // ExampleNetwork_ExtendedServiceSet lists the basic service sets (access points)
 // that make up a network and resolves each path to a live BasicServiceSet handle.
 func ExampleNetwork_ExtendedServiceSet() {
@@ -675,4 +727,16 @@ func Example_errorHandling() {
 // ExampleClient_RegisterAgent.
 func lookupPassphraseFor(networkPath string) string {
 	return networkPath + ": correct horse battery staple"
+}
+
+func lookupEapIdentity(networkPath string) string {
+	return "user-for-" + networkPath
+}
+
+func lookupEapPassword(networkPath string) string {
+	return networkPath + ": correct horse battery staple"
+}
+
+func lookupPrivateKeyPassphrase(networkPath string) string {
+	return networkPath + ": key passphrase"
 }

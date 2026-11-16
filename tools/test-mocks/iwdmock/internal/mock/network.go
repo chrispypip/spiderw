@@ -10,18 +10,23 @@ import (
 
 // networkFixtures defines the mock networks exported under the device.
 //
-// They cover the three Connect outcomes iwd distinguishes:
+// They cover the Connect outcomes iwd distinguishes:
 //   - an open network connects with no agent,
 //   - a known (provisioned) secured network connects with no agent,
-//   - an unknown secured network is rejected with net.connman.iwd.NoAgent.
+//   - an unknown secured PSK network needs the agent's passphrase (NoAgent
+//     without one),
+//   - an unknown 802.1x network needs the agent's username and password.
 //
 // Paths are listed in sorted order to match the daemon's path-sorted
 // enumeration. The open network's ExtendedServiceSet lists both mock BSSes,
 // demonstrating multi-BSS (e.g. 2.4 GHz + 5 GHz) membership.
 var networkFixtures = []struct {
-	path         dbus.ObjectPath
-	name         string
-	secType      string
+	path    dbus.ObjectPath
+	name    string
+	secType string
+	// eapMethod picks the agent callback an 8021x network drives (empty for
+	// non-8021x): "username-password", "password", or "private-key".
+	eapMethod    string
 	connected    bool
 	knownNetwork dbus.ObjectPath // empty means the network is not known
 	ess          []dbus.ObjectPath
@@ -48,11 +53,38 @@ var networkFixtures = []struct {
 		},
 	},
 	{
+		// 802.1x (EAP) network driving RequestUserNameAndPassword (iwd needs both
+		// the identity and the password). 506561704e6574 is "PeapNet".
+		path:      "/net/connman/iwd/0/3/506561704e6574_8021x",
+		name:      "PeapNet",
+		secType:   "8021x",
+		eapMethod: "username-password",
+		ess:       nil,
+	},
+	{
 		path:    "/net/connman/iwd/0/3/536563757265644e6574_psk",
 		name:    "SecuredNet",
 		secType: "psk",
 		// Not known and secured: Connect fails with NoAgent until an agent exists.
 		ess: nil,
+	},
+	{
+		// 802.1x (EAP-TLS) network driving RequestPrivateKeyPassphrase (the
+		// client's private key is encrypted). 546c734e6574 is "TlsNet".
+		path:      "/net/connman/iwd/0/3/546c734e6574_8021x",
+		name:      "TlsNet",
+		secType:   "8021x",
+		eapMethod: "private-key",
+		ess:       nil,
+	},
+	{
+		// 802.1x network driving RequestUserPassword (iwd already carries the
+		// identity and needs only the password). 54746c734e6574 is "TtlsNet".
+		path:      "/net/connman/iwd/0/3/54746c734e6574_8021x",
+		name:      "TtlsNet",
+		secType:   "8021x",
+		eapMethod: "password",
+		ess:       nil,
 	},
 }
 
@@ -74,6 +106,10 @@ type Network struct {
 
 	// Type is the mock Type (security) property.
 	Type string
+
+	// EapMethod is the 8021x credential method the mock drives (not a D-Bus
+	// property): "username-password", "password", or "private-key".
+	EapMethod string
 
 	// KnownNetwork is the mock KnownNetwork property. An empty path means the
 	// property is omitted (the network is not known).
@@ -100,6 +136,7 @@ func ExportNetwork(conn *dbus.Conn) error {
 			Connected:          fixture.connected,
 			Device:             devicePath,
 			Type:               fixture.secType,
+			EapMethod:          fixture.eapMethod,
 			KnownNetwork:       fixture.knownNetwork,
 			ExtendedServiceSet: fixture.ess,
 		}
@@ -148,24 +185,15 @@ func (n *Network) extendedServiceSet() []dbus.ObjectPath {
 // Connect implements the mock Network.Connect method.
 //
 // Open and known (provisioned) networks connect with no agent, mirroring iwd. An
-// unknown secured network needs a credentials agent: the mock calls the
-// registered agent's RequestPassphrase and connects only if it returns the
-// expected passphrase. With no agent registered it is rejected with
-// net.connman.iwd.NoAgent; a wrong or declined passphrase yields
+// unknown secured network needs a credentials agent (see authenticate): a PSK
+// network via RequestPassphrase, an 802.1x network via
+// RequestUserNameAndPassword. With no agent it is rejected with
+// net.connman.iwd.NoAgent; wrong or declined credentials yield
 // net.connman.iwd.Failed.
 func (n *Network) Connect() *dbus.Error {
 	if n.Type != "open" && n.KnownNetwork == "" {
-		passphrase, ok, err := agents.requestPassphrase(n.Path)
-		if !ok {
-			return dbus.NewError(iwdbus.IwdErrorNoAgent, []interface{}{"No agent registered"})
-		}
-		if err != nil {
-			// The agent declined (Canceled) or the callback failed; iwd surfaces
-			// this as an association failure.
-			return dbus.NewError(iwdbus.IwdErrorFailed, []interface{}{err.Error()})
-		}
-		if passphrase != securedNetworkPassphrase {
-			return invalidPassphraseError()
+		if err := n.authenticate(); err != nil {
+			return err
 		}
 	}
 
@@ -177,6 +205,65 @@ func (n *Network) Connect() *dbus.Error {
 	}
 
 	emitPropertiesChanged(n.Path, iwdbus.IwdNetworkIface, map[string]dbus.Variant{"Connected": dbus.MakeVariant(true)}, []string{})
+	return nil
+}
+
+// authenticate drives the credentials agent for a not-yet-known secured network:
+// it returns NoAgent when none is registered, Failed when the callback declines
+// or returns the wrong credentials, or nil on success. An 802.1x network uses
+// RequestUserNameAndPassword; any other secured network uses RequestPassphrase.
+func (n *Network) authenticate() *dbus.Error {
+	if n.Type == "8021x" {
+		return n.authenticate8021x()
+	}
+
+	passphrase, ok, err := agents.requestPassphrase(n.Path)
+	if !ok {
+		return dbus.NewError(iwdbus.IwdErrorNoAgent, []interface{}{"No agent registered"})
+	}
+	if err != nil {
+		// The agent declined (Canceled) or the callback failed; iwd surfaces this
+		// as an association failure.
+		return dbus.NewError(iwdbus.IwdErrorFailed, []interface{}{err.Error()})
+	}
+	if passphrase != securedNetworkPassphrase {
+		return invalidPassphraseError()
+	}
+	return nil
+}
+
+// authenticate8021x drives the EAP credential callback for the network's method
+// (username+password, password-only, or the EAP-TLS private-key passphrase) and
+// validates the result against the expected credentials.
+func (n *Network) authenticate8021x() *dbus.Error {
+	var ok bool
+	var err error
+	var valid bool
+
+	switch n.EapMethod {
+	case "password":
+		var password string
+		password, ok, err = agents.requestUserPassword(n.Path, enterprisePasswordIdentity)
+		valid = password == enterprisePasswordOnly
+	case "private-key":
+		var passphrase string
+		passphrase, ok, err = agents.requestPrivateKeyPassphrase(n.Path)
+		valid = passphrase == enterpriseKeyPassphrase
+	default: // "username-password"
+		var user, password string
+		user, password, ok, err = agents.requestUserNameAndPassword(n.Path)
+		valid = user == enterpriseNetworkUser && password == enterpriseNetworkPassword
+	}
+
+	if !ok {
+		return dbus.NewError(iwdbus.IwdErrorNoAgent, []interface{}{"No agent registered"})
+	}
+	if err != nil {
+		return dbus.NewError(iwdbus.IwdErrorFailed, []interface{}{err.Error()})
+	}
+	if !valid {
+		return dbus.NewError(iwdbus.IwdErrorFailed, []interface{}{"invalid 802.1x credentials"})
+	}
 	return nil
 }
 

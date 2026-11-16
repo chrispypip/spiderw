@@ -180,15 +180,19 @@ spiderw network MyWifi connect --passphrase=hunter2  # non-interactive
 echo hunter2 | spiderw network MyWifi connect --passphrase-stdin
 ```
 
-An **802.1x (EAP)** network takes the EAP identity and password instead:
-`--username=<id>` with `--password=<secret>` (or `--password-stdin`, or the
-no-echo prompt). Omit `--username` when the network's own configuration already
-sets the identity. The EAP method and any CA/client certificates live in iwd's
-network provisioning file, not on the command line.
+An **802.1x (EAP)** network takes EAP credentials instead of a passphrase. For
+the username/password methods (PEAP, TTLS), pass `--username=<id>` with
+`--password=<secret>` (or `--password-stdin`, or the no-echo prompt); omit
+`--username` when the network's own configuration already sets the identity. For
+**EAP-TLS**, where the client's private key is encrypted, pass
+`--private-key-passphrase=<secret>` (or `--private-key-passphrase-stdin`). The
+EAP method and any CA/client certificates live in iwd's network provisioning
+file, not on the command line.
 
 ```bash
 spiderw network Corp connect --username=alice --password=s3cret
 echo s3cret | spiderw network Corp connect --username=alice --password-stdin
+spiderw network Corp connect --private-key-passphrase=keypass   # EAP-TLS
 ```
 
 List known (saved) networks, or print a full snapshot for every one:

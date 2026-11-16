@@ -273,7 +273,8 @@ func (r networkBSSesResult) String() string {
 
 const networkConnectUsage = "usage: spiderw network <network> connect " +
 	"[--passphrase=<secret> | --passphrase-stdin] " +
-	"[--username=<id>] [--password=<secret> | --password-stdin]"
+	"[--username=<id>] [--password=<secret> | --password-stdin] " +
+	"[--private-key-passphrase=<secret> | --private-key-passphrase-stdin]"
 
 func runNetworkConnect(app *App, ctx context.Context, networkRef string, args []string) error {
 	fs := flag.NewFlagSet("connect", flag.ContinueOnError)
@@ -283,6 +284,8 @@ func runNetworkConnect(app *App, ctx context.Context, networkRef string, args []
 	username := fs.String("username", "", "EAP identity for an 802.1x network")
 	password := fs.String("password", "", "EAP password for an 802.1x network")
 	passwordStdin := fs.Bool("password-stdin", false, "read the 802.1x password from the first line of stdin")
+	privKey := fs.String("private-key-passphrase", "", "EAP-TLS private-key passphrase for an 802.1x network")
+	privKeyStdin := fs.Bool("private-key-passphrase-stdin", false, "read the private-key passphrase from the first line of stdin")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -298,6 +301,19 @@ func runNetworkConnect(app *App, ctx context.Context, networkRef string, args []
 	if set["password"] && *passwordStdin {
 		return fmt.Errorf("specify only one of --password or --password-stdin")
 	}
+	if set["private-key-passphrase"] && *privKeyStdin {
+		return fmt.Errorf("specify only one of --private-key-passphrase or --private-key-passphrase-stdin")
+	}
+	flags := connectFlags{
+		set:           set,
+		passphrase:    *passphrase,
+		passStdin:     *passStdin,
+		username:      *username,
+		password:      *password,
+		passwordStdin: *passwordStdin,
+		privKey:       *privKey,
+		privKeyStdin:  *privKeyStdin,
+	}
 
 	return app.withClient(ctx, func(client clientAPI) error {
 		n, err := networkByRef(ctx, client, networkRef)
@@ -311,9 +327,7 @@ func runNetworkConnect(app *App, ctx context.Context, networkRef string, args []
 		}
 
 		if needsAgent {
-			cfg, err := buildConnectAgentConfig(
-				app, networkRef, netType, set,
-				*passphrase, *passStdin, *username, *password, *passwordStdin)
+			cfg, err := buildConnectAgentConfig(app, networkRef, netType, flags)
 			if err != nil {
 				return err
 			}
@@ -356,44 +370,36 @@ func networkNeedsAgent(ctx context.Context, n networkAPI) (bool, spiderw.Network
 	return props.KnownNetwork == nil, props.Type, nil
 }
 
+// connectFlags holds the parsed credential flags for a network connect. Which
+// callbacks they wire depends on the network's security type, so they are
+// gathered here and resolved in buildConnectAgentConfig.
+type connectFlags struct {
+	set           map[string]bool
+	passphrase    string
+	passStdin     bool
+	username      string
+	password      string
+	passwordStdin bool
+	privKey       string
+	privKeyStdin  bool
+}
+
 // buildConnectAgentConfig resolves the credentials for a secured connect and
 // returns the AgentConfig to register, chosen by the network's security type:
-// PSK networks use --passphrase, 802.1x networks use --username/--password.
-// Mixing the two is rejected so the error names the right flags.
-func buildConnectAgentConfig(
-	app *App, networkRef string, netType spiderw.NetworkType, set map[string]bool,
-	passphrase string, passStdin bool, username, password string, passwordStdin bool,
-) (spiderw.AgentConfig, error) {
+// PSK networks use --passphrase, 802.1x networks use --username/--password (EAP
+// username+password) and/or --private-key-passphrase (EAP-TLS). Mixing a PSK
+// flag with an 802.1x one is rejected so the error names the right flags.
+func buildConnectAgentConfig(app *App, networkRef string, netType spiderw.NetworkType, f connectFlags) (spiderw.AgentConfig, error) {
 	if netType == spiderw.NetworkType8021x {
-		if set["passphrase"] || passStdin {
-			return spiderw.AgentConfig{}, fmt.Errorf(
-				"%q is an 802.1x network; use --username/--password, not --passphrase", networkRef)
-		}
-		user, pass, err := resolve8021xCreds(app, networkRef, set, username, password, passwordStdin)
-		if err != nil {
-			return spiderw.AgentConfig{}, err
-		}
-		cfg := spiderw.AgentConfig{
-			// iwd calls this when the network's own config already carries the
-			// identity and it needs only the password.
-			UserPassword: func(ctx context.Context, networkPath, iwdUser string) (string, error) {
-				return pass, nil
-			},
-		}
-		if user != "" {
-			// iwd calls this when the config has no identity and it needs both.
-			cfg.UserNameAndPassword = func(ctx context.Context, networkPath string) (string, string, error) {
-				return user, pass, nil
-			}
-		}
-		return cfg, nil
+		return build8021xAgentConfig(app, networkRef, f)
 	}
 
-	if set["username"] || set["password"] || passwordStdin {
+	if f.set["username"] || f.set["password"] || f.passwordStdin ||
+		f.set["private-key-passphrase"] || f.privKeyStdin {
 		return spiderw.AgentConfig{}, fmt.Errorf(
-			"%q is not an 802.1x network; use --passphrase, not --username/--password", networkRef)
+			"%q is not an 802.1x network; use --passphrase, not the 802.1x flags", networkRef)
 	}
-	secret, err := resolveConnectPassphrase(app, networkRef, set["passphrase"], passphrase, passStdin)
+	secret, err := resolveConnectPassphrase(app, networkRef, f.set["passphrase"], f.passphrase, f.passStdin)
 	if err != nil {
 		return spiderw.AgentConfig{}, err
 	}
@@ -404,23 +410,67 @@ func buildConnectAgentConfig(
 	}, nil
 }
 
-// resolve8021xCreds obtains the 802.1x identity and password for a secured
-// connect: the password from --password, then --password-stdin, then a no-echo
-// prompt; the identity from --username (optional - needed only when the
-// network's own config does not already set it).
-func resolve8021xCreds(app *App, networkRef string, set map[string]bool, username, password string, passwordStdin bool) (user, pass string, err error) {
+// build8021xAgentConfig wires the EAP credential callbacks for an 802.1x connect
+// from the flags supplied: --password (optionally with --username) for the EAP
+// username/password methods, and --private-key-passphrase for EAP-TLS. When no
+// 802.1x credential is given at all it falls back to prompting for a password
+// (the common PEAP/TTLS case).
+func build8021xAgentConfig(app *App, networkRef string, f connectFlags) (spiderw.AgentConfig, error) {
+	if f.set["passphrase"] || f.passStdin {
+		return spiderw.AgentConfig{}, fmt.Errorf(
+			"%q is an 802.1x network; use --username/--password or --private-key-passphrase, "+
+				"not --passphrase", networkRef)
+	}
+
+	cfg := spiderw.AgentConfig{}
+
+	pkProvided := f.set["private-key-passphrase"] || f.privKeyStdin
+	if pkProvided {
+		pass, err := resolveSecret(app, f.set["private-key-passphrase"], f.privKey, f.privKeyStdin,
+			fmt.Sprintf("Private-key passphrase for %s: ", networkRef))
+		if err != nil {
+			return spiderw.AgentConfig{}, err
+		}
+		// iwd calls this for EAP-TLS when the client's private key is encrypted.
+		cfg.PrivateKeyPassphrase = func(ctx context.Context, networkPath string) (string, error) {
+			return pass, nil
+		}
+	}
+
+	// Password path (EAP username/password). Also the fallback that prompts when
+	// no 802.1x credential was supplied, preserving the interactive default.
+	if f.set["password"] || f.passwordStdin || !pkProvided {
+		pass, err := resolveSecret(app, f.set["password"], f.password, f.passwordStdin,
+			fmt.Sprintf("Password for %s: ", networkRef))
+		if err != nil {
+			return spiderw.AgentConfig{}, err
+		}
+		// iwd calls this when the network's own config already carries the identity.
+		cfg.UserPassword = func(ctx context.Context, networkPath, iwdUser string) (string, error) {
+			return pass, nil
+		}
+		if f.username != "" {
+			// iwd calls this when the config has no identity and it needs both.
+			cfg.UserNameAndPassword = func(ctx context.Context, networkPath string) (string, string, error) {
+				return f.username, pass, nil
+			}
+		}
+	}
+
+	return cfg, nil
+}
+
+// resolveSecret obtains a secret in precedence order: its flag, then its -stdin
+// variant, then an interactive no-echo prompt with promptMsg.
+func resolveSecret(app *App, flagSet bool, flagVal string, stdin bool, promptMsg string) (string, error) {
 	switch {
-	case set["password"]:
-		pass = password
-	case passwordStdin:
-		pass, err = readPassphraseStdin(app)
+	case flagSet:
+		return flagVal, nil
+	case stdin:
+		return readPassphraseStdin(app)
 	default:
-		pass, err = app.promptPassphrase(fmt.Sprintf("Password for %s: ", networkRef))
+		return app.promptPassphrase(promptMsg)
 	}
-	if err != nil {
-		return "", "", err
-	}
-	return username, pass, nil
 }
 
 // resolveConnectPassphrase obtains the passphrase for a secured connect, in
@@ -722,7 +772,8 @@ const networkHelpText = `Commands:
   <network> status                 Show a snapshot of one network
   <network> connect                Connect to the network. PSK: --passphrase=<s>,
                                    --passphrase-stdin, or the prompt. 802.1x:
-                                   --username=<id> + --password=<s>/--password-stdin
+                                   --username=<id> + --password=<s>/--password-stdin,
+                                   or --private-key-passphrase=<s> for EAP-TLS
   <network> connected              Show whether the network is connected
   <network> type                   Show the network type
   <network> device                 Show the owning device object path

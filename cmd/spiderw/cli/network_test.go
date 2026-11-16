@@ -301,6 +301,71 @@ func TestNetworkCmd_Connect_Enterprise_PasswordBothSources(t *testing.T) {
 	require.Nil(t, fc.registeredCfg)
 }
 
+func TestNetworkCmd_Connect_Enterprise_PrivateKeyFlag(t *testing.T) {
+	t.Parallel()
+
+	// EAP-TLS: only the private-key passphrase is supplied, so only that callback
+	// is wired (the username/password callbacks stay nil).
+	fc := fakeWithEnterpriseNetwork()
+	out, code := driveConnect(fc, "", nil,
+		"network", "EnterpriseNet", "connect", "--private-key-passphrase=keypass")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "true", strings.TrimSpace(out))
+
+	require.Nil(t, fc.registeredCfg.Passphrase)
+	require.Nil(t, fc.registeredCfg.UserPassword)
+	require.Nil(t, fc.registeredCfg.UserNameAndPassword)
+	require.NotNil(t, fc.registeredCfg.PrivateKeyPassphrase)
+	pw, err := fc.registeredCfg.PrivateKeyPassphrase(context.Background(), "p")
+	require.NoError(t, err)
+	require.Equal(t, "keypass", pw)
+}
+
+func TestNetworkCmd_Connect_Enterprise_PrivateKeyStdin(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithEnterpriseNetwork()
+	out, code := driveConnect(fc, "keyfromstdin\n", nil,
+		"network", "EnterpriseNet", "connect", "--private-key-passphrase-stdin")
+	require.Equal(t, 0, code, out)
+
+	pw, err := fc.registeredCfg.PrivateKeyPassphrase(context.Background(), "p")
+	require.NoError(t, err)
+	require.Equal(t, "keyfromstdin", pw)
+}
+
+func TestNetworkCmd_Connect_Enterprise_PrivateKeyAndPassword(t *testing.T) {
+	t.Parallel()
+
+	// A client may carry both an encrypted key and a password; wire both.
+	fc := fakeWithEnterpriseNetwork()
+	out, code := driveConnect(fc, "", nil,
+		"network", "EnterpriseNet", "connect",
+		"--password=pw", "--private-key-passphrase=keypass")
+	require.Equal(t, 0, code, out)
+
+	require.NotNil(t, fc.registeredCfg.UserPassword)
+	up, err := fc.registeredCfg.UserPassword(context.Background(), "p", "id")
+	require.NoError(t, err)
+	require.Equal(t, "pw", up)
+	require.NotNil(t, fc.registeredCfg.PrivateKeyPassphrase)
+	kp, err := fc.registeredCfg.PrivateKeyPassphrase(context.Background(), "p")
+	require.NoError(t, err)
+	require.Equal(t, "keypass", kp)
+}
+
+func TestNetworkCmd_Connect_Enterprise_PrivateKeyBothSources(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithEnterpriseNetwork()
+	out, code := driveConnect(fc, "x\n", nil,
+		"network", "EnterpriseNet", "connect",
+		"--private-key-passphrase=y", "--private-key-passphrase-stdin")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "only one of --private-key-passphrase")
+	require.Nil(t, fc.registeredCfg)
+}
+
 func TestNetworkCmd_Connect_Known_NoAgent(t *testing.T) {
 	t.Parallel()
 

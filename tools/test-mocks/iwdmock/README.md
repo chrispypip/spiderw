@@ -243,10 +243,15 @@ defined across:
 
 The mock exports multiple basic service sets by default, mirroring iwd reporting
 one BSS per access point/radio a device can hear during a scan. It also exports
-three networks - an open network, a known (provisioned) secured network, and an
-unknown secured network - so `Network.Connect` exercises both the no-agent
-success paths and the `net.connman.iwd.NoAgent` rejection. The open network's
-`ExtendedServiceSet` lists both mock BSSes, demonstrating multi-BSS membership.
+six networks - an open network, a known (provisioned) secured network, an unknown
+secured PSK network, and three unknown 802.1x networks, one per EAP credential
+method - so `Network.Connect` exercises the no-agent success paths, the PSK agent
+path, every 802.1x agent path, and the `net.connman.iwd.NoAgent` rejection. The
+three 802.1x networks drive a distinct agent callback each: `PeapNet`
+(`RequestUserNameAndPassword`), `TtlsNet` (`RequestUserPassword`, with the
+identity supplied by the network), and `TlsNet` (`RequestPrivateKeyPassphrase`,
+EAP-TLS). The open network's `ExtendedServiceSet` lists both mock BSSes,
+demonstrating multi-BSS membership.
 
 ### Station
 
@@ -311,12 +316,16 @@ The mock daemon also hosts the `net.connman.iwd.AgentManager` interface
 (`RegisterAgent`/`UnregisterAgent`) on the daemon object, recording the single
 registered agent the way iwd does - a second `RegisterAgent` is rejected with
 `net.connman.iwd.AlreadyExists`, and unregistering an unknown path with
-`net.connman.iwd.NotFound`. Connecting the unknown secured network drives the
-full callback loop: the mock calls the registered agent's `RequestPassphrase`
-back over D-Bus and connects only when it returns the expected passphrase
-(`mock-secret-passphrase`); a wrong or declined passphrase yields
-`net.connman.iwd.Failed`, and no registered agent yields
-`net.connman.iwd.NoAgent`. Use `--omit-agent` to drop the interface entirely.
+`net.connman.iwd.NotFound`. Connecting an unknown secured network drives the
+full callback loop over D-Bus: a PSK network calls the agent's
+`RequestPassphrase` (expecting `mock-secret-passphrase`), and each 802.1x network
+calls the agent callback for its EAP method - `RequestUserNameAndPassword`
+(`mock-eap-user` / `mock-eap-password`), `RequestUserPassword` (identity
+`mock-eap-identity`, password `mock-ttls-password`), or
+`RequestPrivateKeyPassphrase` (`mock-tls-key-pass`). Each connects only when the
+credentials match; a wrong or declined credential yields `net.connman.iwd.Failed`,
+and no registered agent yields `net.connman.iwd.NoAgent`. Use `--omit-agent` to
+drop the interface entirely.
 
 Two known networks are exported: one (`psk`, with a last-connected time and
 auto-connect on) at the path the mock network references via its `KnownNetwork`

@@ -42,7 +42,10 @@ func runSpiderNetwork(t *testing.T, args ...string) (string, error) {
 var mockNetworks = []spiderw.NetworkRef{
 	{Path: "/net/connman/iwd/0/3/4b6e6f776e4e6574_psk", Name: "KnownNet"},
 	{Path: "/net/connman/iwd/0/3/4f70656e4e6574_open", Name: "OpenNet"},
+	{Path: "/net/connman/iwd/0/3/506561704e6574_8021x", Name: "PeapNet"},
 	{Path: "/net/connman/iwd/0/3/536563757265644e6574_psk", Name: "SecuredNet"},
+	{Path: "/net/connman/iwd/0/3/546c734e6574_8021x", Name: "TlsNet"},
+	{Path: "/net/connman/iwd/0/3/54746c734e6574_8021x", Name: "TtlsNet"},
 }
 
 func newPublicMockNetwork(t *testing.T, ctx context.Context, client *spiderw.Client, name string) *spiderw.Network {

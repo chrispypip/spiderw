@@ -23,10 +23,11 @@ import (
 // Agent.Unregister), so long-running callbacks such as interactive prompts should
 // honor it. OnCancel and OnRelease are optional notifications.
 //
-// Testing status: the Passphrase (PSK) path is tested end to end against the iwd
-// mock. The 802.1x callbacks (PrivateKeyPassphrase, UserNameAndPassword,
-// UserPassword) are wired through every layer but are not yet exercised against
-// the mock or validated on hardware; treat them as experimental.
+// Testing status: all four credential callbacks (Passphrase, UserNameAndPassword,
+// UserPassword, PrivateKeyPassphrase) are tested end to end against the iwd mock.
+// The PSK Passphrase path is also validated on hardware; the three 802.1x (EAP)
+// callbacks are not yet validated on hardware, so treat them as experimental
+// until the hardware 802.1x tier lands.
 type AgentConfig struct {
 	// Passphrase supplies the passphrase for a PSK network.
 	Passphrase func(ctx context.Context, networkPath string) (string, error)

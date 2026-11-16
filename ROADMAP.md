@@ -39,11 +39,12 @@ The following areas are currently implemented and tested end to end:
   connected-state subscriptions.
 - Credentials agent support (`net.connman.iwd.Agent` / `AgentManager`) via
   `Client.RegisterAgent`, enabling connection to not-yet-known secured (PSK)
-  networks. The PSK passphrase path is tested end to end; the 802.1x credential
-  callbacks (username/password and private-key passphrase) are wired through every
-  layer but are not yet tested against the mock or validated on hardware
-  (experimental). A not-yet-known secured network without a registered agent still
-  reports a mapped `ErrNoAgent`.
+  networks. All four credential callbacks (PSK passphrase, 802.1x
+  username/password, password-only, and private-key passphrase) are tested end to
+  end against the mock; the three 802.1x (EAP) paths are not yet validated on
+  hardware, so they remain experimental until the hardware 802.1x tier lands. A
+  not-yet-known secured network without a registered agent still reports a mapped
+  `ErrNoAgent`.
 - Station support (`net.connman.iwd.Station`): discovery and enumeration of
   station-mode devices; the `State`, `Scanning`, `ConnectedNetwork`, and
   experimental `ConnectedAccessPoint` / `Affinities` properties with
@@ -82,8 +83,9 @@ The following areas are currently implemented and tested end to end:
 - CLI coverage for daemon, adapter, device, station (`list` / `status` / `scan` /
   `networks` / `disconnect` / `connect-hidden` / `hidden-aps` / `affinities`),
   access point, basic service set, network (including interactive secured connect
-  with `--passphrase` / `--passphrase-stdin` for PSK and `--username` / `--password`
-  for 802.1x), and known-network operations, plus a
+  with `--passphrase` / `--passphrase-stdin` for PSK and `--username` /
+  `--password` / `--private-key-passphrase` for 802.1x), and known-network
+  operations, plus a
   `monitor` subcommand on every resource that streams a property until interrupted.
 - Mock iwd integration tests, including signal firehose coverage.
 - Shared adapter mode and network type parsing and formatting across layers.
@@ -96,8 +98,10 @@ The following areas are currently implemented and tested end to end:
 - Continue the vertical-slice cadence through the remaining iwd interfaces (see
   Future iwd Coverage), starting with the smaller station-adjacent slices
   (`StationDiagnostic`) before the larger operating-mode and P2P areas.
-- Promote the 802.1x credential-agent callbacks from experimental to tested with
-  a mock fixture that drives the username/password and private-key paths.
+- Finish promoting the 802.1x credential-agent callbacks from experimental to
+  tested: all three EAP paths (username/password, password-only, private-key) now
+  have mock fixtures; the remaining step is real-iwd (hwsim) and hardware
+  validation.
 - Formalize real-hardware validation (real hardware against real iwd) as a release
   step, since mock and CI coverage cannot exercise driver-gated behavior such as
   `SetAffinities`.
@@ -134,12 +138,13 @@ remaining mode-specific interfaces are unimplemented:
 
 ### Provisioning and enterprise
 
-- **802.1x / enterprise** - end-to-end coverage for the enterprise credential
-  callbacks (`RequestUserNameAndPassword` / `RequestUserPassword` /
-  `RequestPrivateKeyPassphrase`) via a mock fixture that promotes them from
-  experimental to tested, plus *configuring* a brand-new enterprise network
-  (distinct from the already-implemented credentials `Agent`, which only supplies
-  secrets for connecting).
+- **802.1x / enterprise** - the enterprise credential callbacks
+  (`RequestUserNameAndPassword` / `RequestUserPassword` /
+  `RequestPrivateKeyPassphrase`) are now covered end to end against the mock;
+  the remaining work is real-iwd (hwsim) and hardware validation to clear the
+  experimental flag, plus *configuring* a brand-new enterprise network (distinct
+  from the already-implemented credentials `Agent`, which only supplies secrets
+  for connecting).
 - **Network configuration** (`net.connman.iwd.NetworkConfigurationAgent`) -
   provisioning new network profiles and IP/DHCP configuration.
 - **DPP / Wi-Fi Easy Connect** (`net.connman.iwd.DeviceProvisioning` plus a
