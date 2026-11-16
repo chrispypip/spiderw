@@ -326,7 +326,12 @@ func runNetworkConnect(app *App, ctx context.Context, networkRef string, args []
 			return err
 		}
 
-		if needsAgent {
+		// Register an agent when iwd will ask us for credentials: always for a
+		// not-yet-known secured network, and also for a KNOWN secured network when
+		// the user supplied credentials. A provisioned 802.1x network is "known"
+		// via its .8021x file yet can still omit the secret and ask the agent at
+		// connect time, so "known" does not imply "needs no agent" for 802.1x.
+		if needsAgent || (netType != spiderw.NetworkTypeOpen && flags.hasCredential()) {
 			cfg, err := buildConnectAgentConfig(app, networkRef, netType, flags)
 			if err != nil {
 				return err
@@ -350,11 +355,16 @@ func runNetworkConnect(app *App, ctx context.Context, networkRef string, args []
 	})
 }
 
-// networkNeedsAgent reports whether connecting to n requires a credentials
-// agent (true only for a secured network iwd does not already know; open and
-// known networks connect without one) and the network's security Type, so the
-// caller can pick the right credentials (PSK passphrase vs 802.1x username and
-// password).
+// networkNeedsAgent reports whether connecting to n DEFINITELY requires a
+// credentials agent - true for a secured network iwd does not already know;
+// false for an open network or one iwd knows - and the network's security Type,
+// so the caller can pick the right credentials (PSK passphrase vs 802.1x username
+// and password).
+//
+// A "known" result is not the whole story: a provisioned 802.1x network is known
+// via its .8021x file yet can still ask the agent for a secret the file omits, so
+// the caller ALSO registers an agent for a known secured network when the user
+// supplied credentials (see hasCredential).
 //
 // It reads Type and KnownNetwork in a single Properties (GetAll) call, which also
 // avoids a single-property Get of the optional KnownNetwork (absent for a network
@@ -382,6 +392,16 @@ type connectFlags struct {
 	passwordStdin bool
 	privKey       string
 	privKeyStdin  bool
+}
+
+// hasCredential reports whether the user supplied any credential on the command
+// line, as opposed to relying on iwd's stored profile or an interactive prompt.
+// It decides whether to register an agent for a network iwd already knows: a
+// provisioned 802.1x network can be "known" yet still need the agent's secret.
+func (f connectFlags) hasCredential() bool {
+	return f.set["passphrase"] || f.passStdin ||
+		f.set["username"] || f.set["password"] || f.passwordStdin ||
+		f.set["private-key-passphrase"] || f.privKeyStdin
 }
 
 // buildConnectAgentConfig resolves the credentials for a secured connect and

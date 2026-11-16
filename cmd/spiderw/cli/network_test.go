@@ -194,6 +194,29 @@ func fakeWithEnterpriseNetwork() *fakeClient {
 	}
 }
 
+// fakeWithKnownEnterpriseNetwork builds a client exposing a PROVISIONED 802.1x
+// network: iwd reports it "known" (its .8021x file is the known-network) yet it
+// can still ask the agent for a secret the file omits. The real-iwd hwsim tier
+// caught spiderw skipping the agent here; this pins the fix at the unit level.
+func fakeWithKnownEnterpriseNetwork() *fakeClient {
+	ent := &fakeNetwork{
+		path: "/net/connman/iwd/phy0/wlan0/known_enterprise_8021x",
+		props: &spiderw.NetworkProperties{
+			Name:         "KnownEnterpriseNet",
+			Device:       spiderw.DeviceRef{Path: "/net/connman/iwd/phy0/wlan0", Name: "wlan0"},
+			Type:         spiderw.NetworkType8021x,
+			KnownNetwork: new("/net/connman/iwd/known_networks/9"),
+		},
+	}
+	return &fakeClient{
+		daemon: &fakeDaemon{networks: []spiderw.NetworkRef{
+			{Path: ent.path, Name: "KnownEnterpriseNet"},
+		}},
+		networks:    map[string]networkAPI{ent.path: ent},
+		allNetworks: []networkAPI{ent},
+	}
+}
+
 func TestNetworkCmd_Connect_Enterprise_UserPassFlags(t *testing.T) {
 	t.Parallel()
 
@@ -364,6 +387,29 @@ func TestNetworkCmd_Connect_Enterprise_PrivateKeyBothSources(t *testing.T) {
 	require.Equal(t, 1, code)
 	require.Contains(t, out, "only one of --private-key-passphrase")
 	require.Nil(t, fc.registeredCfg)
+}
+
+func TestNetworkCmd_Connect_KnownEnterprise_RegistersAgent(t *testing.T) {
+	t.Parallel()
+
+	// Regression (caught by the hwsim enterprise tier): a PROVISIONED (known)
+	// 802.1x network still needs the agent for the secret its .8021x file omits.
+	// "Known" means "no agent" only for PSK; for 802.1x iwd rejects the connect
+	// with No Agent unless one is registered, so supplied creds must register one.
+	fc := fakeWithKnownEnterpriseNetwork()
+	out, code := driveConnect(fc, "", nil,
+		"network", "KnownEnterpriseNet", "connect", "--username=alice", "--password=s3cret")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "true", strings.TrimSpace(out))
+
+	require.NotNil(t, fc.registeredCfg, "a known 802.1x connect with creds must register an agent")
+	require.NotNil(t, fc.registeredCfg.UserNameAndPassword)
+	user, pass, err := fc.registeredCfg.UserNameAndPassword(context.Background(), "p")
+	require.NoError(t, err)
+	require.Equal(t, "alice", user)
+	require.Equal(t, "s3cret", pass)
+	require.NotNil(t, fc.agent)
+	require.True(t, fc.agent.unregistered)
 }
 
 func TestNetworkCmd_Connect_Known_NoAgent(t *testing.T) {
