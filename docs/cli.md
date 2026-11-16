@@ -170,14 +170,25 @@ spiderw network OpenNet monitor bsses
 ```
 
 `connect` joins open and already-known networks directly. For a not-yet-known
-secured (PSK) network it registers a temporary credentials agent and supplies the
-passphrase from `--passphrase`, `--passphrase-stdin`, or an interactive no-echo
-prompt:
+secured network it registers a temporary credentials agent. A **PSK** network
+takes the passphrase from `--passphrase`, `--passphrase-stdin`, or an interactive
+no-echo prompt:
 
 ```bash
 spiderw network MyWifi connect                       # prompts: Passphrase: ******
 spiderw network MyWifi connect --passphrase=hunter2  # non-interactive
 echo hunter2 | spiderw network MyWifi connect --passphrase-stdin
+```
+
+An **802.1x (EAP)** network takes the EAP identity and password instead:
+`--username=<id>` with `--password=<secret>` (or `--password-stdin`, or the
+no-echo prompt). Omit `--username` when the network's own configuration already
+sets the identity. The EAP method and any CA/client certificates live in iwd's
+network provisioning file, not on the command line.
+
+```bash
+spiderw network Corp connect --username=alice --password=s3cret
+echo s3cret | spiderw network Corp connect --username=alice --password-stdin
 ```
 
 List known (saved) networks, or print a full snapshot for every one:

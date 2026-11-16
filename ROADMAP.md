@@ -82,7 +82,8 @@ The following areas are currently implemented and tested end to end:
 - CLI coverage for daemon, adapter, device, station (`list` / `status` / `scan` /
   `networks` / `disconnect` / `connect-hidden` / `hidden-aps` / `affinities`),
   access point, basic service set, network (including interactive secured connect
-  with `--passphrase` / `--passphrase-stdin`), and known-network operations, plus a
+  with `--passphrase` / `--passphrase-stdin` for PSK and `--username` / `--password`
+  for 802.1x), and known-network operations, plus a
   `monitor` subcommand on every resource that streams a property until interrupted.
 - Mock iwd integration tests, including signal firehose coverage.
 - Shared adapter mode and network type parsing and formatting across layers.

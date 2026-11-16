@@ -173,6 +173,134 @@ func TestNetworkCmd_Connect_Secured_RegisterFails(t *testing.T) {
 	require.Contains(t, out, "agent slot taken")
 }
 
+// fakeWithEnterpriseNetwork builds a client exposing a single unknown 802.1x
+// (EAP) network that needs a credentials agent to connect. Kept separate from
+// fakeWithNetwork so tests that count that client's networks are unaffected.
+func fakeWithEnterpriseNetwork() *fakeClient {
+	ent := &fakeNetwork{
+		path: "/net/connman/iwd/phy0/wlan0/enterprise_8021x",
+		props: &spiderw.NetworkProperties{
+			Name:   "EnterpriseNet",
+			Device: spiderw.DeviceRef{Path: "/net/connman/iwd/phy0/wlan0", Name: "wlan0"},
+			Type:   spiderw.NetworkType8021x,
+		},
+	}
+	return &fakeClient{
+		daemon: &fakeDaemon{networks: []spiderw.NetworkRef{
+			{Path: ent.path, Name: "EnterpriseNet"},
+		}},
+		networks:    map[string]networkAPI{ent.path: ent},
+		allNetworks: []networkAPI{ent},
+	}
+}
+
+func TestNetworkCmd_Connect_Enterprise_UserPassFlags(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithEnterpriseNetwork()
+	out, code := driveConnect(fc, "", nil,
+		"network", "EnterpriseNet", "connect", "--username=alice", "--password=s3cret")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "true", strings.TrimSpace(out))
+
+	require.NotNil(t, fc.registeredCfg)
+	// An 802.1x connect wires the EAP callbacks, not the PSK passphrase one.
+	require.Nil(t, fc.registeredCfg.Passphrase)
+	require.NotNil(t, fc.registeredCfg.UserNameAndPassword)
+	user, pass, err := fc.registeredCfg.UserNameAndPassword(context.Background(), "p")
+	require.NoError(t, err)
+	require.Equal(t, "alice", user)
+	require.Equal(t, "s3cret", pass)
+	// UserPassword (identity-already-in-config path) returns the same password.
+	require.NotNil(t, fc.registeredCfg.UserPassword)
+	pw, err := fc.registeredCfg.UserPassword(context.Background(), "p", "ignored")
+	require.NoError(t, err)
+	require.Equal(t, "s3cret", pw)
+	require.NotNil(t, fc.agent)
+	require.True(t, fc.agent.unregistered)
+}
+
+func TestNetworkCmd_Connect_Enterprise_PasswordStdin(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithEnterpriseNetwork()
+	out, code := driveConnect(fc, "fromstdin\n", nil,
+		"network", "EnterpriseNet", "connect", "--username=bob", "--password-stdin")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "true", strings.TrimSpace(out))
+
+	user, pass, err := fc.registeredCfg.UserNameAndPassword(context.Background(), "p")
+	require.NoError(t, err)
+	require.Equal(t, "bob", user)
+	require.Equal(t, "fromstdin", pass)
+}
+
+func TestNetworkCmd_Connect_Enterprise_PasswordOnly(t *testing.T) {
+	t.Parallel()
+
+	// No --username: iwd must already know the identity, so only UserPassword
+	// is wired (UserNameAndPassword stays nil, which declines if iwd asks).
+	fc := fakeWithEnterpriseNetwork()
+	out, code := driveConnect(fc, "", nil,
+		"network", "EnterpriseNet", "connect", "--password=pw")
+	require.Equal(t, 0, code, out)
+	require.Equal(t, "true", strings.TrimSpace(out))
+
+	require.Nil(t, fc.registeredCfg.UserNameAndPassword)
+	require.NotNil(t, fc.registeredCfg.UserPassword)
+	pw, err := fc.registeredCfg.UserPassword(context.Background(), "p", "carol")
+	require.NoError(t, err)
+	require.Equal(t, "pw", pw)
+}
+
+func TestNetworkCmd_Connect_Enterprise_PasswordPrompt(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithEnterpriseNetwork()
+	prompt := func(string) (string, error) { return "prompted-pw", nil }
+	out, code := driveConnect(fc, "", prompt,
+		"network", "EnterpriseNet", "connect", "--username=dan")
+	require.Equal(t, 0, code, out)
+
+	user, pass, err := fc.registeredCfg.UserNameAndPassword(context.Background(), "p")
+	require.NoError(t, err)
+	require.Equal(t, "dan", user)
+	require.Equal(t, "prompted-pw", pass)
+}
+
+func TestNetworkCmd_Connect_Enterprise_RejectPassphrase(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithEnterpriseNetwork()
+	out, code := driveConnect(fc, "", nil,
+		"network", "EnterpriseNet", "connect", "--passphrase=nope")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "802.1x network")
+	require.Nil(t, fc.registeredCfg)
+}
+
+func TestNetworkCmd_Connect_PSK_RejectUserPass(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithNetwork()
+	out, code := driveConnect(fc, "", nil,
+		"network", "SecuredNet", "connect", "--username=x", "--password=y")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "not an 802.1x network")
+	require.Nil(t, fc.registeredCfg)
+}
+
+func TestNetworkCmd_Connect_Enterprise_PasswordBothSources(t *testing.T) {
+	t.Parallel()
+
+	fc := fakeWithEnterpriseNetwork()
+	out, code := driveConnect(fc, "x\n", nil,
+		"network", "EnterpriseNet", "connect", "--password=y", "--password-stdin")
+	require.Equal(t, 1, code)
+	require.Contains(t, out, "only one of --password")
+	require.Nil(t, fc.registeredCfg)
+}
+
 func TestNetworkCmd_Connect_Known_NoAgent(t *testing.T) {
 	t.Parallel()
 

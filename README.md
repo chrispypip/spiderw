@@ -75,8 +75,10 @@ spiderw is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE
   credentials - without one, `Connect()` surfaces an error matching
   `spiderw.ErrNoAgent`. The agent's **PSK passphrase** path is implemented and
   tested end to end. The 802.1x credential callbacks (username/password and
-  private-key passphrase) are wired through every layer but are **not yet tested
-  against the mock or validated on hardware** - treat them as experimental.
+  private-key passphrase) are wired through every layer, and the username/password
+  path is now reachable from the CLI (`network connect --username/--password`) and
+  unit-tested, but the 802.1x paths are **not yet tested against the mock or
+  validated on hardware** - treat them as experimental.
   *Provisioning* a brand-new 802.1x network (`NetworkConfigurationAgent`) is not
   implemented. `KnownNetwork` supports inspecting saved networks, toggling
   auto-connect, and forgetting them. `AccessPoint` runs a device in AP mode:
