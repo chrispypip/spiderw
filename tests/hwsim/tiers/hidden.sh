@@ -12,8 +12,10 @@
 #
 # If iwd instead rejects the call because the network is already visible, that is
 # reported as the feasibility wall: verifying the hidden BEACON path would need a
-# real hidden AP (e.g. hostapd with ignore_broadcast_ssid), which this image does
-# not carry. Asserts and exits non-zero on the first failure. Two radios.
+# real hidden AP (e.g. hostapd with ignore_broadcast_ssid). The image now carries
+# hostapd (see enterprise.sh), so a hostapd-backed hidden-beacon variant is
+# possible future work; this tier uses the iwd visible-AP path and does not stand
+# one up. Asserts and exits non-zero on the first failure. Two radios.
 set -uo pipefail
 
 SSID="${SSID:-spiderw-hidden}"
@@ -70,7 +72,7 @@ for try in $(seq 1 "$CONNECT_TRIES"); do
     # flake - stop and say so plainly.
     case "$out" in
     *NotHidden* | *not*hidden* | *already*visible* | *AlreadyProvisioned* | *already*provisioned*)
-        fail "iwd rejected connect-hidden as not-hidden/visible: a real hidden AP (hostapd) would be needed; not feasible with iwd AP mode"
+        fail "iwd rejected connect-hidden as not-hidden/visible: a true hidden BEACON (hostapd ignore_broadcast_ssid) would be needed; this tier uses iwd's visible-AP path"
         ;;
     esac
     sleep 2

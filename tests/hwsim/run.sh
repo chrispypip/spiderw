@@ -48,6 +48,11 @@ roam.sh | */roam.sh | ordered-networks.sh | */ordered-networks.sh)
 affinities.sh | */affinities.sh)
     export IWD_EXPERIMENTAL=1 IWD_DEBUG=1
     ;;
+enterprise.sh | */enterprise.sh)
+    # Two radios (hostapd AP + iwd station); iwd -d makes EAP handshake failures
+    # legible, which they are not otherwise.
+    export IWD_DEBUG=1
+    ;;
 esac
 RADIOS="${RADIOS:-$default_radios}"
 

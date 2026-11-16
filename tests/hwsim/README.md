@@ -59,6 +59,7 @@ tests/hwsim/run.sh hidden.sh             # connect-hidden method
 tests/hwsim/run.sh affinities.sh         # SetAffinities round-trip
 tests/hwsim/run.sh ordered-networks.sh   # ranked scan; auto-selects 3 radios
 tests/hwsim/run.sh wsc.sh                # WSC (WPS) enrollee interface
+tests/hwsim/run.sh enterprise.sh         # 802.1x (EAP) agent paths via hostapd
 tests/hwsim/run.sh spiderw device list   # override the command
 RADIOS=2 tests/hwsim/run.sh              # override the radio count
 SPIDERW_VERSION=v0.14.0 tests/hwsim/run.sh   # test a published binary
@@ -164,7 +165,9 @@ same scripts serve both paths. One level up:
   `station connect-hidden` - a real AP answers the directed probe, so the connect
   succeeds and exercises the method. If a future iwd instead rejected the call as
   not-hidden, the test reports that as the feasibility wall (a true hidden BEACON
-  would need hostapd's `ignore_broadcast_ssid`, which this image does not carry).
+  would need hostapd's `ignore_broadcast_ssid`; the image now carries hostapd -
+  see `enterprise.sh` - so a hostapd-backed hidden-beacon variant is possible
+  future work).
 - **`affinities.sh` (SetAffinities):** spiderw *writes* `Station.Affinities` - a
   BSS the station should stay pinned to within its connected network. Affinities
   is an iwd `[experimental]` property, so `run.sh` starts iwd with `-E`
@@ -180,8 +183,9 @@ same scripts serve both paths. One level up:
 - **`wsc.sh` (WSC / WPS enrollee):** spiderw *drives the station's
   `SimpleConfiguration` interface* - `GeneratePin`, `PushButton`, `Cancel`. A
   completed enrollment needs an AP acting as a WPS registrar, which iwd AP mode
-  is not (its `AccessPoint` interface has no WSC method) and this image has no
-  hostapd, so a join cannot complete on hwsim. Short of that, the tier asserts
+  is not (its `AccessPoint` interface has no WSC method). The image now carries
+  hostapd (see `enterprise.sh`), which can act as a WPS registrar, so a
+  join-completing variant is possible future work; for now the tier asserts
   the enrollee interface works: `GeneratePin` returns a valid 8-digit WPS PIN
   (correct check digit - a real PIN, not eight random digits), `PushButton`
   initiates a session that `Cancel` then aborts on iwd's side (the blocking call
@@ -199,6 +203,22 @@ same scripts serve both paths. One level up:
   survey its neighbours). A scanner in AP mode scans for a second, started AP,
   and asserts that AP's SSID comes back through `access-point <ap> networks`,
   resolved to its name with a signal and a security type.
+- **`enterprise.sh` (802.1x / EAP agent paths):** spiderw *drives the 802.1x
+  credential agent* against real iwd. Unlike every other tier, the AP is not iwd
+  (its AP mode is PSK-only) but **hostapd** as the EAP authenticator, on its own
+  radio moved into a network namespace so iwd never manages it (the radios still
+  meet over the shared hwsim medium, the way iwd's own autotests pair the two).
+  iwd learns the EAP method and trusted CA from a `.8021x` provisioning file the
+  tier writes, with the credential deliberately omitted so iwd asks the agent -
+  the path spiderw drives from the CLI. Three cases cover the three callbacks:
+  PEAP with `--username`/`--password` (RequestUserNameAndPassword), PEAP with the
+  identity in the file and `--password` only (RequestUserPassword), and EAP-TLS
+  with an encrypted client key and `--private-key-passphrase`
+  (RequestPrivateKeyPassphrase); a fourth asserts a wrong password fails then
+  recovers. The CLI cannot see which callback iwd chose (the mock integration
+  tests cover that attribution); this proves each path connects end to end
+  against the real daemon. Certs are generated per run with `openssl`, so the
+  image stays immutable.
 
 ## Automating it
 

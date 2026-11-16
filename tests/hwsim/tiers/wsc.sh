@@ -5,9 +5,10 @@
 # PushButton / StartPin / GeneratePin / Cancel on a device's SimpleConfiguration
 # interface. A COMPLETED enrollment needs an access point advertising active
 # WPS/PBC as a registrar - and iwd's AP mode is not a WPS registrar (its
-# AccessPoint interface has no WSC method), while this image ships no hostapd. So
-# no registrar exists on hwsim and a join cannot complete here; that would need
-# real WPS hardware or hostapd with wps_state configured.
+# AccessPoint interface has no WSC method). The image now carries hostapd (see
+# enterprise.sh), which CAN act as a WPS registrar with wps_state configured, so
+# a join-completing variant is possible future work; this tier does not set one
+# up, so no registrar runs here and the join stays out of scope.
 #
 # What this tier CAN drive, and asserts, is the enrollee interface short of a
 # join:
